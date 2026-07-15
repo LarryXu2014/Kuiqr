@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scan Overlay</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      cursor: crosshair;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #root {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    #screenshot-img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Dim layers */
+    .dim {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.55);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Selection box */
+    #selection {
+      position: absolute;
+      border: 3px solid #22d3ee;
+      background: rgba(34, 211, 238, 0.1);
+      pointer-events: none;
+      display: none;
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 0 30px rgba(34, 211, 238, 0.6);
+      z-index: 3;
+    }
+
+    /* Hint text */
+    #hint {
+      position: fixed;
+      top: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(79, 70, 229, 0.95);
+      color: white;
+      padding: 12px 28px;
+      border-radius: 12px;
+      font-family: -apple-system, system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      pointer-events: none;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      white-space: nowrap;
+      z-index: 10;
+      transition: opacity 0.2s;
+    }
+
+    /* Cancel button */
+    #cancel-btn {
+      position: fixed;
+      top: 20px;
+      right: 24px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+      z-index: 11;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+
+    #cancel-btn:hover {
+      background: rgba(0, 0, 0, 0.8);
+    }
+
+    /* Result badge */
+    #badge {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      padding: 16px 36px;
+      border-radius: 14px;
+      font-family: -apple-system, system-ui, sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      z-index: 100;
+      pointer-events: none;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      white-space: nowrap;
+      transition: opacity 0.3s;
+    }
+
+    /* Hidden util */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <img id="screenshot-img" alt="" />
+    <div class="dim" id="dim-top"></div>
+    <div class="dim" id="dim-bottom"></div>
+    <div class="dim" id="dim-left"></div>
+    <div class="dim" id="dim-right"></div>
+    <div id="selection"></div>
+    <div id="hint">Drag to select the QR code area &middot; Press Esc to cancel</div>
+    <button id="cancel-btn">&times;</button>
+    <div id="badge" class="hidden"></div>
+  </div>
+
+  <canvas id="crop-canvas" style="display:none;"></canvas>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const params = new URLSearchParams(window.location.search);
+      const screenshotPath = params.get("screenshot");
+      const displayWidth = parseInt(params.get("width"), 10);
+      const displayHeight = parseInt(params.get("height"), 10);
+      const scaleFactor = parseFloat(params.get("scaleFactor")) || 1;
+
+      const root = document.getElementById("root");
+      const img = document.getElementById("screenshot-img");
+      const sel = document.getElementById("selection");
+      const hint = document.getElementById("hint");
+      const cancelBtn = document.getElementById("cancel-btn");
+      const badge = document.getElementById("badge");
+      const cropCanvas = document.getElementById("crop-canvas");
+
+      const dimTop = document.getElementById("dim-top");
+      const dimBottom = document.getElementById("dim-bottom");
+      const dimLeft = document.getElementById("dim-left");
+      const dimRight = document.getElementById("dim-right");
+
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      // Load screenshot
+      img.src = "file://" + screenshotPath;
+
+      // Cancel button
+      cancelBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        window.overlayAPI.cancel();
+      });
+      cancelBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+
+      // Escape to cancel
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          window.overlayAPI.cancel();
+        }
+      });
+
+      // Drag logic
+      let dragging = false;
+      let sx = 0, sy = 0, ex = 0, ey = 0;
+
+      function updateDim() {
+        const left = Math.min(sx, ex);
+        const top = Math.min(sy, ey);
+        const w = Math.abs(ex - sx);
+        const h = Math.abs(ey - sy);
+
+        if (w < 2 || h < 2) {
+          // Dim everything
+          dimTop.style.cssText = "position:absolute;background:rgba(0,0,0,0.55);pointer-events:none;z-index:2;top:0;left:0;width:100%;height:100%;";
+          dimBottom.style.display = "none";
+          dimLeft.style.display = "none";
+          dimRight.style.display = "none";
+          return;
+        }
+
+        dimTop.style.cssText = `position:absolute;background:rgba(0,0,0,0.55);pointer-events:none;z-index:2;top:0;left:0;width:100%;height:${top}px;`;
+        dimBottom.style.cssText = `position:absolute;background:rgba(0,0,0,0.55);pointer-events:none;z-index:2;top:${top + h}px;left:0;width:100%;height:${Math.max(0, vh - top - h)}px;`;
+        dimLeft.style.cssText = `position:absolute;background:rgba(0,0,0,0.55);pointer-events:none;z-index:2;top:${top}px;left:0;width:${left}px;height:${h}px;`;
+        dimRight.style.cssText = `position:absolute;background:rgba(0,0,0,0.55);pointer-events:none;z-index:2;top:${top}px;left:${left + w}px;width:${Math.max(0, vw - left - w)}px;height:${h}px;`;
+      }
+
+      root.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        dragging = true;
+        sx = ex = e.clientX;
+        sy = ey = e.clientY;
+        sel.style.display = "block";
+        hint.style.opacity = "0";
+        cancelBtn.style.opacity = "0";
+        updateDim();
+      });
+
+      root.addEventListener("mousemove", (e) => {
+        if (!dragging) return;
+        ex = e.clientX;
+        ey = e.clientY;
+        const left = Math.min(sx, ex);
+        const top = Math.min(sy, ey);
+        const w = Math.abs(ex - sx);
+        const h = Math.abs(ey - sy);
+        sel.style.left = left + "px";
+        sel.style.top = top + "px";
+        sel.style.width = w + "px";
+        sel.style.height = h + "px";
+        updateDim();
+      });
+
+      root.addEventListener("mouseup", async (e) => {
+        if (!dragging) return;
+        dragging = false;
+
+        const left = Math.min(sx, ex);
+        const top = Math.min(sy, ey);
+        const w = Math.abs(ex - sx);
+        const h = Math.abs(ey - sy);
+
+        if (w < 10 || h < 10) {
+          window.overlayAPI.cancel();
+          return;
+        }
+
+        // Scanning state
+        sel.style.borderColor = "#4f46e5";
+        hint.style.opacity = "1";
+        hint.textContent = "Scanning...";
+        hint.style.background = "rgba(79, 70, 229, 0.95)";
+        dimTop.style.display = "none";
+        dimBottom.style.display = "none";
+        dimLeft.style.display = "none";
+        dimRight.style.display = "none";
+
+        // Crop the selected region from the full-res screenshot
+        const cropW = Math.round(w * scaleFactor);
+        const cropH = Math.round(h * scaleFactor);
+        cropCanvas.width = cropW;
+        cropCanvas.height = cropH;
+        const ctx = cropCanvas.getContext("2d");
+        ctx.drawImage(
+          img,
+          Math.round(left * scaleFactor),
+          Math.round(top * scaleFactor),
+          cropW, cropH,
+          0, 0, cropW, cropH
+        );
+
+        const croppedDataUrl = cropCanvas.toDataURL("image/png");
+
+        // Send to main process for decoding
+        let result;
+        try {
+          result = await window.overlayAPI.decodeCrop(croppedDataUrl);
+        } catch (err) {
+          result = { result: "error", message: "Decode failed" };
+        }
+
+        // Show result badge
+        showResult(result);
+
+        // Close overlay after a short delay
+        setTimeout(() => {
+          window.overlayAPI.done();
+        }, 2000);
+      });
+
+      // Initialize full dim
+      updateDim();
+
+      // Result badge
+      function showResult(result) {
+        badge.classList.remove("hidden");
+
+        if (result.result === "url") {
+          badge.style.background = "#22c55e";
+          badge.textContent = "QR found \u2014 opening URL...";
+        } else if (result.result === "text") {
+          badge.style.background = "#22c55e";
+          badge.textContent = "QR found \u2014 copied to clipboard!";
+        } else if (result.result === "error") {
+          badge.style.background = "#dc2626";
+          badge.textContent = "Error: " + (result.message || "unknown");
+        } else {
+          badge.style.background = "#f59e0b";
+          badge.textContent = "No QR code found in that area.";
+        }
+
+        setTimeout(() => { badge.style.opacity = "0"; }, 1700);
+      }
+    })();
+  </script>
+</body>
+</html>

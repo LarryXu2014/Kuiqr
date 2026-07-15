@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output
+desktop-app/dist/
+desktop-app/release/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# Temp files
+*.tmp
+*~
+
+# Packaged zips (generated, not source)
+qr-scan-extension.zip
+qr-scan-firefox.zip

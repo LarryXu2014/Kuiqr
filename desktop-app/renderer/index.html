@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR Scan & Open</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Title bar drag region (macOS) -->
+  <div class="titlebar">
+    <div class="drag-region"></div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <nav class="tabs">
+    <button class="tab active" data-tab="scan">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span>Scan</span>
+    </button>
+    <button class="tab" data-tab="history">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span>History</span>
+    </button>
+    <button class="tab" data-tab="settings">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </button>
+  </nav>
+
+  <!-- ===== Scan Tab ===== -->
+  <div id="tab-scan" class="tab-content active">
+    <div class="scan-hero">
+      <div class="hero-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M7 7h.01M17 7h.01M7 17h.01M17 17h.01M10 10h4v4h-4z"/></svg>
+      </div>
+      <h1>QR Scan &amp; Open</h1>
+      <p class="hero-subtitle">Press the shortcut or click below to scan any QR code on your screen</p>
+    </div>
+
+    <div class="shortcut-card">
+      <div class="shortcut-display">
+        <kbd id="shortcut-display">Cmd+Shift+Y</kbd>
+      </div>
+      <p class="shortcut-hint">Press this anywhere to start scanning</p>
+    </div>
+
+    <button id="scan-btn" class="btn-scan">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span>Select Area to Scan</span>
+    </button>
+
+    <div class="how-it-works">
+      <h3>How it works</h3>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text">Press the shortcut — screen dims with a crosshair</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text">Drag a rectangle around the QR code</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">URLs open automatically, text is copied to clipboard</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== History Tab ===== -->
+  <div id="tab-history" class="tab-content">
+    <div class="section-header">
+      <h2>Recent Scans</h2>
+      <button id="clear-btn" class="btn-text">Clear All</button>
+    </div>
+    <div id="history-list" class="history-list">
+      <p class="empty-state">No scans yet. Press the shortcut to scan a QR code.</p>
+    </div>
+  </div>
+
+  <!-- ===== Settings Tab ===== -->
+  <div id="tab-settings" class="tab-content">
+    <h2 class="settings-title">Settings</h2>
+
+    <div class="settings-group">
+      <label class="setting-item">
+        <div class="setting-label">Keyboard Shortcut</div>
+        <div class="setting-desc">Global hotkey to trigger screen scan</div>
+        <input type="text" id="setting-shortcut" class="setting-input" placeholder="CommandOrControl+Shift+Y" />
+      </label>
+
+      <div class="setting-item">
+        <div class="setting-info">
+          <div class="setting-label">Auto-open URLs</div>
+          <div class="setting-desc">Automatically open decoded URLs in your browser</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="setting-autoopen" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-info">
+          <div class="setting-label">Copy text to clipboard</div>
+          <div class="setting-desc">Copy non-URL QR data to clipboard automatically</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="setting-copytext" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-info">
+          <div class="setting-label">Show notifications</div>
+          <div class="setting-desc">Show a notification when a QR code is found</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="setting-notify" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <label class="setting-item">
+        <div class="setting-label">Max history items</div>
+        <div class="setting-desc">Number of scans to keep in history</div>
+        <input type="number" id="setting-maxhistory" class="setting-input" min="10" max="500" step="10" />
+      </label>
+    </div>
+
+    <button id="save-settings-btn" class="btn-save">Save Settings</button>
+    <p id="settings-saved" class="settings-saved hidden">Settings saved!</p>
+
+    <div class="about-section">
+      <h3>About</h3>
+      <p>QR Scan &amp; Open v2.0.0</p>
+      <p>All processing is local. No data is sent to any server.</p>
+      <p class="platform-info" id="platform-info"></p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
