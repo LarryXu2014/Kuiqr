@@ -8,7 +8,7 @@
 // ============================================================
 
 // Cross-browser jsQR loading:
-// - Chrome/Edge/Safari (service worker): use importScripts
+// - Chrome/Edge/Firefox (service worker): use importScripts
 // - Firefox (background page): jsQR loaded via background.scripts array
 if (typeof importScripts === "function") {
   importScripts("jsQR.js");
@@ -446,7 +446,7 @@ async function injectOverlay(tabId, screenshotUrl) {
 // ============================================================
 
 // Cross-browser canvas creation:
-// - Service worker (Chrome/Edge/Safari): OffscreenCanvas
+// - Service worker (Chrome/Edge/Firefox): OffscreenCanvas
 // - Background page (Firefox): regular <canvas> via document
 function createCanvas(w, h) {
   if (typeof OffscreenCanvas !== "undefined") {

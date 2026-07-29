@@ -11,10 +11,9 @@
 
 1. **Browser Extension** (Chrome/Edge/Brave) — right-click scan + keyboard shortcut drag-to-select
 2. **Firefox Extension** — same features, MV3-compatible with `background.scripts`
-3. **Safari Extension** — conversion guide for Xcode wrapping (Safari 17+)
-4. **Desktop App** (Electron) — standalone macOS + Windows app with global hotkey
-5. **Web App** (PWA) — camera scanning, image upload, clipboard paste (iOS/Android/desktop)
-6. **Landing Page** — beautiful download site with all platform options
+3. **Desktop App** (Electron) — standalone macOS (Apple Silicon + Intel) + Windows app with global hotkey
+4. **Web App** (PWA) — camera scanning, image upload, clipboard paste (iOS/Android/desktop)
+5. **Landing Page** — beautiful download site with all platform options
 
 All QR decoding happens locally using the [jsQR](https://github.com/cozmo/jsQR) library. No data is sent to any server.
 
@@ -43,10 +42,7 @@ qr-scanner/
 │   ├── icons/                       # Same icons
 │   └── FIREFOX_INSTALL_GUIDE.md     # Installation instructions
 │
-├── safari/                          # Safari extension (GUIDE ONLY)
-│   └── SAFARI_BUILD_GUIDE.md        # Xcode conversion instructions
-│
-├── desktop-app/                     # Electron desktop app (v2.0.0, CODE COMPLETE, NOT BUILT)
+├── desktop-app/                     # Electron desktop app (v2.1.0, BUILT)
 │   ├── package.json                 # Electron + electron-builder config
 │   ├── main.js                      # Main process — globalShortcut, tray, screen capture, IPC
 │   ├── overlay.html                 # Overlay window — dim screen + drag-to-select UI
@@ -113,14 +109,7 @@ qr-scanner/
   - Does `chrome.tabs.captureVisibleTab(null, ...)` work in Firefox? (Should work)
   - Does the overlay injection work correctly in Firefox?
 
-### 3.3 Safari Extension — GUIDE ONLY
-- **Status:** Build guide written. No actual Safari build created.
-- **Requirements:** macOS 14+, Xcode 15+, Safari 17+
-- **Limitation:** `chrome.commands` (keyboard shortcuts) NOT supported in Safari. Users must use the popup button.
-- **Build process:** Use `xcrun safari-web-extension-converter` to convert the Chrome extension, then build in Xcode.
-- **See:** `safari/SAFARI_BUILD_GUIDE.md`
-
-### 3.4 Desktop App (Electron) — CODE COMPLETE, NOT BUILT
+### 3.3 Desktop App (Electron) — BUILT
 - **Status:** All source code written. Dependencies installed. Build was INTERRUPTED before producing any binaries.
 - **What exists:**
   - `main.js` — Full Electron main process with globalShortcut, system tray, screen capture, IPC handlers, hidden window for QR decoding
@@ -146,7 +135,7 @@ qr-scanner/
 
 ### 3.6 Landing Page — COMPLETE
 - **Status:** Single-page HTML site with all download options.
-- **Cards:** Chrome/Edge, Firefox, Safari, macOS App, Windows App, Web App (PWA)
+- **Cards:** Chrome/Edge, Firefox, macOS App, Windows App, Web App (PWA)
 - **Features:** Platform detection, responsive design, feature grid, how-it-works section, privacy banner
 - **GitHub links:** Point to `https://github.com/qrscanopen/qr-scan-open` (repo not created yet)
 
@@ -154,26 +143,22 @@ qr-scanner/
 
 ## 4. What's DONE
 
-1. Chrome extension (v1.6.0) — working, tested by user
+1. Chrome extension (v2.1.0) — working, robust multi-strategy QR decoder
 2. Cross-browser background.js — importScripts guard + OffscreenCanvas fallback
 3. Firefox extension — code complete, manifest + all files, install guide
-4. Safari conversion guide — step-by-step Xcode instructions
-5. Electron desktop app — all source code written, dependencies installed
-6. Landing page — complete with all 6 platform cards
-7. Web app (PWA) — deployed and working
-8. Extension zips packaged — qr-scan-extension.zip, qr-scan-firefox.zip
-9. "Scan whole page" removed from popup (user requested)
+4. Electron desktop app — built for macOS (arm64 + x64) and Windows (x64)
+5. Landing page — complete with platform cards
+6. Web app (PWA) — camera / upload / paste scanning
+7. Extension zips packaged — qr-scan-extension.zip, qr-scan-firefox.zip
+8. "Scan whole page" removed from popup (user requested)
 
 ## 5. What's PENDING
 
-1. **Build Electron desktop binaries** — `cd desktop-app && npx electron-builder --mac dir` and `--win` (was interrupted)
+1. **Set up GitHub repository** — push to `LarryXu2014/Local-QR-Scan`, create releases with binaries
 2. **Test Firefox extension** — load in Firefox, verify overlay injection works
-3. **Create Safari build** — run Xcode conversion on a Mac with Xcode installed
-4. **Set up GitHub repository** — create repo, push all files, create releases with binaries
-5. **Update README.md** — needs to reflect new structure (firefox/, safari/, desktop-app/, landing/)
-6. **Create .gitignore** — exclude node_modules/, dist/, *.zip, .DS_Store
-7. **Redeploy web app** if CloudStudio sandbox expired
-8. **Test desktop app** — run `npm start` in desktop-app to verify it works before building
+3. **Update README.md** — reflect current structure (firefox/, desktop-app/, landing/)
+4. **Redeploy web app** if CloudStudio sandbox expired
+5. **Test desktop app** — run `npm start` in desktop-app to verify it works
 
 ---
 
@@ -190,12 +175,6 @@ Firefox MV3 uses `background.scripts` (event page) instead of `background.servic
 jsQR is loaded via the scripts array: `["jsQR.js", "background.js"]`.
 The `importScripts()` call is guarded with `typeof importScripts === "function"` so it's skipped in Firefox.
 `OffscreenCanvas` may not be available in Firefox background pages, so `createCanvas()` falls back to `document.createElement("canvas")`.
-
-### Safari Limitations
-- `chrome.commands` (keyboard shortcuts) NOT supported in Safari Web Extensions
-- Popup button is the alternative trigger
-- Same MV3 manifest works, but needs Xcode wrapping for distribution
-- Requires macOS 14+ / Safari 17+
 
 ### Electron QR Decoding
 jsQR needs a canvas/DOM environment, but Electron's main process doesn't have one.
@@ -256,7 +235,6 @@ When starting a new chat, paste this:
 
 - Extension: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/extension/`
 - Firefox: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/firefox/`
-- Safari guide: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/safari/SAFARI_BUILD_GUIDE.md`
 - Desktop app: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/desktop-app/`
 - Web app: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/web-app/`
 - Landing page: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/landing/index.html`
@@ -302,4 +280,4 @@ zip -r ../qr-scan-firefox.zip . -x "*.DS_Store"
 - User wants: popup UI integrated into the app (done in Electron app)
 - User wants: settings tab where everything can be customized (done in Electron app)
 - User wants: README and other files on GitHub
-- User wants: Firefox, Safari, and other browser support
+- User wants: Firefox and other browser support

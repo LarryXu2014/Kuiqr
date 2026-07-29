@@ -32,7 +32,7 @@ git push origin v2.1.0
 
 - **Massively improved QR decoding** — now handles artistic/decorative QR codes, low-contrast images, colored backgrounds, and noisy patterns
 - **Multi-strategy decoder** — tries 70+ combinations of scale, threshold, and inversion before giving up
-- **Cross-browser compatible** — Chrome, Edge, Firefox, Safari, Brave
+- **Cross-browser compatible** — Chrome, Edge, Firefox, Brave
 - **Desktop app** — macOS (Apple Silicon) + Windows (x64)
 - **One-line install** via curl/PowerShell commands in README
 
@@ -55,7 +55,6 @@ curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR
 **Windows (PowerShell):**
 ```
 Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"; Start-Process "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"
-```
 ```
 
 6. **Upload these files** from your local `releases/` folder:

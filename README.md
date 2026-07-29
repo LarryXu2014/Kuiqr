@@ -58,7 +58,7 @@ curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr
 
 ## Features
 
-### Browser Extension (Chrome, Edge, Firefox, Safari, Brave)
+### Browser Extension (Chrome, Edge, Firefox, Brave)
 
 - **Right-click scan** — Right-click any QR code image → "Scan QR Code" → URL opens in new tab
 - **Keyboard shortcut + drag-to-select** — Press `Cmd/Ctrl+Shift+Y` → screen dims → drag to select QR area → auto-scans
@@ -102,10 +102,6 @@ curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr
 4. Select `manifest.json` inside the unzipped folder
 5. See [FIREFOX\_INSTALL\_GUIDE.md](firefox/FIREFOX_INSTALL_GUIDE.md) for permanent installation
 
-### Safari (macOS 14+)
-
-Requires building with Xcode. See [SAFARI\_BUILD\_GUIDE.md](safari/SAFARI_BUILD_GUIDE.md).
-
 ### Desktop App
 
 **macOS:** Download `.dmg`, open it, drag **QR Scan & Open** to Applications. First launch: right-click → "Open" (Gatekeeper bypass).
@@ -133,7 +129,7 @@ All processing happens on your device. Zero server communication.
 
 - **Massively improved QR decoding** — now handles artistic/decorative QR codes, low-contrast images, colored backgrounds, and noisy patterns
 - **Multi-strategy decoder** — tries 70+ combinations of scale, threshold, and inversion before giving up
-- **Cross-browser compatible** — same extension code works on Chrome, Edge, Firefox, Safari, Brave
+- **Cross-browser compatible** — same extension code works on Chrome, Edge, Firefox, Brave
 - **Desktop app parity** — same robust decoder in the Electron app
 
 ---
@@ -152,7 +148,6 @@ Local-QR-Scan/
 │   ├── manifest.json
 │   ├── background.js           # Same cross-browser code
 │   └── FIREFOX_INSTALL_GUIDE.md
-├── safari/                     # Safari build guide
 ├── desktop-app/                # Electron desktop app
 │   ├── package.json            # electron-builder config
 │   ├── main.js                 # Global hotkey, tray, capture, IPC
