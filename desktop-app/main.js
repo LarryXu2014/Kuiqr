@@ -1,11 +1,12 @@
 // ============================================================
-// QR Scan & Open — Electron Main Process (v2.1.0)
+// QR Scan & Open — Electron Main Process (v2.2.0)
 // Features:
-//   1. Global hotkey Cmd/Ctrl+Shift+Y → capture screen → show overlay
-//   2. Overlay drag-to-select → crop → decode locally → open URL / copy text
-//   3. Main window with scan history, settings, and manual trigger
-//   4. System tray for background operation
-//   5. All processing local — no data sent to any server
+//   1. Global hotkey → capture screen → overlay drag-to-select → decode
+//   2. In-app scan: paste from clipboard or drag-drop image → decode instantly
+//   3. Auto-detect keyboard shortcut recorder in Settings
+//   4. Main window with scan history, settings, manual trigger
+//   5. System tray for background operation
+//   6. All processing local — no data sent to any server
 // ============================================================
 
 const { app, BrowserWindow, globalShortcut, screen, desktopCapturer, ipcMain, Tray, Menu, nativeImage, shell, clipboard, Notification } = require("electron");
@@ -406,4 +407,34 @@ function showNotification(title, body) {
 
 ipcMain.handle("get-platform", () => {
   return { isMac, isWin, platform: process.platform };
+});
+
+// ============================================================
+// IPC: Read image from clipboard (for in-app paste scan)
+// ============================================================
+
+ipcMain.handle("read-clipboard-image", () => {
+  const img = clipboard.readImage();
+  if (img.isEmpty()) return null;
+  const dataUrl = img.toDataURL();
+  // Return null if it's a tiny/blank image
+  if (dataUrl === "data:,") return null;
+  return dataUrl;
+});
+
+// ============================================================
+// IPC: Test if a shortcut accelerator is valid
+// ============================================================
+
+ipcMain.handle("test-shortcut", (event, accelerator) => {
+  if (!accelerator || typeof accelerator !== "string") return false;
+  try {
+    // Try to register temporarily to validate format
+    // Unregister right after — this is just a format check
+    const ok = globalShortcut.register(accelerator, () => {});
+    if (ok) globalShortcut.unregister(accelerator);
+    return ok;
+  } catch {
+    return false;
+  }
 });

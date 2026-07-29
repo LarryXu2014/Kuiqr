@@ -32,37 +32,72 @@
   <div id="tab-scan" class="tab-content active">
     <div class="scan-hero">
       <div class="hero-icon">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M7 7h.01M17 7h.01M7 17h.01M17 17h.01M10 10h4v4h-4z"/></svg>
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M7 7h.01M17 7h.01M17 17h.01M10 10h4v4h-4z"/></svg>
       </div>
       <h1>QR Scan &amp; Open</h1>
-      <p class="hero-subtitle">Press the shortcut or click below to scan any QR code on your screen</p>
+      <p class="hero-subtitle">Scan QR codes from your screen, clipboard, or an image file</p>
     </div>
 
-    <div class="shortcut-card">
-      <div class="shortcut-display">
-        <kbd id="shortcut-display">Cmd+Shift+Y</kbd>
+    <!-- In-app scan: Paste / Drop zone -->
+    <div id="drop-zone" class="drop-zone">
+      <div class="drop-zone-content">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <p class="drop-zone-text">Drop an image here or click to paste from clipboard</p>
+        <p class="drop-zone-hint">Supports PNG, JPG, GIF, BMP — scans instantly in this window</p>
       </div>
-      <p class="shortcut-hint">Press this anywhere to start scanning</p>
+      <input type="file" id="file-input" accept="image/*" hidden />
     </div>
 
-    <button id="scan-btn" class="btn-scan">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-      <span>Select Area to Scan</span>
-    </button>
+    <div class="scan-actions">
+      <button id="paste-btn" class="btn-action">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span>Paste from Clipboard</span>
+        <kbd class="btn-kbd">⌘V</kbd>
+      </button>
+
+      <button id="scan-btn" class="btn-action btn-action-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10 7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Select Screen Area</span>
+        <kbd id="shortcut-display" class="btn-kbd">Cmd+Shift+Y</kbd>
+      </button>
+    </div>
+
+    <!-- Scan result (shown after in-app decode) -->
+    <div id="scan-result" class="scan-result hidden">
+      <div class="result-header">
+        <span class="result-badge" id="result-badge">URL</span>
+        <button id="result-close" class="result-close">&times;</button>
+      </div>
+      <div class="result-data" id="result-data"></div>
+      <div class="result-actions" id="result-actions"></div>
+    </div>
+
+    <!-- Preview of dropped/pasted image -->
+    <div id="image-preview-container" class="image-preview-container hidden">
+      <div class="preview-header">
+        <span>Scanned Image</span>
+        <button id="clear-preview" class="btn-text-small">Clear</button>
+      </div>
+      <canvas id="preview-canvas"></canvas>
+    </div>
 
     <div class="how-it-works">
-      <h3>How it works</h3>
+      <h3>How to scan</h3>
       <div class="steps">
         <div class="step">
           <div class="step-num">1</div>
-          <div class="step-text">Press the shortcut — screen dims with a crosshair</div>
+          <div class="step-text"><b>In-app:</b> Paste an image (⌘V) or drag &amp; drop one here</div>
         </div>
         <div class="step">
           <div class="step-num">2</div>
-          <div class="step-text">Drag a rectangle around the QR code</div>
+          <div class="step-text"><b>Screen capture:</b> Press the shortcut or click the button below</div>
         </div>
         <div class="step">
           <div class="step-num">3</div>
+          <div class="step-text">Drag a rectangle around the QR code on screen</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
           <div class="step-text">URLs open automatically, text is copied to clipboard</div>
         </div>
       </div>
@@ -76,7 +111,7 @@
       <button id="clear-btn" class="btn-text">Clear All</button>
     </div>
     <div id="history-list" class="history-list">
-      <p class="empty-state">No scans yet. Press the shortcut to scan a QR code.</p>
+      <p class="empty-state">No scans yet. Paste an image or press the shortcut to scan.</p>
     </div>
   </div>
 
@@ -85,10 +120,18 @@
     <h2 class="settings-title">Settings</h2>
 
     <div class="settings-group">
+      <!-- Keyboard Shortcut Recorder -->
       <label class="setting-item">
         <div class="setting-label">Keyboard Shortcut</div>
-        <div class="setting-desc">Global hotkey to trigger screen scan</div>
-        <input type="text" id="setting-shortcut" class="setting-input" placeholder="CommandOrControl+Shift+Y" />
+        <div class="setting-desc">Global hotkey to trigger screen capture. Click to record a new shortcut.</div>
+        <div class="shortcut-recorder">
+          <button id="shortcut-record-btn" class="btn-record" type="button">
+            <span id="shortcut-record-label">Press keys to record…</span>
+          </button>
+          <div id="shortcut-current" class="shortcut-current">
+            Current: <kbd id="shortcut-current-value">Cmd+Shift+Y</kbd>
+          </div>
+        </div>
       </label>
 
       <div class="setting-item">
@@ -136,12 +179,14 @@
 
     <div class="about-section">
       <h3>About</h3>
-      <p>QR Scan &amp; Open v2.1.0</p>
+      <p>QR Scan &amp; Open v2.2.0</p>
       <p>All processing is local. No data is sent to any server.</p>
       <p class="platform-info" id="platform-info"></p>
     </div>
   </div>
 
+  <!-- jsQR library for in-app decoding -->
+  <script src="../jsQR.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
