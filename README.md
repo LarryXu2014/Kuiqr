@@ -2,8 +2,9 @@
 
 > Scan QR codes instantly — right-click, press a keyboard shortcut, or use your camera. Works everywhere.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-2.1.0-green.svg)](https://github.com/LarryXu2014/Local-QR-Scan/releases)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+
+![Version](https://img.shields.io/badge/Version-2.1.0-green.svg)
 
 All QR decoding happens **locally on your device** using the [jsQR](https://github.com/cozmo/jsQR) library with robust multi-strategy preprocessing for artistic and decorative QR codes. No images, URLs, or scan data are ever sent to any server.
 
@@ -11,11 +12,19 @@ All QR decoding happens **locally on your device** using the [jsQR](https://gith
 
 ## One-Line Install (Terminal)
 
-### macOS (Apple Silicon)
+### macOS (Apple Silicon / M1, M2, M3, M4)
 
 ```bash
 curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
 ```
+
+### macOS (Intel)
+
+```bash
+curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-x64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+```
+
+> **Not sure which Mac you have?** Click   → About This Mac. If the chip says "Apple M-series" use the Apple Silicon command above; if it says "Intel" use the Intel command.
 
 ### Windows (x64)
 
@@ -36,13 +45,14 @@ curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr
 
 ## Download
 
-| Platform | File | Size |
-|----------|------|------|
-| Chrome / Edge / Brave | [qr-scan-extension.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-extension.zip) | 69 KB |
-| Firefox (109+) | [qr-scan-firefox.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-firefox.zip) | 68 KB |
-| macOS (Apple Silicon) | [QR-Scan-Open-2.1.0-mac-arm64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg) | 91 MB |
-| macOS (Apple Silicon, ZIP) | [QR-Scan-Open-2.1.0-mac-arm64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.zip) | 87 MB |
-| Windows (x64) | [QR-Scan-Open-2.1.0-windows-x64.exe](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-windows-x64.exe) | 67 MB |
+| Platform                   | File                                                                                                                                           | Size  |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| Chrome / Edge / Brave      | [qr-scan-extension.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-extension.zip)                           | 69 KB |
+| Firefox (109+)             | [qr-scan-firefox.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-firefox.zip)                               | 68 KB |
+| macOS (Apple Silicon)      | [QR-Scan-Open-2.1.0-mac-arm64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg)     | 91 MB |
+| macOS (Apple Silicon, ZIP) | [QR-Scan-Open-2.1.0-mac-arm64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.zip)     | 87 MB |
+| macOS (Intel)              | [QR-Scan-Open-2.1.0-mac-x64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-x64.dmg)         | ~91 MB |
+| Windows (x64)              | [QR-Scan-Open-2.1.0-windows-x64.exe](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-windows-x64.exe) | 67 MB |
 
 ---
 
@@ -90,11 +100,11 @@ curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr
 2. Open `about:debugging#/runtime/this-firefox`
 3. Click **Load Temporary Add-on**
 4. Select `manifest.json` inside the unzipped folder
-5. See [FIREFOX_INSTALL_GUIDE.md](firefox/FIREFOX_INSTALL_GUIDE.md) for permanent installation
+5. See [FIREFOX\_INSTALL\_GUIDE.md](firefox/FIREFOX_INSTALL_GUIDE.md) for permanent installation
 
 ### Safari (macOS 14+)
 
-Requires building with Xcode. See [SAFARI_BUILD_GUIDE.md](safari/SAFARI_BUILD_GUIDE.md).
+Requires building with Xcode. See [SAFARI\_BUILD\_GUIDE.md](safari/SAFARI_BUILD_GUIDE.md).
 
 ### Desktop App
 
@@ -190,13 +200,13 @@ cd ../firefox && zip -r ../qr-scan-firefox.zip . -x "*.DS_Store"
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|-----------|
-| QR Decoding | [jsQR](https://github.com/cozmo/jsQR) + custom multi-strategy preprocessor |
-| Browser Extension | Manifest V3 (service worker / event page) |
-| Desktop App | [Electron 30](https://www.electronjs.org/) + electron-builder |
-| Web App | Vanilla JS PWA + getUserMedia camera API |
-| No frameworks, no build step for extensions/web app | Everything is static files |
+| Component                                           | Technology                                                                 |
+| --------------------------------------------------- | -------------------------------------------------------------------------- |
+| QR Decoding                                         | [jsQR](https://github.com/cozmo/jsQR) + custom multi-strategy preprocessor |
+| Browser Extension                                   | Manifest V3 (service worker / event page)                                  |
+| Desktop App                                         | [Electron 30](https://www.electronjs.org/) + electron-builder              |
+| Web App                                             | Vanilla JS PWA + getUserMedia camera API                                   |
+| No frameworks, no build step for extensions/web app | Everything is static files                                                 |
 
 ---
 
