@@ -12,6 +12,12 @@ All QR decoding happens **locally on your device** using the [jsQR](https://gith
 
 ## One-Line Install (Terminal)
 
+> **Download too slow?** GitHub's release server (`objects.githubusercontent.com`) is throttled in some regions (e.g. China). Just prefix the GitHub URL with `https://ghproxy.com/` to route through a fast mirror — same file, same version:
+> ```bash
+> curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg" -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+> ```
+> If `ghproxy.com` is ever down, try `https://mirror.ghproxy.com/` instead.
+
 ### macOS (Apple Silicon / M1, M2, M3, M4)
 
 ```bash
