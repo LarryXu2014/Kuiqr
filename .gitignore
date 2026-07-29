@@ -28,3 +28,6 @@ npm-debug.log*
 # Packaged zips (generated, not source)
 qr-scan-extension.zip
 qr-scan-firefox.zip
+
+# Release binaries (uploaded to GitHub Releases, not committed)
+releases/
