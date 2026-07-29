@@ -3,7 +3,7 @@
 > Scan QR codes instantly — right-click, press a keyboard shortcut, or use your camera. Works everywhere.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-2.1.0-green.svg)](https://github.com/qrscanopen/qr-scan-open/releases)
+[![Version](https://img.shields.io/badge/Version-2.1.0-green.svg)](https://github.com/LarryXu2014/Local-QR-Scan/releases)
 
 All QR decoding happens **locally on your device** using the [jsQR](https://github.com/cozmo/jsQR) library with robust multi-strategy preprocessing for artistic and decorative QR codes. No images, URLs, or scan data are ever sent to any server.
 
@@ -14,20 +14,20 @@ All QR decoding happens **locally on your device** using the [jsQR](https://gith
 ### macOS (Apple Silicon)
 
 ```bash
-curl -L https://github.com/qrscanopen/qr-scan-open/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
 ```
 
 ### Windows (x64)
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/qrscanopen/qr-scan-open/releases/latest/download/QR-Scan-Open-2.1.0-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"; Start-Process "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"
+Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"; Start-Process "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"
 ```
 
 ### Chrome / Edge / Brave Extension
 
 ```bash
 # Download and extract
-curl -L https://github.com/qrscanopen/qr-scan-open/releases/latest/download/qr-scan-extension.zip -o /tmp/qr-scan-extension.zip && unzip -q /tmp/qr-scan-extension.zip -d ~/qr-scan-extension && echo "Extension extracted to ~/qr-scan-extension — load it from chrome://extensions > Load unpacked"
+curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-extension.zip -o /tmp/qr-scan-extension.zip && unzip -q /tmp/qr-scan-extension.zip -d ~/qr-scan-extension && echo "Extension extracted to ~/qr-scan-extension — load it from chrome://extensions > Load unpacked"
 ```
 
 > **After installing:** Go to `chrome://extensions/shortcuts` and make sure the shortcut is set to **"In Chrome"** (not "Global"). Press **Cmd+Shift+Y** (Mac) or **Ctrl+Shift+Y** (Windows) to scan.
@@ -38,11 +38,11 @@ curl -L https://github.com/qrscanopen/qr-scan-open/releases/latest/download/qr-s
 
 | Platform | File | Size |
 |----------|------|------|
-| Chrome / Edge / Brave | [qr-scan-extension.zip](https://github.com/qrscanopen/qr-scan-open/releases/latest/download/qr-scan-extension.zip) | 69 KB |
-| Firefox (109+) | [qr-scan-firefox.zip](https://github.com/qrscanopen/qr-scan-open/releases/latest/download/qr-scan-firefox.zip) | 68 KB |
-| macOS (Apple Silicon) | [QR-Scan-Open-2.1.0-mac-arm64.dmg](https://github.com/qrscanopen/qr-scan-open/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg) | 91 MB |
-| macOS (Apple Silicon, ZIP) | [QR-Scan-Open-2.1.0-mac-arm64.zip](https://github.com/qrscanopen/qr-scan-open/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.zip) | 87 MB |
-| Windows (x64) | [QR-Scan-Open-2.1.0-windows-x64.exe](https://github.com/qrscanopen/qr-scan-open/releases/latest/download/QR-Scan-Open-2.1.0-windows-x64.exe) | 67 MB |
+| Chrome / Edge / Brave | [qr-scan-extension.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-extension.zip) | 69 KB |
+| Firefox (109+) | [qr-scan-firefox.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-firefox.zip) | 68 KB |
+| macOS (Apple Silicon) | [QR-Scan-Open-2.1.0-mac-arm64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg) | 91 MB |
+| macOS (Apple Silicon, ZIP) | [QR-Scan-Open-2.1.0-mac-arm64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.zip) | 87 MB |
+| Windows (x64) | [QR-Scan-Open-2.1.0-windows-x64.exe](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-windows-x64.exe) | 67 MB |
 
 ---
 
@@ -131,7 +131,7 @@ All processing happens on your device. Zero server communication.
 ## File Structure
 
 ```
-qr-scan-open/
+Local-QR-Scan/
 ├── extension/                  # Chrome / Edge / Brave (Manifest V3)
 │   ├── manifest.json           # v2.1.0
 │   ├── background.js           # Service worker + robust QR decoder
