@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Background Service Worker (v1.6.0)
+// QR Scan & Open — Background Service Worker (v2.1.0)
 // Features:
 //   1. Right-click image → "Scan QR Code" (direct decode)
 //   2. Keyboard shortcut Cmd/Ctrl+Shift+Y → capture screen + inject overlay
@@ -459,32 +459,120 @@ function createCanvas(w, h) {
   return c;
 }
 
+// ── Robust QR decoding with multiple preprocessing strategies ──
+// Handles: artistic/decorative QR codes, low contrast, color backgrounds,
+// small QR codes, inverted codes, and noisy images.
 async function decodeDataUrl(dataUrl) {
   const blob = await (await fetch(dataUrl)).blob();
   const bitmap = await createImageBitmap(blob);
+  const origW = bitmap.width;
+  const origH = bitmap.height;
 
-  let w = bitmap.width;
-  let h = bitmap.height;
-  const minSize = 200;
-  if (w < minSize || h < minSize) {
-    const scale = Math.ceil(minSize / Math.min(w, h));
-    w *= scale;
-    h *= scale;
+  // Try a matrix of: [scale, threshold, invert]
+  // scale = multiplier for minSize (try multiple sizes)
+  // threshold = 0 means no thresholding (grayscale only), >0 = binary threshold
+  // invert = try inverted colors too
+  const strategies = [];
+
+  // Base sizes to try (in pixels, targeting QR module size)
+  const baseSizes = [200, 400, 600, 800, 1000, 1200];
+  const minDim = Math.min(origW, origH);
+
+  for (const targetSize of baseSizes) {
+    if (targetSize < minDim) continue; // skip if already bigger than original
+    const scale = Math.ceil(targetSize / minDim);
+    strategies.push({ scale, threshold: 0, invert: false });
+    strategies.push({ scale, threshold: 0, invert: true });
+    // Binary thresholds
+    for (const thresh of [80, 100, 120, 140, 160]) {
+      strategies.push({ scale, threshold: thresh, invert: false });
+      strategies.push({ scale, threshold: thresh, invert: true });
+    }
   }
 
-  const canvas = createCanvas(w, h);
-  const ctx = canvas.getContext("2d");
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(bitmap, 0, 0, w, h);
+  // Also try exact original size
+  strategies.push({ scale: 1, threshold: 0, invert: false });
+  strategies.push({ scale: 1, threshold: 0, invert: true });
+
+  log(`decodeDataUrl: original=${origW}x${origH}, trying ${strategies.length} strategies`);
+
+  for (const { scale, threshold, invert } of strategies) {
+    let w = origW * scale;
+    let h = origH * scale;
+
+    // Cap at reasonable max to avoid OOM
+    if (w > 2000 || h > 2000) {
+      const ratio = Math.min(2000 / w, 2000 / h);
+      w = Math.round(w * ratio);
+      h = Math.round(h * ratio);
+    }
+
+    const canvas = createCanvas(w, h);
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(bitmap, 0, 0, w, h);
+
+    let imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+
+    // Step 1: Convert to grayscale
+    for (let i = 0; i < data.length; i += 4) {
+      // Luminance formula (perceptual)
+      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      data[i] = gray;
+      data[i + 1] = gray;
+      data[i + 2] = gray;
+    }
+
+    // Step 2: Contrast enhancement (histogram stretching)
+    let minG = 255, maxG = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] < minG) minG = data[i];
+      if (data[i] > maxG) maxG = data[i];
+    }
+    if (maxG > minG) {
+      const range = maxG - minG;
+      for (let i = 0; i < data.length; i += 4) {
+        const v = ((data[i] - minG) / range) * 255;
+        data[i] = v;
+        data[i + 1] = v;
+        data[i + 2] = v;
+      }
+    }
+
+    // Step 3: Invert if requested
+    if (invert) {
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = 255 - data[i];
+        data[i + 1] = 255 - data[i + 1];
+        data[i + 2] = 255 - data[i + 2];
+      }
+    }
+
+    // Step 4: Binary thresholding if requested
+    if (threshold > 0) {
+      for (let i = 0; i < data.length; i += 4) {
+        const v = data[i] >= threshold ? 255 : 0;
+        data[i] = v;
+        data[i + 1] = v;
+        data[i + 2] = v;
+      }
+    }
+
+    const code = jsQR(imageData.data, w, h, {
+      inversionAttempts: "dontInvert", // we handle inversion ourselves
+    });
+
+    if (code && code.data) {
+      log(`QR FOUND! strategy=scale:${scale} thresh:${threshold} invert:${invert} data=${code.data.slice(0, 60)}`);
+      bitmap.close();
+      return code.data;
+    }
+  }
+
   bitmap.close();
-
-  const imageData = ctx.getImageData(0, 0, w, h);
-  const code = jsQR(imageData.data, w, h, {
-    inversionAttempts: "attemptBoth",
-  });
-
-  return code ? code.data : null;
+  return null;
 }
 
 async function decodeQRFromUrl(url, tabId) {
@@ -498,30 +586,14 @@ async function decodeQRFromUrl(url, tabId) {
     blob = await response.blob();
   }
 
-  const bitmap = await createImageBitmap(blob);
-
-  let w = bitmap.width;
-  let h = bitmap.height;
-  const minSize = 200;
-  if (w < minSize || h < minSize) {
-    const scale = Math.ceil(minSize / Math.min(w, h));
-    w *= scale;
-    h *= scale;
-  }
-
-  const canvas = createCanvas(w, h);
-  const ctx = canvas.getContext("2d");
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(bitmap, 0, 0, w, h);
-  bitmap.close();
-
-  const imageData = ctx.getImageData(0, 0, w, h);
-  const code = jsQR(imageData.data, w, h, {
-    inversionAttempts: "attemptBoth",
+  // Convert to dataURL and reuse the robust decoder
+  const dataUrl = await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
   });
 
-  return code ? code.data : null;
+  return decodeDataUrl(dataUrl);
 }
 
 async function fetchBlobFromTab(blobUrl, tabId) {

@@ -367,6 +367,7 @@ ipcMain.handle("copy-clipboard", (event, text) => {
 
 // ============================================================
 // QR Decoding — uses a hidden BrowserWindow with jsQR + canvas
+// Robust multi-strategy decoding for artistic/decorative QR codes
 // ============================================================
 
 let decodeWindow = null;
@@ -397,32 +398,96 @@ function ensureDecodeWindow() {
       <script>
         const { ipcRenderer } = require("electron");
         const canvas = document.getElementById("canvas");
-        const ctx = canvas.getContext("2d");
+
+        // Robust QR decode with multiple preprocessing strategies
+        function robustDecode(img) {
+          const origW = img.width;
+          const origH = img.height;
+
+          const baseSizes = [200, 400, 600, 800, 1000, 1200];
+          const minDim = Math.min(origW, origH);
+          const strategies = [];
+
+          for (const targetSize of baseSizes) {
+            if (targetSize < minDim) continue;
+            const scale = Math.ceil(targetSize / minDim);
+            strategies.push({ scale, threshold: 0, invert: false });
+            strategies.push({ scale, threshold: 0, invert: true });
+            for (const thresh of [80, 100, 120, 140, 160]) {
+              strategies.push({ scale, threshold: thresh, invert: false });
+              strategies.push({ scale, threshold: thresh, invert: true });
+            }
+          }
+          strategies.push({ scale: 1, threshold: 0, invert: false });
+          strategies.push({ scale: 1, threshold: 0, invert: true });
+
+          for (const { scale, threshold, invert } of strategies) {
+            let w = Math.round(origW * scale);
+            let h = Math.round(origH * scale);
+            if (w > 2000 || h > 2000) {
+              const ratio = Math.min(2000 / w, 2000 / h);
+              w = Math.round(w * ratio);
+              h = Math.round(h * ratio);
+            }
+
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(img, 0, 0, w, h);
+
+            let imageData = ctx.getImageData(0, 0, w, h);
+            const data = imageData.data;
+
+            // Grayscale
+            for (let i = 0; i < data.length; i += 4) {
+              const gray = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
+              data[i] = gray; data[i+1] = gray; data[i+2] = gray;
+            }
+
+            // Contrast enhancement
+            let minG = 255, maxG = 0;
+            for (let i = 0; i < data.length; i += 4) {
+              if (data[i] < minG) minG = data[i];
+              if (data[i] > maxG) maxG = data[i];
+            }
+            if (maxG > minG) {
+              const range = maxG - minG;
+              for (let i = 0; i < data.length; i += 4) {
+                const v = ((data[i] - minG) / range) * 255;
+                data[i] = v; data[i+1] = v; data[i+2] = v;
+              }
+            }
+
+            // Invert
+            if (invert) {
+              for (let i = 0; i < data.length; i += 4) {
+                data[i] = 255 - data[i]; data[i+1] = 255 - data[i+1]; data[i+2] = 255 - data[i+2];
+              }
+            }
+
+            // Binary threshold
+            if (threshold > 0) {
+              for (let i = 0; i < data.length; i += 4) {
+                const v = data[i] >= threshold ? 255 : 0;
+                data[i] = v; data[i+1] = v; data[i+2] = v;
+              }
+            }
+
+            const code = jsQR(imageData.data, w, h, { inversionAttempts: "dontInvert" });
+            if (code && code.data) return code.data;
+          }
+          return null;
+        }
 
         ipcRenderer.handle("decode", async (event, dataUrl) => {
           return new Promise((resolve) => {
             const img = new Image();
             img.onload = () => {
-              let w = img.width;
-              let h = img.height;
-              const minSize = 200;
-              if (w < minSize || h < minSize) {
-                const scale = Math.ceil(minSize / Math.min(w, h));
-                w = Math.round(w * scale);
-                h = Math.round(h * scale);
-              }
-              canvas.width = w;
-              canvas.height = h;
-              ctx.imageSmoothingEnabled = true;
-              ctx.imageSmoothingQuality = "high";
-              ctx.drawImage(img, 0, 0, w, h);
-              const imageData = ctx.getImageData(0, 0, w, h);
-              const code = jsQR(imageData.data, w, h, { inversionAttempts: "attemptBoth" });
-              if (code) {
-                resolve({ result: "decoded", data: code.data });
-              } else {
-                resolve({ result: "none" });
-              }
+              const result = robustDecode(img);
+              if (result) resolve({ result: "decoded", data: result });
+              else resolve({ result: "none" });
             };
             img.onerror = () => resolve({ result: "error", message: "Image load failed" });
             img.src = dataUrl;
@@ -445,24 +510,8 @@ async function decodeInHiddenWindow(dataUrl) {
       return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
-          let w = img.width;
-          let h = img.height;
-          const minSize = 200;
-          if (w < minSize || h < minSize) {
-            const scale = Math.ceil(minSize / Math.min(w, h));
-            w = Math.round(w * scale);
-            h = Math.round(h * scale);
-          }
-          const canvas = document.getElementById("canvas");
-          const ctx = canvas.getContext("2d");
-          canvas.width = w;
-          canvas.height = h;
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = "high";
-          ctx.drawImage(img, 0, 0, w, h);
-          const imageData = ctx.getImageData(0, 0, w, h);
-          const code = jsQR(imageData.data, w, h, { inversionAttempts: "attemptBoth" });
-          if (code) resolve({ result: "decoded", data: code.data });
+          const result = robustDecode(img);
+          if (result) resolve({ result: "decoded", data: result });
           else resolve({ result: "none" });
         };
         img.onerror = () => resolve({ result: "error", message: "Image load failed" });
