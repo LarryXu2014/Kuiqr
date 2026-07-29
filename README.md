@@ -196,7 +196,6 @@ Local-QR-Scan/
 │   ├── renderer/               # Main UI: tabs for Scan / History / Settings
 │   └── dist/                   # Build output (gitignored)
 ├── web-app/                    # PWA web app (camera / upload / paste)
-├── landing/                    # Landing page
 ├── releases/                   # Pre-built binaries for GitHub Releases
 ├── README.md
 └── PROJECT_SUMMARY.md          # Full technical notes

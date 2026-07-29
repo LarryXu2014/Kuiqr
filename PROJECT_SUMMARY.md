@@ -67,9 +67,6 @@ qr-scanner/
 │   ├── js/jsQR.js                   # QR decoding library
 │   └── icons/                       # PWA icons
 │
-├── landing/                         # Landing/download page
-│   └── index.html                   # Single-page site with all download options
-│
 ├── qr-scan-extension.zip            # Packaged Chrome extension (70KB)
 ├── qr-scan-firefox.zip              # Packaged Firefox extension (71KB)
 ├── README.md                        # Main readme (needs updating for new structure)
@@ -156,7 +153,7 @@ qr-scanner/
 
 1. **Set up GitHub repository** — push to `LarryXu2014/Local-QR-Scan`, create releases with binaries
 2. **Test Firefox extension** — load in Firefox, verify overlay injection works
-3. **Update README.md** — reflect current structure (firefox/, desktop-app/, landing/)
+3. **Update README.md** — reflect current structure (firefox/, desktop-app/)
 4. **Redeploy web app** if CloudStudio sandbox expired
 5. **Test desktop app** — run `npm start` in desktop-app to verify it works
 
@@ -237,7 +234,6 @@ When starting a new chat, paste this:
 - Firefox: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/firefox/`
 - Desktop app: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/desktop-app/`
 - Web app: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/web-app/`
-- Landing page: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/landing/index.html`
 - Chrome zip: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/qr-scan-extension.zip`
 - Firefox zip: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/qr-scan-firefox.zip`
 - This summary: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/PROJECT_SUMMARY.md`
