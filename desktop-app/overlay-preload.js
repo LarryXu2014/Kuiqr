@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("overlayAPI", {
-  decodeCrop: (dataUrl) => ipcRenderer.invoke("decode-crop", dataUrl),
+  decoded: (data) => ipcRenderer.invoke("decoded", data),
   cancel: () => ipcRenderer.invoke("overlay-cancel"),
   done: () => ipcRenderer.invoke("overlay-done"),
 });

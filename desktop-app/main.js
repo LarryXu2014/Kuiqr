@@ -1,8 +1,8 @@
 // ============================================================
-// QR Scan & Open — Electron Main Process (v2.0.0)
+// QR Scan & Open — Electron Main Process (v2.1.0)
 // Features:
 //   1. Global hotkey Cmd/Ctrl+Shift+Y → capture screen → show overlay
-//   2. Overlay drag-to-select → crop → decode QR → open URL / copy text
+//   2. Overlay drag-to-select → crop → decode locally → open URL / copy text
 //   3. Main window with scan history, settings, and manual trigger
 //   4. System tray for background operation
 //   5. All processing local — no data sent to any server
@@ -11,9 +11,6 @@
 const { app, BrowserWindow, globalShortcut, screen, desktopCapturer, ipcMain, Tray, Menu, nativeImage, shell, clipboard, Notification } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const { exec } = require("child_process");
-
-// jsQR is loaded in the renderer / overlay process, not here.
 
 let mainWindow = null;
 let overlayWindow = null;
@@ -23,12 +20,12 @@ let lastScreenshot = null; // NativeImage of the full screen capture
 const isMac = process.platform === "darwin";
 const isWin = process.platform === "win32";
 
-// ── Settings (stored in electron settings.json next to app) ──
+// ── Settings (stored next to the app's userData) ──
 const SETTINGS_PATH = path.join(app.getPath("userData"), "settings.json");
 const HISTORY_PATH = path.join(app.getPath("userData"), "history.json");
 
 const DEFAULT_SETTINGS = {
-  shortcut: isMac ? "CommandOrControl+Shift+Y" : "CommandOrControl+Shift+Y",
+  shortcut: "CommandOrControl+Shift+Y",
   autoOpenUrl: true,
   copyTextToClipboard: true,
   showNotification: true,
@@ -76,25 +73,19 @@ function addToHistory(data, type) {
 // ============================================================
 
 app.whenReady().then(() => {
-  createMainWindow();
+  createMainWindow(); // shows itself
   createTray();
   registerShortcut();
 
-  // On macOS, hide dock icon (run in menu bar only) — optional
-  // app.dock.hide();
-
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
-    }
+    // macOS: clicking the dock icon reveals the window
+    showMainWindow();
   });
 });
 
 app.on("window-all-closed", () => {
-  // On macOS, keep running in the menu bar
-  if (isMac) {
-    // Keep app alive in tray
-  } else {
+  // On macOS we keep running in the tray; elsewhere we quit.
+  if (!isMac) {
     app.quit();
   }
 });
@@ -113,7 +104,7 @@ function createMainWindow() {
     height: 640,
     minWidth: 380,
     minHeight: 500,
-    show: false,
+    show: true, // visible on launch so the user is never "windowless"
     resizable: true,
     maximizable: false,
     fullscreenable: false,
@@ -129,13 +120,13 @@ function createMainWindow() {
 
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
 
-  mainWindow.once("ready-to-show", () => {
-    // Don't show on launch — user activates via tray or shortcut
-  });
-
   mainWindow.on("close", (e) => {
-    e.preventDefault();
-    mainWindow.hide();
+    // On macOS, closing the window just hides it (app stays in the tray).
+    // On other platforms the window closes and the app quits via window-all-closed.
+    if (isMac) {
+      e.preventDefault();
+      mainWindow.hide();
+    }
   });
 }
 
@@ -169,7 +160,7 @@ function createTray() {
     { label: "Show Window", click: () => showMainWindow() },
     { label: "Settings", click: () => { showMainWindow(); mainWindow.webContents.send("switch-tab", "settings"); } },
     { type: "separator" },
-    { label: "Quit", click: () => { globalShortcut.unregisterAll(); app.exit(); } },
+    { label: "Quit", click: () => { globalShortcut.unregisterAll(); app.exit(0); } },
   ]);
 
   tray.setContextMenu(contextMenu);
@@ -209,7 +200,6 @@ function reregisterShortcut() {
 
 async function triggerScan() {
   try {
-    // Capture the screen
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.size;
     const scaleFactor = primaryDisplay.scaleFactor;
@@ -230,6 +220,15 @@ async function triggerScan() {
     // Use the first screen source (primary display)
     const source = sources[0];
     lastScreenshot = source.thumbnail;
+
+    // On macOS the screen can be blank if Screen Recording permission is missing.
+    if (lastScreenshot.isEmpty()) {
+      showNotification(
+        "Screen capture blocked",
+        "Please grant Screen Recording permission in System Settings → Privacy & Security, then try again."
+      );
+      return;
+    }
 
     // Save screenshot to a temp file for the overlay to load
     const tempPath = path.join(app.getPath("temp"), "qr-scan-screenshot.png");
@@ -256,7 +255,7 @@ function createOverlayWindow(screenshotPath, displayInfo) {
     height,
     x: 0,
     y: 0,
-    fullscreen: isMac,
+    fullscreen: true,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -286,7 +285,6 @@ function createOverlayWindow(screenshotPath, displayInfo) {
   overlayWindow.once("ready-to-show", () => {
     overlayWindow.show();
     overlayWindow.focus();
-    overlayWindow.setKiosk(isMac);
   });
 
   overlayWindow.on("closed", () => {
@@ -298,19 +296,7 @@ function createOverlayWindow(screenshotPath, displayInfo) {
 // IPC Handlers
 // ============================================================
 
-// Overlay sends crop coordinates → main process decodes
-ipcMain.handle("decode-crop", async (event, dataUrl) => {
-  try {
-    // Send to a hidden renderer for decoding (jsQR needs canvas)
-    const result = await decodeInHiddenWindow(dataUrl);
-    return result;
-  } catch (err) {
-    console.error("Decode error:", err);
-    return { result: "error", message: err.message };
-  }
-});
-
-// Overlay closed without selection
+// Overlay closed without a selection
 ipcMain.handle("overlay-cancel", () => {
   if (overlayWindow) {
     overlayWindow.close();
@@ -365,195 +351,40 @@ ipcMain.handle("copy-clipboard", (event, text) => {
   clipboard.writeText(text);
 });
 
-// ============================================================
-// QR Decoding — uses a hidden BrowserWindow with jsQR + canvas
-// Robust multi-strategy decoding for artistic/decorative QR codes
-// ============================================================
+// Overlay decodes the QR locally and sends the decoded string (or null).
+// The main process applies the side effects: open URL / copy text / history / notification.
+ipcMain.handle("decoded", (event, data) => {
+  const settings = loadSettings();
 
-let decodeWindow = null;
-
-function ensureDecodeWindow() {
-  return new Promise((resolve) => {
-    if (decodeWindow && !decodeWindow.isDestroyed()) {
-      resolve(decodeWindow);
-      return;
-    }
-
-    decodeWindow = new BrowserWindow({
-      show: false,
-      width: 400,
-      height: 400,
-      webPreferences: {
-        contextIsolation: false,
-        nodeIntegration: true,
-      },
-    });
-
-    decodeWindow.loadURL("data:text/html," + encodeURIComponent(`
-      <html><body>
-      <canvas id="canvas"></canvas>
-      <script>
-        require("${path.join(__dirname, "jsQR.js").replace(/\\/g, "\\\\")}");
-      </script>
-      <script>
-        const { ipcRenderer } = require("electron");
-        const canvas = document.getElementById("canvas");
-
-        // Robust QR decode with multiple preprocessing strategies
-        function robustDecode(img) {
-          const origW = img.width;
-          const origH = img.height;
-
-          const baseSizes = [200, 400, 600, 800, 1000, 1200];
-          const minDim = Math.min(origW, origH);
-          const strategies = [];
-
-          for (const targetSize of baseSizes) {
-            if (targetSize < minDim) continue;
-            const scale = Math.ceil(targetSize / minDim);
-            strategies.push({ scale, threshold: 0, invert: false });
-            strategies.push({ scale, threshold: 0, invert: true });
-            for (const thresh of [80, 100, 120, 140, 160]) {
-              strategies.push({ scale, threshold: thresh, invert: false });
-              strategies.push({ scale, threshold: thresh, invert: true });
-            }
-          }
-          strategies.push({ scale: 1, threshold: 0, invert: false });
-          strategies.push({ scale: 1, threshold: 0, invert: true });
-
-          for (const { scale, threshold, invert } of strategies) {
-            let w = Math.round(origW * scale);
-            let h = Math.round(origH * scale);
-            if (w > 2000 || h > 2000) {
-              const ratio = Math.min(2000 / w, 2000 / h);
-              w = Math.round(w * ratio);
-              h = Math.round(h * ratio);
-            }
-
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext("2d");
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = "high";
-            ctx.drawImage(img, 0, 0, w, h);
-
-            let imageData = ctx.getImageData(0, 0, w, h);
-            const data = imageData.data;
-
-            // Grayscale
-            for (let i = 0; i < data.length; i += 4) {
-              const gray = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
-              data[i] = gray; data[i+1] = gray; data[i+2] = gray;
-            }
-
-            // Contrast enhancement
-            let minG = 255, maxG = 0;
-            for (let i = 0; i < data.length; i += 4) {
-              if (data[i] < minG) minG = data[i];
-              if (data[i] > maxG) maxG = data[i];
-            }
-            if (maxG > minG) {
-              const range = maxG - minG;
-              for (let i = 0; i < data.length; i += 4) {
-                const v = ((data[i] - minG) / range) * 255;
-                data[i] = v; data[i+1] = v; data[i+2] = v;
-              }
-            }
-
-            // Invert
-            if (invert) {
-              for (let i = 0; i < data.length; i += 4) {
-                data[i] = 255 - data[i]; data[i+1] = 255 - data[i+1]; data[i+2] = 255 - data[i+2];
-              }
-            }
-
-            // Binary threshold
-            if (threshold > 0) {
-              for (let i = 0; i < data.length; i += 4) {
-                const v = data[i] >= threshold ? 255 : 0;
-                data[i] = v; data[i+1] = v; data[i+2] = v;
-              }
-            }
-
-            const code = jsQR(imageData.data, w, h, { inversionAttempts: "dontInvert" });
-            if (code && code.data) return code.data;
-          }
-          return null;
-        }
-
-        ipcRenderer.handle("decode", async (event, dataUrl) => {
-          return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-              const result = robustDecode(img);
-              if (result) resolve({ result: "decoded", data: result });
-              else resolve({ result: "none" });
-            };
-            img.onerror = () => resolve({ result: "error", message: "Image load failed" });
-            img.src = dataUrl;
-          });
-        });
-      </script>
-      </body></html>
-    `));
-
-    decodeWindow.webContents.once("did-finish-load", () => {
-      resolve(decodeWindow);
-    });
-  });
-}
-
-async function decodeInHiddenWindow(dataUrl) {
-  const win = await ensureDecodeWindow();
-  const result = await win.webContents.executeJavaScript(`
-    (async () => {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          const result = robustDecode(img);
-          if (result) resolve({ result: "decoded", data: result });
-          else resolve({ result: "none" });
-        };
-        img.onerror = () => resolve({ result: "error", message: "Image load failed" });
-        img.src = ${JSON.stringify(dataUrl)};
-      });
-    })()
-  `);
-
-  if (result.result === "decoded") {
-    const data = result.data.trim();
-    const isUrl = /^(https?:\/\/|www\.)/i.test(data);
-    const settings = loadSettings();
-
-    if (isUrl && settings.autoOpenUrl) {
-      const targetUrl = data.startsWith("http") ? data : `https://${data}`;
-      shell.openExternal(targetUrl);
-    } else if (settings.copyTextToClipboard) {
-      clipboard.writeText(data);
-    }
-
-    addToHistory(data, isUrl ? "url" : "text");
-
-    if (settings.showNotification) {
-      if (isUrl && settings.autoOpenUrl) {
-        showNotification("QR Found — Opening URL", data.slice(0, 100));
-      } else {
-        showNotification("QR Found — Copied to Clipboard", data.slice(0, 100));
-      }
-    }
-
-    return { result: isUrl ? "url" : "text", data };
-  }
-
-  if (result.result === "none") {
-    addToHistory(null, "no-qr");
+  if (!data) {
     if (settings.showNotification) {
       showNotification("No QR Found", "No QR code detected in the selected area.");
     }
+    return { result: "none" };
   }
 
-  return result;
-}
+  const text = String(data).trim();
+  const isUrl = /^(https?:\/\/|www\.)/i.test(text);
+
+  if (isUrl && settings.autoOpenUrl) {
+    const targetUrl = text.startsWith("http") ? text : `https://${text}`;
+    shell.openExternal(targetUrl);
+    addToHistory(text, "url");
+    if (settings.showNotification) {
+      showNotification("QR Found — Opening URL", text.slice(0, 100));
+    }
+    return { result: "url", data: text };
+  }
+
+  if (settings.copyTextToClipboard) {
+    clipboard.writeText(text);
+  }
+  addToHistory(text, "text");
+  if (settings.showNotification) {
+    showNotification("QR Found — Copied to Clipboard", text.slice(0, 100));
+  }
+  return { result: "text", data: text };
+});
 
 // ============================================================
 // Notifications
@@ -570,7 +401,7 @@ function showNotification(title, body) {
 }
 
 // ============================================================
-// IPC: Update tray menu dynamically
+// IPC: platform info
 // ============================================================
 
 ipcMain.handle("get-platform", () => {
