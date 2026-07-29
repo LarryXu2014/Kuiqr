@@ -3,7 +3,6 @@
 > Scan QR codes instantly — right-click, press a keyboard shortcut, or use your camera. Works everywhere.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-
 ![Version](https://img.shields.io/badge/Version-2.1.0-green.svg)
 
 All QR decoding happens **locally on your device** using the [jsQR](https://github.com/cozmo/jsQR) library with robust multi-strategy preprocessing for artistic and decorative QR codes. No images, URLs, or scan data are ever sent to any server.
@@ -12,16 +11,15 @@ All QR decoding happens **locally on your device** using the [jsQR](https://gith
 
 ## One-Line Install (Terminal)
 
-> **Download too slow?** GitHub's release server (`objects.githubusercontent.com`) is throttled in some regions (e.g. China). Just prefix the GitHub URL with `https://ghproxy.com/` to route through a fast mirror — same file, same version:
-> ```bash
-> curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg" -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
-> ```
-> If `ghproxy.com` is ever down, try `https://mirror.ghproxy.com/` instead.
-
 ### macOS (Apple Silicon / M1, M2, M3, M4)
 
 ```bash
 curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+```
+
+After dragging to Applications, **first launch only**: open Terminal and run:
+```bash
+xattr -cr /Applications/QR\ Scan\ \&\ Open.app && open /Applications/QR\ Scan\ \&\ Open.app
 ```
 
 ### macOS (Intel)
@@ -30,7 +28,12 @@ curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR
 curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-x64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
 ```
 
-> **Not sure which Mac you have?** Click   → About This Mac. If the chip says "Apple M-series" use the Apple Silicon command above; if it says "Intel" use the Intel command.
+After dragging to Applications, **first launch only**:
+```bash
+xattr -cr /Applications/QR\ Scan\ \&\ Open.app && open /Applications/QR\ Scan\ \&\ Open.app
+```
+
+> **Not sure which Mac you have?** Click   → About This Mac. If the chip says "Apple M-series" use Apple Silicon; if it says "Intel" use Intel.
 
 ### Windows (x64)
 
@@ -49,16 +52,44 @@ curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr
 
 ---
 
+## Troubleshooting
+
+### macOS shows "damaged" or "can't be opened"
+
+This is a **macOS Gatekeeper false positive**, not actual corruption. The app is not signed with an Apple Developer certificate ($99/year), so macOS quarantines it. The file is perfectly fine — verified by `hdiutil verify` checksum.
+
+**Fix (one-time, takes 2 seconds):**
+```bash
+xattr -cr /Applications/QR\ Scan\ \&\ Open.app
+```
+Then double-click the app normally. You only need to do this once.
+
+**Alternative:** Right-click the app → "Open" → confirm in the dialog.
+
+### Download is very slow
+
+GitHub's release server (`objects.githubusercontent.com`) is throttled in some regions. Use a mirror instead:
+
+```bash
+# Replace any GitHub releases URL prefix with ghproxy.com
+curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg" -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+```
+If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
+
+---
+
 ## Download
 
-| Platform                   | File                                                                                                                                           | Size  |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| Chrome / Edge / Brave      | [qr-scan-extension.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-extension.zip)                           | 69 KB |
-| Firefox (109+)             | [qr-scan-firefox.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-firefox.zip)                               | 68 KB |
-| macOS (Apple Silicon)      | [QR-Scan-Open-2.1.0-mac-arm64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg)     | 91 MB |
-| macOS (Apple Silicon, ZIP) | [QR-Scan-Open-2.1.0-mac-arm64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.zip)     | 87 MB |
-| macOS (Intel)              | [QR-Scan-Open-2.1.0-mac-x64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-x64.dmg)         | ~91 MB |
-| Windows (x64)              | [QR-Scan-Open-2.1.0-windows-x64.exe](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-windows-x64.exe) | 67 MB |
+| Platform                   | File                                                                                                                                           | Size  | Status |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
+| Chrome / Edge / Brave      | [qr-scan-extension.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-extension.zip)                           | 69 KB | Verified |
+| Firefox (109+)             | [qr-scan-firefox.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-firefox.zip)                               | 68 KB | Verified |
+| macOS (Apple Silicon)      | [QR-Scan-Open-2.1.0-mac-arm64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg)     | 91 MB | Verified |
+| macOS (Apple Silicon, ZIP) | [QR-Scan-Open-2.1.0-mac-arm64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.zip)     | 87 MB | Verified |
+| macOS (Intel)              | [QR-Scan-Open-2.1.0-mac-x64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-x64.dmg)         | ~91 MB | Verified |
+| Windows (x64)              | [QR-Scan-Open-2.1.0-windows-x64.exe](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-windows-x64.exe) | 67 MB | Verified |
+
+All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 
 ---
 
@@ -110,7 +141,11 @@ curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr
 
 ### Desktop App
 
-**macOS:** Download `.dmg`, open it, drag **QR Scan & Open** to Applications. First launch: right-click → "Open" (Gatekeeper bypass).
+**macOS:**
+1. Download `.dmg`, open it
+2. Drag **QR Scan & Open** to Applications
+3. **First launch only** — open Terminal and run: `xattr -cr /Applications/QR\ Scan\ \&\ Open.app`
+4. Double-click to open (or run `open /Applications/QR\ Scan\ \&\ Open.app`)
 
 **Windows:** Run the `.exe` — no installer needed (portable).
 

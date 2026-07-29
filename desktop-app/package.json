@@ -31,6 +31,7 @@
       "icons/**/*"
     ],
     "mac": {
+      "identity": null,
       "category": "public.app-category.utilities",
       "target": [
         { "target": "dmg", "arch": ["x64", "arm64"] },

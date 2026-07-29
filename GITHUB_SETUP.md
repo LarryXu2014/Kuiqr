@@ -7,17 +7,19 @@ Your repo is already created at **https://github.com/LarryXu2014/Local-QR-Scan**
 Open Terminal and run:
 
 ```bash
-cd /path/to/qr-scanner
+cd /Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner
 
-# Add your GitHub remote (already exists, or add it)
-git remote set-url origin https://github.com/LarryXu2014/Local-QR-Scan.git
+# Add your GitHub remote
+git remote add origin https://github.com/LarryXu2014/Local-QR-Scan.git
 
 # Push everything
 git push -u origin main --force
 git push origin v2.1.0
 ```
 
-> Use `--force` because your GitHub repo already has old files. This replaces them with the new v2.1.0 code.
+> **Note:** Use `git remote add` (not `set-url`) if no remote exists yet. If GitHub asks for a password, use a [Personal Access Token](https://github.com/settings/tokens) (Settings → Developer settings → PAT, `repo` scope) — passwords are no longer accepted.
+
+> Use `--force` because your GitHub repo may already have old files. This replaces them with the new v2.1.0 code.
 
 ## Step 2: Create a GitHub Release with Binaries
 
@@ -33,7 +35,7 @@ git push origin v2.1.0
 - **Massively improved QR decoding** — now handles artistic/decorative QR codes, low-contrast images, colored backgrounds, and noisy patterns
 - **Multi-strategy decoder** — tries 70+ combinations of scale, threshold, and inversion before giving up
 - **Cross-browser compatible** — Chrome, Edge, Firefox, Brave
-- **Desktop app** — macOS (Apple Silicon) + Windows (x64)
+- **Desktop app** — macOS (Apple Silicon + Intel) + Windows (x64)
 - **One-line install** via curl/PowerShell commands in README
 
 ## Downloads
@@ -41,24 +43,37 @@ git push origin v2.1.0
 | File | Platform |
 |------|----------|
 | `qr-scan-extension.zip` | Chrome / Edge / Brave / Opera |
-| `QR-Scan-Open-2.1.0-mac-arm64.dmg` | macOS (Apple Silicon M1/M2/M3/M4) |
-| `QR-Scan-Open-2.1.0-mac-arm64.zip` | macOS (Apple Silicon, zip) |
+| `qr-scan-firefox.zip` | Firefox 109+ |
+| `QR-Scan-Open-2.1.0-mac-arm64.dmg` | macOS Apple Silicon (M1/M2/M3/M4) |
+| `QR-Scan-Open-2.1.0-mac-arm64.zip` | macOS Apple Silicon (zip format) |
+| `QR-Scan-Open-2.1.0-mac-x64.dmg` | macOS Intel |
 | `QR-Scan-Open-2.1.0-windows-x64.exe` | Windows x64 (portable, no install) |
 
 ## Quick Install
 
-**macOS (Terminal):**
+**macOS Apple Silicon (Terminal):**
 ```
 curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-arm64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
 ```
+After dragging to Applications, first launch: `xattr -cr /Applications/QR\ Scan\ \&\ Open.app`
+
+**macOS Intel (Terminal):**
+```
+curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-mac-x64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+```
+After dragging to Applications, first launch: `xattr -cr /Applications/QR\ Scan\ \&\ Open.app`
 
 **Windows (PowerShell):**
 ```
 Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.1.0-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"; Start-Process "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"
 ```
 
+> **macOS "damaged" error?** This is a Gatekeeper false positive (not actual corruption). Run: `xattr -cr /Applications/QR\ Scan\ \&\ Open.app` — one-time fix, 2 seconds.
+```
+
 6. **Upload these files** from your local `releases/` folder:
    - `qr-scan-extension.zip` (69 KB)
+   - `qr-scan-firefox.zip` (68 KB)
    - `QR-Scan-Open-2.1.0-mac-arm64.dmg` (91 MB)
    - `QR-Scan-Open-2.1.0-mac-arm64.zip` (87 MB)
    - `QR-Scan-Open-2.1.0-windows-x64.exe` (67 MB)
