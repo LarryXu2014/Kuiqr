@@ -1,11 +1,11 @@
 // ============================================================
-// QR Scan & Open — Electron Main Process (v2.2.0)
+// QR Scan & Open — Electron Main Process (v2.2.1)
 // Features:
 //   1. Global hotkey → capture screen → overlay drag-to-select → decode
 //   2. In-app scan: paste from clipboard or drag-drop image → decode instantly
 //   3. Auto-detect keyboard shortcut recorder in Settings
 //   4. Main window with scan history, settings, manual trigger
-//   5. System tray for background operation
+//   5. System tray for background operation (app stays alive on all platforms)
 //   6. All processing local — no data sent to any server
 // ============================================================
 
@@ -73,22 +73,33 @@ function addToHistory(data, type) {
 // App Lifecycle
 // ============================================================
 
-app.whenReady().then(() => {
-  createMainWindow(); // shows itself
-  createTray();
-  registerShortcut();
-
-  app.on("activate", () => {
-    // macOS: clicking the dock icon reveals the window
+// Ensure a single running instance. Re-launching the app (e.g. double-clicking the
+// Windows .exe again) focuses the existing window instead of spawning a second copy.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  // Another instance is already running — let it handle everything and exit.
+  app.quit();
+} else {
+  app.on("second-instance", () => {
     showMainWindow();
   });
-});
+
+  app.whenReady().then(() => {
+    createMainWindow(); // shows itself on launch
+    createTray();
+    registerShortcut();
+
+    app.on("activate", () => {
+      // macOS dock click / generic focus request
+      showMainWindow();
+    });
+  });
+}
 
 app.on("window-all-closed", () => {
-  // On macOS we keep running in the tray; elsewhere we quit.
-  if (!isMac) {
-    app.quit();
-  }
+  // Keep the app alive in the background (tray + global shortcut) on ALL platforms,
+  // so the user can always re-open it via the tray icon or the global hotkey.
+  // The app is only fully quit via the tray "Quit" menu item.
 });
 
 app.on("before-quit", () => {
@@ -122,12 +133,10 @@ function createMainWindow() {
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
 
   mainWindow.on("close", (e) => {
-    // On macOS, closing the window just hides it (app stays in the tray).
-    // On other platforms the window closes and the app quits via window-all-closed.
-    if (isMac) {
-      e.preventDefault();
-      mainWindow.hide();
-    }
+    // Always hide to the tray instead of quitting, so the app + global shortcut
+    // keep working after the window is closed (Windows/Linux included).
+    e.preventDefault();
+    mainWindow.hide();
   });
 }
 
@@ -182,13 +191,36 @@ function registerShortcut() {
   const settings = loadSettings();
   globalShortcut.unregisterAll();
 
-  try {
-    globalShortcut.register(settings.shortcut, () => {
-      triggerScan();
-    });
-  } catch (err) {
-    console.error("Failed to register shortcut:", err);
+  // Try the user's saved shortcut first, then fall back to a few guaranteed-valid
+  // accelerators so the hotkey always works even if a stored value became invalid.
+  const candidates = [
+    settings.shortcut,
+    "CommandOrControl+Shift+Y",
+    "Shift+Y", // user-requested simpler combo (note: intercepts the Y key globally)
+    "CommandOrControl+Shift+S",
+    "CommandOrControl+Shift+A",
+  ];
+
+  for (const accel of candidates) {
+    if (!accel || typeof accel !== "string") continue;
+    try {
+      const ok = globalShortcut.register(accel, () => {
+        triggerScan();
+      });
+      if (ok) {
+        console.log("QR Scan: registered global shortcut:", accel);
+        return;
+      }
+    } catch (err) {
+      console.error("QR Scan: failed to register", accel, err);
+    }
   }
+
+  // Nothing registered — tell the user they can still use the tray / in-app button.
+  showNotification(
+    "QR Scan & Open",
+    "Global shortcut unavailable. Use the tray icon or the 'Select Screen Area' button to scan."
+  );
 }
 
 function reregisterShortcut() {

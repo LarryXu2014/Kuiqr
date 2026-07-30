@@ -3,7 +3,7 @@
 > Scan QR codes instantly — right-click, press a keyboard shortcut, or use your camera. Works everywhere.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Version](https://img.shields.io/badge/Version-2.2.0-green.svg)
+![Version](https://img.shields.io/badge/Version-2.2.1-green.svg)
 
 All QR decoding happens **locally on your device** using the [jsQR](https://github.com/cozmo/jsQR) library with robust multi-strategy preprocessing for artistic and decorative QR codes. No images, URLs, or scan data are ever sent to any server.
 
@@ -14,7 +14,7 @@ All QR decoding happens **locally on your device** using the [jsQR](https://gith
 ### macOS (Apple Silicon / M1, M2, M3, M4)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.0-mac-arm64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.1-mac-arm64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
 ```
 
 After dragging to Applications, **first launch only**: open Terminal and run:
@@ -25,7 +25,7 @@ xattr -cr /Applications/QR\ Scan\ \&\ Open.app && open /Applications/QR\ Scan\ \
 ### macOS (Intel)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.0-mac-x64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.1-mac-x64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
 ```
 
 After dragging to Applications, **first launch only**:
@@ -38,7 +38,7 @@ xattr -cr /Applications/QR\ Scan\ \&\ Open.app && open /Applications/QR\ Scan\ \
 ### Windows (x64)
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.0-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"; Start-Process "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"
+Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.1-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"; Start-Process "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"
 ```
 
 ### Chrome / Edge / Brave Extension
@@ -72,7 +72,7 @@ GitHub's release server (`objects.githubusercontent.com`) is throttled in some r
 
 ```bash
 # Replace any GitHub releases URL prefix with ghproxy.com
-curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.0-mac-arm64.dmg" -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.1-mac-arm64.dmg" -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
 ```
 If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 
@@ -84,10 +84,10 @@ If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
 | Chrome / Edge / Brave      | [qr-scan-extension.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-extension.zip)                           | 69 KB | Verified |
 | Firefox (109+)             | [qr-scan-firefox.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-firefox.zip)                               | 68 KB | Verified |
-| macOS (Apple Silicon)      | [QR-Scan-Open-2.2.0-mac-arm64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.0-mac-arm64.dmg)     | 91 MB | Verified |
-| macOS (Apple Silicon, ZIP) | [QR-Scan-Open-2.2.0-mac-arm64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.0-mac-arm64.zip)     | 87 MB | Verified |
-| macOS (Intel)              | [QR-Scan-Open-2.2.0-mac-x64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.0-mac-x64.dmg)         | ~96 MB | Verified |
-| Windows (x64)              | [QR-Scan-Open-2.2.0-windows-x64.exe](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.0-windows-x64.exe) | ~67 MB | Verified |
+| macOS (Apple Silicon)      | [QR-Scan-Open-2.2.1-mac-arm64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.1-mac-arm64.dmg)     | 95 MB | Verified |
+| macOS (Apple Silicon, ZIP) | [QR-Scan-Open-2.2.1-mac-arm64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.1-mac-arm64.zip)     | 92 MB | Verified |
+| macOS (Intel)              | [QR-Scan-Open-2.2.1-mac-x64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.1-mac-x64.dmg)         | ~100 MB | Verified |
+| Windows (x64)              | [QR-Scan-Open-2.2.1-windows-x64.exe](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.1-windows-x64.exe) | ~70 MB | Verified |
 
 All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 
@@ -110,7 +110,7 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 - **Auto-detect shortcut recorder** — Click "Press keys to record" in Settings to set any hotkey combo (Cmd+Shift+A, etc.)
 - **System tray** — Runs in background; click tray icon to show/hide window
 - **Settings tab** — Customize shortcut (auto-record), toggle auto-open URL, notifications, history size
-- **Same robust QR decoder** as the extension (60+ multi-strategy preprocessing)
+- **Same robust QR decoder** as the extension — a fast tier (direct + cheap upscales, usually 1–3 attempts) handles normal QR codes instantly, with an advanced threshold/invert fallback only for hard artistic/decorative codes
 
 ### Web App (PWA — iOS, Android, Desktop)
 
@@ -148,7 +148,9 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 3. **First launch only** — open Terminal and run: `xattr -cr /Applications/QR\ Scan\ \&\ Open.app`
 4. Double-click to open (or run `open /Applications/QR\ Scan\ \&\ Open.app`)
 
-**Windows:** Run the `.exe` — no installer needed (portable).
+**Windows:** Run the `.exe` — no installer needed (portable). The app stays in the **system tray** after you close the window, so the global shortcut keeps working. To fully quit, right-click the tray icon → **Quit**.
+
+> **Windows SmartScreen ("Windows protected your PC"):** The app is not code-signed (no paid certificate), so Windows may block the first launch. This is expected for unsigned apps — click **More info → Run anyway**. You only need to do this once.
 
 ---
 
@@ -158,7 +160,7 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 
 1. **Paste an image** — Copy a screenshot or QR image, press **⌘V** (or Ctrl+V) in the app
 2. **Or drag & drop** — Drag any image file onto the Scan tab's drop zone
-3. **Instant decode** — jsQR with 60+ strategies decodes it right in the window
+3. **Instant decode** — jsQR runs a fast tier first (1–3 attempts for normal codes) with an advanced fallback for hard codes
 4. **URLs open automatically**; text copies to clipboard
 
 ### Screen Capture Scan
@@ -173,6 +175,11 @@ All processing happens on your device. Zero server communication.
 ---
 
 ## What's New
+
+### v2.2.1
+- **Much faster scanning** — The decoder now runs a *fast tier* first (direct decode + a couple of cheap upscales, normally 1–3 attempts) and only falls back to the slow multi-threshold/invert sweep for hard artistic/decorative QR codes. Normal codes decode instantly.
+- **Fixed "can't open the app" on Windows** — The app now stays alive in the **system tray** when you close the window (instead of fully quitting), so the global shortcut `Ctrl+Shift+Y` keeps working. Re-launching the `.exe` focuses the existing window instead of opening a second copy.
+- **Robust shortcut registration** — If the saved hotkey can't be registered, the app automatically falls back to `Ctrl/Cmd+Shift+Y/S/A` and notifies you; you can always scan via the tray icon or the **Select Screen Area** button.
 
 ### v2.2.0
 - **In-app scan** — Paste from clipboard (⌘V) or drag & drop images directly in the app — no overlay needed

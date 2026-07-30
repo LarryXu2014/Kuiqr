@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Desktop App Renderer Logic (v2.2.0)
+// QR Scan & Open — Desktop App Renderer Logic (v2.2.1)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -206,11 +206,26 @@ function clearPreview() {
 function decodeImageRobust(ctx, w, h) {
   const imageData = ctx.getImageData(0, 0, w, h);
 
-  // Try direct decode first
-  let result = jsQR(imageData.data, w, h);
+  // ============================================================
+  // TIER 1 — Fast / "basic" ways. A normal QR code is read here in
+  // 1–3 cheap jsQR calls. We only move to the slow strategies
+  // (threshold sweep + invert) if this tier fails.
+  // ============================================================
+  let result = jsQR(imageData.data, w, h, { inversionAttempts: "attemptBoth" });
   if (result) return result;
 
-  // Multi-strategy decoding
+  // Cheap upscales help small QR codes; jsQR's "attemptBoth" handles inverted codes.
+  for (const s of [1.5, 2, 2.5]) {
+    result = tryScaleDecode(ctx, w, h, s, (sd) =>
+      jsQR(sd.data, sd.width, sd.height, { inversionAttempts: "attemptBoth" })
+    );
+    if (result) return result;
+  }
+
+  // ============================================================
+  // TIER 2 — Advanced strategies (only reached for hard QR codes:
+  // low contrast, color backgrounds, artistic/decorative codes).
+  // ============================================================
   const scales = [0.5, 0.75, 1.25, 1.5, 2];
   for (const s of scales) {
     const sw = Math.round(w * s);
@@ -221,24 +236,37 @@ function decodeImageRobust(ctx, w, h) {
     sc.width = sw; sc.height = sh;
     const sctx = sc.getContext("2d");
     sctx.drawImage(ctx.canvas, 0, 0, sw, sh);
-    const sd = sctx.getImageData(0, 0, sw, sh);
+    let sd = sctx.getImageData(0, 0, sw, sh);
+    sd = grayscale(sd);
+    sd = stretchContrast(sd);
 
-    result = jsQR(sd.data, sw, sh);
+    result = jsQR(sd.data, sw, sh, { inversionAttempts: "attemptBoth" });
     if (result) return result;
 
-    // Grayscale + contrast variants
     for (const thresh of [80, 100, 120, 140, 160]) {
       const bin = binaryThreshold(sd, thresh);
-      result = jsQR(bin.data, sw, sh);
+      result = jsQR(bin.data, sw, sh, { inversionAttempts: "attemptBoth" });
       if (result) return result;
 
       const invBin = invertBin(bin);
-      result = jsQR(invBin.data, sw, sh);
+      result = jsQR(invBin.data, sw, sh, { inversionAttempts: "attemptBoth" });
       if (result) return result;
     }
   }
 
   return null;
+}
+
+function tryScaleDecode(ctx, w, h, s, decode) {
+  const sw = Math.round(w * s);
+  const sh = Math.round(h * s);
+  if (sw < 10 || sh < 10) return null;
+  const sc = document.createElement("canvas");
+  sc.width = sw; sc.height = sh;
+  const sctx = sc.getContext("2d");
+  sctx.drawImage(ctx.canvas, 0, 0, sw, sh);
+  const sd = sctx.getImageData(0, 0, sw, sh);
+  return decode(sd);
 }
 
 function grayscale(imageData) {
