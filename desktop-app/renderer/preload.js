@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld("qrAPI", {
   getSettings: () => ipcRenderer.invoke("get-settings"),
   saveSettings: (s) => ipcRenderer.invoke("save-settings", s),
   testShortcut: (accel) => ipcRenderer.invoke("test-shortcut", accel),
+  suspendShortcut: () => ipcRenderer.invoke("suspend-shortcut"),
+  resumeShortcut: () => ipcRenderer.invoke("resume-shortcut"),
 
   // History
   getHistory: () => ipcRenderer.invoke("get-history"),

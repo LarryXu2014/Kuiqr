@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Electron Main Process (v2.2.1)
+// QR Scan & Open — Electron Main Process (v2.2.2)
 // Features:
 //   1. Global hotkey → capture screen → overlay drag-to-select → decode
 //   2. In-app scan: paste from clipboard or drag-drop image → decode instantly
@@ -187,7 +187,27 @@ function createTray() {
 // Global Shortcut
 // ============================================================
 
+// When the user is recording a NEW shortcut in Settings, we fully unregister the
+// global hotkey so the keystrokes they press are captured by the recorder and do
+// NOT trigger a scan / open the capture overlay. registerShortcut() becomes a no-op
+// while `shortcutSuspended` is true (we just remember the intent). resumeShortcut()
+// re-registers with whatever is currently saved.
+let shortcutSuspended = false;
+
+function suspendShortcut() {
+  shortcutSuspended = true;
+  globalShortcut.unregisterAll();
+}
+
+function resumeShortcut() {
+  shortcutSuspended = false;
+  registerShortcut();
+}
+
 function registerShortcut() {
+  // Don't actually register while the user is recording a new shortcut.
+  if (shortcutSuspended) return;
+
   const settings = loadSettings();
   globalShortcut.unregisterAll();
 
@@ -469,4 +489,16 @@ ipcMain.handle("test-shortcut", (event, accelerator) => {
   } catch {
     return false;
   }
+});
+
+// IPC: Suspend / resume the global shortcut (used while recording a new one)
+// ============================================================
+ipcMain.handle("suspend-shortcut", () => {
+  suspendShortcut();
+  return true;
+});
+
+ipcMain.handle("resume-shortcut", () => {
+  resumeShortcut();
+  return true;
 });

@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Desktop App Renderer Logic (v2.2.1)
+// QR Scan & Open — Desktop App Renderer Logic (v2.2.2)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -8,6 +8,8 @@
 // ============================================================
 
 let currentPlatform = null;
+let currentShortcut = "CommandOrControl+Shift+Y"; // the active saved shortcut (kept in sync)
+let isRecordingShortcut = false; // true while the user is recording a new shortcut
 
 document.addEventListener("DOMContentLoaded", async () => {
   // Detect platform
@@ -24,12 +26,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ── In-App Scan: Paste from Clipboard ──
   const pasteBtn = document.getElementById("paste-btn");
-  pasteBtn.addEventListener("click", () => readClipboardImage());
+  pasteBtn.addEventListener("click", () => {
+    if (isRecordingShortcut) return; // never scan while recording a shortcut
+    readClipboardImage();
+  });
 
   // Global ⌘V / Ctrl+V listener
   document.addEventListener("paste", (e) => {
     // Only intercept when focused on scan tab body (not an input field)
     if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+    if (isRecordingShortcut) return; // never scan while recording a shortcut
     e.preventDefault();
     readClipboardImage();
   });
@@ -57,6 +63,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     e.preventDefault();
     e.stopPropagation();
     dropZone.classList.remove("drag-over");
+    if (isRecordingShortcut) return; // never scan while recording a shortcut
     const file = e.dataTransfer.files && e.dataTransfer.files[0];
     if (file && file.type.startsWith("image/")) {
       loadImageFile(file);
@@ -66,12 +73,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ── Screen Area Scan Button ──
   const scanBtn = document.getElementById("scan-btn");
   scanBtn.addEventListener("click", async () => {
+    if (isRecordingShortcut) return; // never scan while recording a shortcut
     scanBtn.disabled = true;
     scanBtn.innerHTML = '<span>Starting capture…</span>';
     await window.qrAPI.triggerScan();
     setTimeout(() => {
       scanBtn.disabled = false;
-      scanBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10 7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><span>Select Screen Area</span><kbd id="shortcut-display" class="btn-kbd">' + (currentPlatform && currentPlatform.isMac ? "Cmd+Shift+Y" : "Ctrl+Shift+Y") + '</kbd>';
+      scanBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10 7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><span>Select Screen Area</span><kbd id="shortcut-display" class="btn-kbd">' + formatShortcutForDisplay(currentShortcut) + '</kbd>';
     }, 2000);
   });
 
@@ -111,14 +119,10 @@ function switchTab(tabName) {
 // ============================================================
 
 function updatePlatformUI() {
+  // Keep the scan button's kbd in sync with the actual shortcut (not hardcoded Y)
   const shortcutEl = document.getElementById("shortcut-display");
-  if (shortcutEl && currentPlatform) {
-    shortcutEl.textContent = currentPlatform.isMac ? "Cmd+Shift+Y" : "Ctrl+Shift+Y";
-  }
-
-  const shortcutCurrentValue = document.getElementById("shortcut-current-value");
-  if (shortcutCurrentValue && currentPlatform) {
-    shortcutCurrentValue.textContent = currentPlatform.isMac ? "Cmd+Shift+Y" : "Ctrl+Shift+Y";
+  if (shortcutEl) {
+    shortcutEl.textContent = formatShortcutForDisplay(currentShortcut);
   }
 
   const platformInfo = document.getElementById("platform-info");
@@ -454,8 +458,14 @@ async function loadSettingsForm() {
   document.getElementById("setting-notify").checked = settings.showNotification !== false;
   document.getElementById("setting-maxhistory").value = settings.maxHistory || 50;
 
-  // Update shortcut display
-  const displayKbd = formatShortcutForDisplay(settings.shortcut || "CommandOrControl+Shift+Y");
+  // Track the active shortcut and reflect it everywhere
+  currentShortcut = settings.shortcut || "CommandOrControl+Shift+Y";
+  updateShortcutDisplay(currentShortcut);
+}
+
+// Update both the "Current:" label and the scan button's kbd to match a shortcut
+function updateShortcutDisplay(accelerator) {
+  const displayKbd = formatShortcutForDisplay(accelerator);
   const curVal = document.getElementById("shortcut-current-value");
   if (curVal) curVal.textContent = displayKbd;
   const scDisplay = document.getElementById("shortcut-display");
@@ -495,47 +505,59 @@ function isMacOS() {
 function setupShortcutRecorder() {
   const btn = document.getElementById("shortcut-record-btn");
   const label = document.getElementById("shortcut-record-label");
-  const currentVal = document.getElementById("shortcut-current-value");
-  let isRecording = false;
+  let recording = false;   // true between Record-click and stopRecording()
+  let finalizing = false;  // true while we validate the pressed combo (locks re-entry)
   let pressedKeys = {};
 
   btn.addEventListener("click", () => {
-    if (isRecording) return;
-    isRecording = true;
+    if (recording) return;
+    recording = true;
+    finalizing = false;
     pressedKeys = {};
+    // Suspend the global hotkey so the keystrokes we capture do NOT trigger a scan
+    // or open the capture overlay. Re-enabled in stopRecording().
+    window.qrAPI.suspendShortcut();
+    isRecordingShortcut = true;
     btn.classList.add("recording");
-    label.textContent = "Press a key combination now…";
+    label.textContent = "Press a key combination now…  (Esc to cancel)";
   });
 
   const stopRecording = (newShortcut) => {
-    isRecording = false;
-    btn.classList.remove("recording");
+    recording = false;
+    finalizing = false;
     pressedKeys = {};
+    isRecordingShortcut = false;
+    // Re-enable the global hotkey with whatever is now saved
+    window.qrAPI.resumeShortcut();
+    btn.classList.remove("recording");
 
     if (newShortcut) {
-      const display = formatShortcutForDisplay(newShortcut);
-      label.textContent = "Press keys to record…";
-      if (currentVal) currentVal.textContent = display;
-      // Also update the scan button's kbd
-      const scDisplay = document.getElementById("shortcut-display");
-      if (scDisplay) scDisplay.textContent = display;
-
-      // Store it so saveSettings picks it up
       btn.dataset.shortcut = newShortcut;
+      updateShortcutDisplay(newShortcut);
+      label.textContent = "Saved! Press Record to change it again.";
     } else {
-      label.textContent = "Press keys to record…";
+      label.textContent = "Cancelled. Press Record to set a shortcut.";
     }
   };
 
   document.addEventListener("keydown", (e) => {
-    if (!isRecording) return;
+    if (!recording || finalizing) return;
     e.preventDefault();
     e.stopPropagation();
 
-    // Ignore just modifiers alone
+    // Cancel with Escape
+    if (e.key === "Escape") {
+      stopRecording(null);
+      return;
+    }
+
+    // Ignore auto-repeat (held keys)
+    if (e.repeat) return;
+
+    // Ignore just modifiers alone (wait for the real key)
     if (["Meta", "Control", "Alt", "Shift"].includes(e.key)) {
       pressedKeys[e.key.toLowerCase()] = true;
-      label.textContent = `${getModifierLabels()}…`;
+      label.textContent = getModifierLabels() + "…";
       return;
     }
 
@@ -546,36 +568,29 @@ function setupShortcutRecorder() {
     if (e.altKey) pressedKeys.alt = true;
 
     const accelerator = formatShortcutForElectron(pressedKeys);
-    if (accelerator) {
-      // Test if Electron can register this accelerator
-      window.qrAPI.testShortcut(accelerator).then((ok) => {
-        if (ok) {
-          stopRecording(accelerator);
-        } else {
-          label.textContent = "Invalid combination. Try again.";
-          setTimeout(() => { if (isRecording) label.textContent = "Press keys to record now…"; }, 1500);
-        }
-      });
-    } else {
+    if (!accelerator) {
       stopRecording(null);
+      return;
     }
+
+    // Lock so a second combo / auto-repeat can't re-trigger while we validate
+    finalizing = true;
+    label.textContent = "Checking…";
+
+    window.qrAPI.testShortcut(accelerator).then((ok) => {
+      if (ok) {
+        // Record = save: persist immediately and make it the active shortcut
+        persistShortcut(accelerator).then(() => stopRecording(accelerator));
+      } else {
+        label.textContent = "That combination can't be used. Try another.";
+        finalizing = false;
+        pressedKeys = {};
+        setTimeout(() => {
+          if (recording && !finalizing) label.textContent = "Press a key combination now…  (Esc to cancel)";
+        }, 1800);
+      }
+    });
   }, true); // capture phase so we get all keydowns
-
-  document.addEventListener("keyup", (e) => {
-    if (!isRecording) return;
-    const key = e.key.toLowerCase();
-    if (key in pressedKeys) {
-      // Don't stop on modifier release — wait for the actual key
-    }
-  }, true);
-
-  // Cancel on Escape
-  document.addEventListener("keydown", (e) => {
-    if (isRecording && e.key === "Escape") {
-      e.preventDefault();
-      stopRecording(null);
-    }
-  }, true);
 
   function getModifierLabels() {
     const parts = [];
@@ -585,6 +600,19 @@ function setupShortcutRecorder() {
     if (pressedKeys.alt) parts.push("Alt");
     return parts.join(" + ") || "…";
   }
+}
+
+// Persist the newly recorded shortcut immediately (record = save).
+async function persistShortcut(accelerator) {
+  const settings = {
+    shortcut: accelerator,
+    autoOpenUrl: document.getElementById("setting-autoopen").checked,
+    copyTextToClipboard: document.getElementById("setting-copytext").checked,
+    showNotification: document.getElementById("setting-notify").checked,
+    maxHistory: parseInt(document.getElementById("setting-maxhistory").value, 10) || 50,
+  };
+  await window.qrAPI.saveSettings(settings); // main saves + re-registers (suspended → applied on resume)
+  currentShortcut = accelerator;
 }
 
 async function saveSettings() {
@@ -598,6 +626,8 @@ async function saveSettings() {
   };
 
   await window.qrAPI.saveSettings(settings);
+  currentShortcut = settings.shortcut;
+  updateShortcutDisplay(currentShortcut);
 
   const savedMsg = document.getElementById("settings-saved");
   savedMsg.classList.remove("hidden");
