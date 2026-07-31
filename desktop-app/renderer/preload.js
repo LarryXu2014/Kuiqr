@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld("qrAPI", {
   // Platform
   getPlatform: () => ipcRenderer.invoke("get-platform"),
 
+  // macOS: open System Settings → Privacy & Security → Automation
+  openAutomationSettings: () => ipcRenderer.invoke("open-automation-settings"),
+
   // Tab switching from tray/main process
   onSwitchTab: (callback) => ipcRenderer.on("switch-tab", (e, tab) => callback(tab)),
 

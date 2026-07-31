@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "QR Scan & Open",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "description": "Right-click any QR code image to scan and open it in a new tab. Or set a custom shortcut (Options/Record) to scan from the screen with a drag-to-select overlay. Works on Chrome, Edge, Brave, and Firefox.",
   "icons": {
     "16": "icons/icon16.png",

@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Desktop App Renderer Logic (v2.3.3)
+// QR Scan & Open — Desktop App Renderer Logic (v2.3.4)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -119,6 +119,30 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("save-settings-btn").addEventListener("click", saveSettings);
   setupShortcutRecorder();
   setupGenerate();
+
+  // ── macOS Automation permission: show the row + wire the Settings button ──
+  const autoRow = document.getElementById("automation-permission-row");
+  if (autoRow) {
+    if (currentPlatform && currentPlatform.isMac) {
+      autoRow.classList.remove("hidden");
+    } else {
+      autoRow.classList.add("hidden");
+    }
+  }
+  const openAutoBtn = document.getElementById("open-automation-settings-btn");
+  if (openAutoBtn) {
+    openAutoBtn.addEventListener("click", async () => {
+      try {
+        const res = await window.qrAPI.openAutomationSettings();
+        if (!res || !res.ok) {
+          // Couldn't deep-link — copy the manual path so the user can find it.
+          window.qrAPI.copyClipboard("System Settings → Privacy & Security → Automation");
+        }
+      } catch (err) {
+        console.error("Failed to open Automation settings:", err);
+      }
+    });
+  }
 });
 
 // ============================================================

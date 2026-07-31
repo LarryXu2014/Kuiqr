@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Electron Main Process (v2.3.2)
+// QR Scan & Open — Electron Main Process (v2.3.4)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -12,12 +12,14 @@
 //   6. Main window with scan history, settings, manual trigger
 //   7. System tray for background operation (app stays alive on all platforms)
 //   8. All processing local — no data sent to any server
+//   9. macOS: asks for Automation permission at launch (native OS prompt) and
+//      provides a Settings button to jump to System Settings → Privacy & Security → Automation
 // ============================================================
 
 const { app, BrowserWindow, globalShortcut, screen, desktopCapturer, ipcMain, Tray, Menu, nativeImage, shell, clipboard, Notification } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const { execSync, spawn } = require("child_process");
+const { execSync, spawn, exec } = require("child_process");
 
 let mainWindow = null;
 let tray = null;
@@ -99,6 +101,12 @@ if (!gotSingleInstanceLock) {
     createMainWindow(); // shows itself on launch
     createTray();
     registerShortcut();
+
+    // On macOS, proactively trigger the native "Automation" permission prompt the
+    // first time the app opens. macOS only shows its own system alert (we draw no
+    // custom dialog) the first time an app controls System Events. See
+    // requestAutomationPermissionIfNeeded() for details.
+    if (isMac) requestAutomationPermissionIfNeeded();
 
     app.on("activate", () => {
       // macOS dock click / generic focus request
@@ -383,6 +391,44 @@ function isForegroundAppBrowser() {
     return false;
   }
 }
+
+// ============================================================
+// macOS Automation permission
+// ============================================================
+// The browser-extension priority feature needs to know which app is frontmost,
+// which we read via AppleScript / System Events. The FIRST time the app does this,
+// macOS shows its OWN native alert ("QR Scan & Open wants to control System
+// Events"). We deliberately run that osascript once at launch so the user is asked
+// for the permission up front — there is no custom dialog, just the OS popup.
+// (macOS only prompts once per app. If it was already granted or denied the alert
+// won't reappear; the user can still grant it later via the in-app settings button.)
+function requestAutomationPermissionIfNeeded() {
+  if (!isMac) return;
+  try {
+    // Running this fires an osascript that requires Automation access, which makes
+    // macOS present its native permission prompt on first run. We ignore the result.
+    isForegroundAppBrowser();
+  } catch {
+    // The OS prompt may be shown while osascript is waiting; ignore any error here.
+  }
+}
+
+// Opens System Settings → Privacy & Security → Automation so the user can grant or
+// review this app's Automation permission. Wired to the in-app settings button.
+ipcMain.handle("open-automation-settings", () => {
+  if (!isMac) return { ok: false, reason: "unsupported-platform" };
+  try {
+    // Deep link straight to the Automation sub-page of Privacy & Security.
+    exec('open "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"');
+    return { ok: true };
+  } catch (err) {
+    // Fallback: open the Security & Privacy pane (the anchor may differ by macOS version).
+    try {
+      exec('open "x-apple.systempreferences:com.apple.preference.security"');
+    } catch { /* ignore */ }
+    return { ok: false, reason: String((err && err.message) || err) };
+  }
+});
 
 async function triggerScan() {
   try {

@@ -171,6 +171,14 @@
         </label>
       </div>
 
+      <div class="setting-item hidden" id="automation-permission-row">
+        <div class="setting-info">
+          <div class="setting-label">macOS Automation permission</div>
+          <div class="setting-desc">Needed so the app can detect the frontmost app for browser-extension priority. If the system prompt didn't appear when the app opened, open System Settings and enable <b>QR Scan &amp; Open</b> under Privacy &amp; Security → Automation.</div>
+        </div>
+        <button id="open-automation-settings-btn" class="btn-text" type="button">Open System Settings → Automation</button>
+      </div>
+
       <div class="setting-item">
         <div class="setting-info">
           <div class="setting-label">Show notifications</div>
@@ -194,7 +202,7 @@
 
     <div class="about-section">
       <h3>About</h3>
-      <p>QR Scan &amp; Open v2.3.3</p>
+      <p>QR Scan &amp; Open v2.3.4</p>
       <p>All processing is local. No data is sent to any server.</p>
       <p class="platform-info" id="platform-info"></p>
     </div>
