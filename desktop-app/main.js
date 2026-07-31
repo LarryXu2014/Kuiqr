@@ -12,10 +12,12 @@
 const { app, BrowserWindow, globalShortcut, screen, desktopCapturer, ipcMain, Tray, Menu, nativeImage, shell, clipboard, Notification } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const { execSync } = require("child_process");
 
 let mainWindow = null;
 let overlayWindow = null;
 let tray = null;
+let isQuiting = false; // set true when we actually want to quit (so window-close hides don't block it)
 let lastScreenshot = null; // NativeImage of the full screen capture
 
 const isMac = process.platform === "darwin";
@@ -32,6 +34,7 @@ const DEFAULT_SETTINGS = {
   showNotification: true,
   maxHistory: 50,
   launchAtLogin: false,
+  browserExtensionPriority: true, // when true and a browser is the foreground app, let the browser extension handle the shortcut
 };
 
 function loadSettings() {
@@ -99,10 +102,16 @@ if (!gotSingleInstanceLock) {
 app.on("window-all-closed", () => {
   // Keep the app alive in the background (tray + global shortcut) on ALL platforms,
   // so the user can always re-open it via the tray icon or the global hotkey.
-  // The app is only fully quit via the tray "Quit" menu item.
+  // A registered listener suppresses Electron's default quit-on-close, so when we
+  // genuinely want to quit (isQuiting === true, set by tray Quit / Cmd+Q / menu
+  // Quit) we must explicitly quit here.
+  if (isQuiting) {
+    app.quit();
+  }
 });
 
 app.on("before-quit", () => {
+  isQuiting = true;
   globalShortcut.unregisterAll();
 });
 
@@ -133,10 +142,13 @@ function createMainWindow() {
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
 
   mainWindow.on("close", (e) => {
-    // Always hide to the tray instead of quitting, so the app + global shortcut
-    // keep working after the window is closed (Windows/Linux included).
-    e.preventDefault();
-    mainWindow.hide();
+    // Normally hide to the tray instead of quitting, so the app + global shortcut
+    // keep working after the window is closed. But when we're genuinely quitting
+    // (isQuiting === true), let the window actually close so the app can exit.
+    if (!isQuiting) {
+      e.preventDefault();
+      mainWindow.hide();
+    }
   });
 }
 
@@ -170,7 +182,7 @@ function createTray() {
     { label: "Show Window", click: () => showMainWindow() },
     { label: "Settings", click: () => { showMainWindow(); mainWindow.webContents.send("switch-tab", "settings"); } },
     { type: "separator" },
-    { label: "Quit", click: () => { globalShortcut.unregisterAll(); app.exit(0); } },
+    { label: "Quit", click: () => { isQuiting = true; globalShortcut.unregisterAll(); app.quit(); } },
   ]);
 
   tray.setContextMenu(contextMenu);
@@ -251,8 +263,55 @@ function reregisterShortcut() {
 // Screen Capture + Overlay
 // ============================================================
 
+// Returns true if the currently focused application is a known web browser.
+// Used so the browser extension can take priority over this app's global shortcut.
+// Best-effort: fully implemented on macOS; on other platforms returns false
+// (the app always scans) until a platform-specific check is added.
+function isForegroundAppBrowser() {
+  if (!isMac) return false;
+  try {
+    const bid = execSync(
+      'osascript -e \'tell application "System Events" to get bundle identifier of (first process whose frontmost is true)\'',
+      { timeout: 2000 }
+    ).toString().trim();
+    const BROWSERS = [
+      "com.google.Chrome",
+      "com.google.Chrome.canary",
+      "com.microsoft.edgemac",
+      "com.microsoft.edgemac.Canary",
+      "org.mozilla.firefox",
+      "com.brave.Browser",
+      "com.operasoftware.Opera",
+      "com.operasoftware.OperaNext",
+      "com.vivaldi.Vivaldi",
+      "company.thebrowser.Browser", // Arc
+      "com.yandex.desktop.yandex",
+      "com.qwant.engine.macos",
+      "com.ecosia.mac",
+      "com.centbrowser.Chrome",
+      "com.duckduckgo.mobile.ios",
+      "com.tencent.webtab", // QQ Browser
+      "com.ucweb.uc", // UC Browser
+      "com.baidu.Baidu", // Baidu Browser
+    ];
+    return BROWSERS.includes(bid);
+  } catch {
+    return false;
+  }
+}
+
 async function triggerScan() {
   try {
+    const settings = loadSettings();
+
+    // Extension-priority: if the user enabled it AND a browser is the foreground
+    // app, let the browser extension handle the shortcut. This avoids a double
+    // overlay and stops this app from stealing focus / minimizing the browser.
+    if (settings.browserExtensionPriority && isForegroundAppBrowser()) {
+      console.log("QR Scan: foreground is a browser — deferring to the browser extension.");
+      return;
+    }
+
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.size;
     const scaleFactor = primaryDisplay.scaleFactor;

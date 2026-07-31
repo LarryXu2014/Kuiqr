@@ -1,10 +1,11 @@
 // ============================================================
-// QR Scan & Open — Desktop App Renderer Logic (v2.2.2)
+// QR Scan & Open — Desktop App Renderer Logic (v2.3.0)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
 //   - Auto-detect keyboard shortcut recorder
 //   - History + Settings
+//   - Generate QR codes from any text/URL
 // ============================================================
 
 let currentPlatform = null;
@@ -97,6 +98,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadSettingsForm();
   document.getElementById("save-settings-btn").addEventListener("click", saveSettings);
   setupShortcutRecorder();
+  setupGenerate();
 });
 
 // ============================================================
@@ -456,6 +458,7 @@ async function loadSettingsForm() {
   document.getElementById("setting-autoopen").checked = settings.autoOpenUrl !== false;
   document.getElementById("setting-copytext").checked = settings.copyTextToClipboard !== false;
   document.getElementById("setting-notify").checked = settings.showNotification !== false;
+  document.getElementById("setting-browserpriority").checked = settings.browserExtensionPriority !== false;
   document.getElementById("setting-maxhistory").value = settings.maxHistory || 50;
 
   // Track the active shortcut and reflect it everywhere
@@ -609,6 +612,7 @@ async function persistShortcut(accelerator) {
     autoOpenUrl: document.getElementById("setting-autoopen").checked,
     copyTextToClipboard: document.getElementById("setting-copytext").checked,
     showNotification: document.getElementById("setting-notify").checked,
+    browserExtensionPriority: document.getElementById("setting-browserpriority").checked,
     maxHistory: parseInt(document.getElementById("setting-maxhistory").value, 10) || 50,
   };
   await window.qrAPI.saveSettings(settings); // main saves + re-registers (suspended → applied on resume)
@@ -622,6 +626,7 @@ async function saveSettings() {
     autoOpenUrl: document.getElementById("setting-autoopen").checked,
     copyTextToClipboard: document.getElementById("setting-copytext").checked,
     showNotification: document.getElementById("setting-notify").checked,
+    browserExtensionPriority: document.getElementById("setting-browserpriority").checked,
     maxHistory: parseInt(document.getElementById("setting-maxhistory").value, 10) || 50,
   };
 
@@ -632,6 +637,72 @@ async function saveSettings() {
   const savedMsg = document.getElementById("settings-saved");
   savedMsg.classList.remove("hidden");
   setTimeout(() => savedMsg.classList.add("hidden"), 2000);
+}
+
+// ============================================================
+// Generate QR Code
+// ============================================================
+
+function setupGenerate() {
+  const input = document.getElementById("gen-input");
+  const ecc = document.getElementById("gen-ecc");
+  const img = document.getElementById("gen-img");
+  const errorEl = document.getElementById("gen-error");
+  const downloadBtn = document.getElementById("gen-download");
+  const copyBtn = document.getElementById("gen-copy");
+
+  let lastDataUrl = "";
+
+  function render() {
+    const text = input.value;
+    errorEl.classList.add("hidden");
+    if (!text) {
+      img.style.display = "none";
+      lastDataUrl = "";
+      return;
+    }
+    try {
+      // qrcode(typeNumber=0 → auto, errorCorrectionLevel) from qrcode-generator (UMD)
+      const qr = qrcode(0, ecc.value);
+      qr.addData(text);
+      qr.make();
+      const dataUrl = qr.createDataURL(6, 4); // cellSize, margin
+      img.src = dataUrl;
+      img.style.display = "block";
+      lastDataUrl = dataUrl;
+    } catch (e) {
+      img.style.display = "none";
+      lastDataUrl = "";
+      errorEl.textContent = "Could not generate: " + (e.message || "text may be too long for a QR code");
+      errorEl.classList.remove("hidden");
+    }
+  }
+
+  if (input) {
+    input.addEventListener("input", render);
+    ecc.addEventListener("change", render);
+  }
+
+  if (downloadBtn) {
+    downloadBtn.addEventListener("click", () => {
+      if (!lastDataUrl) return;
+      const a = document.createElement("a");
+      a.href = lastDataUrl;
+      a.download = "qrcode.png";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+  }
+
+  if (copyBtn) {
+    copyBtn.addEventListener("click", () => {
+      if (!input.value) return;
+      window.qrAPI.copyClipboard(input.value);
+      copyBtn.textContent = "Copied!";
+      setTimeout(() => { copyBtn.textContent = "Copy Text"; }, 1500);
+    });
+  }
 }
 
 // ============================================================

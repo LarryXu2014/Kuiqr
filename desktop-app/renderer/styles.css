@@ -746,3 +746,62 @@ body {
 .hidden {
   display: none !important;
 }
+
+/* ---- Generate QR tab ---- */
+.generate-group {
+  margin-bottom: 16px;
+}
+.generate-input {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  resize: vertical;
+  background: #fff;
+}
+.generate-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+.generate-row {
+  margin-bottom: 16px;
+}
+.generate-col {
+  max-width: 220px;
+}
+.generate-preview {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+}
+.generate-preview img {
+  display: none;
+  max-width: 220px;
+  max-height: 220px;
+  image-rendering: pixelated;
+  background: #fff;
+  padding: 8px;
+  border-radius: 8px;
+}
+.generate-error {
+  color: var(--error);
+  font-size: 13px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+.generate-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}

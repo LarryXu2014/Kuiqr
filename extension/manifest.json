@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "QR Scan & Open",
-  "version": "2.1.0",
-  "description": "Right-click any QR code image to scan and open it in a new tab. Or press Cmd/Ctrl+Shift+Y to scan from the screen with a drag-to-select overlay. Works on Chrome, Edge, Brave, and Firefox.",
+  "version": "2.3.0",
+  "description": "Right-click any QR code image to scan and open it in a new tab. Or set a custom shortcut (Options/Record) to scan from the screen with a drag-to-select overlay. Works on Chrome, Edge, Brave, and Firefox.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -33,16 +33,14 @@
       "128": "icons/icon128.png"
     }
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
-  },
-  "commands": {
-    "scan-screenshot": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+Y",
-        "mac": "Command+Shift+Y"
-      },
-      "description": "Scan QR code from screen with drag-to-select overlay"
-    }
   }
 }

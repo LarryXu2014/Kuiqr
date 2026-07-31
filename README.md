@@ -3,7 +3,7 @@
 > Scan QR codes instantly — right-click, press a keyboard shortcut, or use your camera. Works everywhere.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Version](https://img.shields.io/badge/Version-2.2.2-green.svg)
+![Version](https://img.shields.io/badge/Version-2.3.0-green.svg)
 
 All QR decoding happens **locally on your device** using the [jsQR](https://github.com/cozmo/jsQR) library with robust multi-strategy preprocessing for artistic and decorative QR codes. No images, URLs, or scan data are ever sent to any server.
 
@@ -14,7 +14,7 @@ All QR decoding happens **locally on your device** using the [jsQR](https://gith
 ### macOS (Apple Silicon / M1, M2, M3, M4)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.2-mac-arm64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.0-mac-arm64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
 ```
 
 After dragging to Applications, **first launch only**: open Terminal and run:
@@ -25,7 +25,7 @@ xattr -cr /Applications/QR\ Scan\ \&\ Open.app && open /Applications/QR\ Scan\ \
 ### macOS (Intel)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.2-mac-x64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.0-mac-x64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
 ```
 
 After dragging to Applications, **first launch only**:
@@ -38,7 +38,7 @@ xattr -cr /Applications/QR\ Scan\ \&\ Open.app && open /Applications/QR\ Scan\ \
 ### Windows (x64)
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.2-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"; Start-Process "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"
+Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.0-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"; Start-Process "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"
 ```
 
 ### Chrome / Edge / Brave Extension
@@ -48,7 +48,7 @@ Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Local-QR-Scan/releases/la
 curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-extension.zip -o /tmp/qr-scan-extension.zip && unzip -q /tmp/qr-scan-extension.zip -d ~/qr-scan-extension && echo "Extension extracted to ~/qr-scan-extension — load it from chrome://extensions > Load unpacked"
 ```
 
-> **After installing:** Go to `chrome://extensions/shortcuts` and make sure the shortcut is set to **"In Chrome"** (not "Global"). Press **Cmd+Shift+Y** (Mac) or **Ctrl+Shift+Y** (Windows) to scan.
+> **After installing:** Open the extension popup, click **Record**, and press your shortcut (default **Cmd+Shift+Y** on Mac, **Ctrl+Shift+Y** on Windows). The shortcut is captured right in the popup — no need to touch `chrome://extensions/shortcuts`.
 
 ---
 
@@ -72,7 +72,7 @@ GitHub's release server (`objects.githubusercontent.com`) is throttled in some r
 
 ```bash
 # Replace any GitHub releases URL prefix with ghproxy.com
-curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.2-mac-arm64.dmg" -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.0-mac-arm64.dmg" -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
 ```
 If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 
@@ -82,12 +82,13 @@ If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 
 | Platform                   | File                                                                                                                                           | Size  | Status |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
-| Chrome / Edge / Brave      | [qr-scan-extension.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-extension.zip)                           | 69 KB | Verified |
-| Firefox (109+)             | [qr-scan-firefox.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-firefox.zip)                               | 68 KB | Verified |
-| macOS (Apple Silicon)      | [QR-Scan-Open-2.2.2-mac-arm64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.2-mac-arm64.dmg)     | 95 MB | Verified |
-| macOS (Apple Silicon, ZIP) | [QR-Scan-Open-2.2.2-mac-arm64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.2-mac-arm64.zip)     | 92 MB | Verified |
-| macOS (Intel)              | [QR-Scan-Open-2.2.2-mac-x64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.2-mac-x64.dmg)         | ~100 MB | Verified |
-| Windows (x64)              | [QR-Scan-Open-2.2.2-windows-x64.exe](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.2.2-windows-x64.exe) | ~70 MB | Verified |
+| Chrome / Edge / Brave      | [qr-scan-extension.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-extension.zip)                           | 84 KB | Verified |
+| Firefox (109+)             | [qr-scan-firefox.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-firefox.zip)                               | 84 KB | Verified |
+| macOS (Apple Silicon)      | [QR-Scan-Open-2.3.0-mac-arm64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.0-mac-arm64.dmg)     | ~95 MB | Verified |
+| macOS (Apple Silicon, ZIP) | [QR-Scan-Open-2.3.0-mac-arm64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.0-mac-arm64.zip)     | ~92 MB | Verified |
+| macOS (Intel)              | [QR-Scan-Open-2.3.0-mac-x64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.0-mac-x64.dmg)         | ~100 MB | Verified |
+| macOS (Intel, ZIP)         | [QR-Scan-Open-2.3.0-mac-x64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.0-mac-x64.zip)         | ~97 MB | Verified |
+| Windows (x64)              | [QR-Scan-Open-2.3.0-windows-x64.exe](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.0-windows-x64.exe) | ~70 MB | Verified |
 
 All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 
@@ -97,19 +98,26 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 
 ### Browser Extension (Chrome, Edge, Firefox, Brave)
 
-- **Right-click scan** — Right-click any QR code image → "Scan QR Code" → URL opens in new tab
-- **Keyboard shortcut + drag-to-select** — Press `Cmd/Ctrl+Shift+Y` → screen dims → drag to select QR area → auto-scans
-- **Popup button** — Click extension icon → "Select Area to Scan" → same overlay experience
+- **Right-click scan** — Right-click any QR code image → "Scan QR Code" → URL opens in a **new tab** (never replaces your current page)
+- **Customizable keyboard shortcut** — Press the hotkey to dim the screen and drag-select a QR area. Record any combo you like from the popup (default `Cmd/Ctrl+Shift+Y`); the extension captures it directly — no `chrome://extensions/shortcuts` needed
+- **Clipboard copy that actually works** — Scanned text is copied to your clipboard via a content-script delegate (the old service-worker copy silently failed). URLs still open in a new tab automatically
+- **Scan while browsing, no new window** — Detection runs in the page you're on; scanning never spawns a separate window
+- **Popup button** — Click extension icon → "Select Area to Scan" → same overlay experience, plus a scan history list
+- **Generate QR codes** — Type or paste any text/URL in the popup and get a scannable QR image you can copy or download
 - **Robust decoding** — Multi-strategy preprocessing handles artistic/decorative QR codes, low contrast, color backgrounds, inverted codes, and noisy images
 - **Scan history** — Last 50 scans stored locally
 
 ### Desktop App (macOS, Windows)
 
+- **No new window on trigger** — Pressing the global hotkey no longer forces a visible window open; the app behaves like a screenshot tool and only appears when you need it (it stays in the system tray)
 - **In-app scan** — Paste an image from clipboard (⌘V) or drag & drop any image file — decodes instantly in the app window
 - **Screen capture scan** — Global hotkey `Cmd/Ctrl+Shift+Y` dims the screen with a crosshair for drag-to-select
 - **Auto-detect shortcut recorder** — Click "Press keys to record" in Settings to set any hotkey combo (Cmd+Shift+A, etc.)
+- **Generate QR codes** — New **Generate** tab: enter text/URL, pick error-correction level, and copy or download the QR image
+- **Browser-extension priority** — When a browser is the foreground app and both the app and the extension use the same shortcut, the app steps aside so the extension handles it (toggle in Settings; macOS only)
+- **Fixed Quit** — "Quit" from the tray now fully exits the app (previously it had to be force-quit)
 - **System tray** — Runs in background; click tray icon to show/hide window
-- **Settings tab** — Customize shortcut (auto-record), toggle auto-open URL, notifications, history size
+- **Settings tab** — Customize shortcut (auto-record), browser-extension priority, auto-open URL, notifications, history size
 - **Same robust QR decoder** as the extension — a fast tier (direct + cheap upscales, usually 1–3 attempts) handles normal QR codes instantly, with an advanced threshold/invert fallback only for hard artistic/decorative codes
 
 ### Web App (PWA — iOS, Android, Desktop)
@@ -130,7 +138,8 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 3. Turn on **Developer mode** (top-right corner)
 4. Click **Load unpacked**
 5. Select the unzipped folder
-6. Done! Right-click any QR code image or press `Cmd/Ctrl+Shift+Y`
+6. Open the extension popup, click **Record**, and press your scan shortcut (default `Cmd/Ctrl+Shift+Y`)
+7. Done! Right-click any QR code image or press your shortcut
 
 ### Firefox
 
@@ -138,7 +147,7 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 2. Open `about:debugging#/runtime/this-firefox`
 3. Click **Load Temporary Add-on**
 4. Select `manifest.json` inside the unzipped folder
-5. See [FIREFOX\_INSTALL\_GUIDE.md](firefox/FIREFOX_INSTALL_GUIDE.md) for permanent installation
+5. The Firefox build is the same Manifest V3 add-on (with a Gecko ID baked in), packaged just like the Chrome extension — no separate folder needed.
 
 ### Desktop App
 
@@ -172,9 +181,25 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 
 All processing happens on your device. Zero server communication.
 
+### Generate a QR Code
+
+1. **App** — Open the **Generate** tab, type or paste any text/URL, pick an error-correction level (L/M/Q/H)
+2. **Extension** — Open the popup, type in the **Generate** box
+3. **Copy or download** the rendered QR image — it encodes exactly what you entered (text and links; images can't be embedded, so use a link to the image)
+
 ---
 
 ## What's New
+
+### v2.3.0
+- **Browser extension now copies to clipboard** — Fixed the long-standing bug where scanning text in the extension didn't copy it. The extension now delegates the copy to a content script (service workers can't touch the clipboard directly), so scanned text lands on your clipboard just like the desktop app.
+- **Customizable extension shortcut** — The extension shortcut is now recordable from the popup, exactly like the app. While recording, all QR scanning/detection is fully suspended, and re-pressing the same combo won't start a new scan. Your combo is saved and used immediately.
+- **Browser-extension priority** — If both the app and the extension share the same shortcut and a browser is the foreground app, the desktop app steps aside and lets the extension handle it (macOS). This also fixes the "Chrome minimizes when I press Cmd+Shift+Y" double-trigger glitch.
+- **No new window on trigger (app)** — Pressing the global hotkey no longer pops a new app window — it works like a screenshot tool and only shows the UI when needed.
+- **App fully quits** — "Quit" from the tray now exits the process cleanly (no more force-quit).
+- **Scan opens in a new tab (extension)** — Scanned URLs open in a new browser tab instead of replacing the page you're on.
+- **Generate QR codes** — New for both the app (Generate tab) and the extension (popup): type or paste any text/URL and get a copyable/downloadable QR code.
+- **Extension included in every release** — Chrome and Firefox zips are now published automatically with each release (the Firefox build is packaged from the same source with a Gecko ID). Removed the stale, duplicate `firefox/` folder from the repo.
 
 ### v2.2.2
 - **Fixed the shortcut recorder** — The root cause of several bugs: the global hotkey stayed active *while you were recording a new one*, so pressing the keys both recorded them **and** triggered a scan (opening the capture overlay / "new page"). Now the global shortcut is fully **suspended the moment you click Record** and re-enabled when you finish.
@@ -208,16 +233,14 @@ All processing happens on your device. Zero server communication.
 
 ```
 Local-QR-Scan/
-├── extension/                  # Chrome / Edge / Brave (Manifest V3)
-│   ├── manifest.json           # v2.1.0
-│   ├── background.js           # Service worker + robust QR decoder
-│   ├── popup.html / .css / .js # Popup UI with scan history
+├── extension/                  # Chrome / Edge / Brave / Firefox (Manifest V3)
+│   ├── manifest.json           # v2.3.0 — same source builds both Chrome & Firefox zips
+│   ├── background.js           # Service worker + robust QR decoder + content-script clipboard delegate
+│   ├── content.js              # In-page shortcut listener + clipboard copy
+│   ├── popup.html / .css / .js # Popup UI: scan history, shortcut recorder, QR generator
 │   ├── jsQR.js                 # QR decoding library
+│   ├── qrcode.js               # QR *generation* library (qrcode-generator)
 │   └── icons/
-├── firefox/                    # Firefox (Manifest V3, event page)
-│   ├── manifest.json
-│   ├── background.js           # Same cross-browser code
-│   └── FIREFOX_INSTALL_GUIDE.md
 ├── desktop-app/                # Electron desktop app
 │   ├── package.json            # electron-builder config
 │   ├── main.js                 # Global hotkey, tray, capture, IPC
@@ -256,8 +279,13 @@ No build step needed — pure static files. Load directly from the folder.
 ### Package Zips
 
 ```bash
+# Chrome / Edge / Brave zip (straight from the source folder)
 cd extension && zip -r ../qr-scan-extension.zip . -x "*.DS_Store"
-cd ../firefox && zip -r ../qr-scan-firefox.zip . -x "*.DS_Store"
+
+# Firefox zip — copy source, inject a Gecko ID, then zip
+rm -rf /tmp/ff-build && cp -r extension /tmp/ff-build
+python3 -c "import json; p='/tmp/ff-build/manifest.json'; m=json.load(open(p)); m['browser_specific_settings']={'gecko':{'id':'qr-scan-open@local'}}; json.dump(m,open(p,'w'),indent=2)"
+cd /tmp/ff-build && zip -r /path/to/qr-scan-firefox.zip . -x "*.DS_Store"
 ```
 
 ---

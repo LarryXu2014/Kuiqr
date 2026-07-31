@@ -40,6 +40,13 @@ chrome.runtime.onInstalled.addListener(() => {
     title: "Scan QR Code",
     contexts: ["image"],
   });
+  // Seed a default shortcut if none is stored yet (platform-aware).
+  chrome.storage.local.get("qrShortcut", (res) => {
+    if (!res.qrShortcut) {
+      const isMac = /Mac/i.test(navigator.userAgent || "");
+      chrome.storage.local.set({ qrShortcut: isMac ? "Meta+Shift+Y" : "Control+Shift+Y" });
+    }
+  });
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -66,17 +73,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 });
 
-// ── Keyboard Shortcut (chrome.commands) ──
-chrome.commands.onCommand.addListener(async (command) => {
-  if (command !== "scan-screenshot") return;
-  log("Command received:", command);
-  try {
-    await captureAndShowOverlay();
-  } catch (err) {
-    log("Shortcut handler error:", err);
-    notifyError("Scan failed: " + (err.message || err));
-  }
-});
+// ── Keyboard Shortcut ──
+// The actual trigger is implemented in content.js (a customizable, recorded
+// key combo). content.js sends { action: "showOverlay" } here, which performs
+// the screen capture + overlay. (The old chrome.commands approach was fixed
+// and not customizable, so it was removed.)
 
 // ── Popup handler: show overlay ──
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -642,7 +643,10 @@ async function actOnQRData(rawData, source) {
     chrome.tabs.create({ url: targetUrl });
     notify("Opening QR Code", targetUrl);
   } else {
-    await copyToClipboard(data);
+    // Copy from the page (content script) — the service worker itself
+    // cannot write to the clipboard, so copyToClipboard() here silently
+    // failed before. copyTextToActiveTab() asks the active tab to copy.
+    await copyTextToActiveTab(data);
     notify(
       "QR Code Scanned \u2014 Copied to Clipboard",
       data.length > 100 ? data.slice(0, 100) + "\u2026" : data
@@ -658,6 +662,39 @@ async function copyToClipboard(text) {
   } catch {
     // Silently skip
   }
+}
+
+// Copy text to the clipboard by asking the active tab's content script to do
+// it (the service worker cannot access navigator.clipboard). Falls back to an
+// injected copy, then a best-effort SW copy.
+async function copyTextToActiveTab(text) {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab && tab.id != null) {
+      try {
+        const resp = await chrome.tabs.sendMessage(tab.id, { action: "copyText", text });
+        if (resp && resp.ok) return;
+      } catch (_) {
+        // content script not present on this tab — fall through
+      }
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: (t) => navigator.clipboard && navigator.clipboard.writeText(t),
+          args: [text],
+        });
+        return;
+      } catch (_) {
+        // ignore
+      }
+    }
+  } catch (_) {
+    // ignore
+  }
+  // Last resort (may work on Firefox background page)
+  try {
+    await navigator.clipboard?.writeText(text);
+  } catch (_) {}
 }
 
 function notify(title, message) {

@@ -16,14 +16,37 @@
   </div>
 
   <div id="content">
+    <!-- ── Shortcut + Scan ── -->
     <div class="shortcut-info">
       <div class="shortcut-row">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg>
-        <span>Press <kbd id="shortcut-key">Ctrl+Shift+Y</kbd> or click</span>
+        <span>Current shortcut: <kbd id="shortcut-key">⌘+Shift+Y</kbd></span>
       </div>
+
+      <div class="recorder">
+        <button id="record-btn" class="btn-record" type="button">Record shortcut</button>
+        <span id="record-status" class="record-status"></span>
+      </div>
+
       <button id="scan-btn" class="btn-primary">Select Area to Scan</button>
     </div>
 
+    <!-- ── Generate QR ── -->
+    <div class="generate-section">
+      <h2>Generate QR Code</h2>
+      <p class="tip">Type any text or link to create a QR code (photos can't be embedded — paste a link to an image instead).</p>
+      <textarea id="gen-input" class="generate-input" placeholder="https://example.com or any text…" rows="3"></textarea>
+      <div class="gen-preview">
+        <img id="gen-img" alt="QR code preview" />
+      </div>
+      <p id="gen-error" class="gen-error"></p>
+      <div class="gen-buttons">
+        <button id="gen-download" class="btn-primary">Download PNG</button>
+        <button id="gen-copy" class="btn-text">Copy Text</button>
+      </div>
+    </div>
+
+    <!-- ── History ── -->
     <div id="history-section">
       <div class="section-header">
         <h2>Recent Scans</h2>
@@ -41,6 +64,7 @@
     </div>
   </div>
 
+  <script src="qrcode.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
