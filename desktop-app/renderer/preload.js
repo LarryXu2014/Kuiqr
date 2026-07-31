@@ -27,3 +27,10 @@ contextBridge.exposeInMainWorld("qrAPI", {
   // Tab switching from tray/main process
   onSwitchTab: (callback) => ipcRenderer.on("switch-tab", (e, tab) => callback(tab)),
 });
+
+// Overlay API — used when overlay.html is loaded into the same mainWindow
+contextBridge.exposeInMainWorld("overlayAPI", {
+  decoded: (data) => ipcRenderer.invoke("decoded", data),
+  cancel: () => ipcRenderer.invoke("overlay-cancel"),
+  done: () => ipcRenderer.invoke("overlay-done"),
+});

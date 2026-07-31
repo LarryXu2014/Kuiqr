@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Electron Main Process (v2.2.2)
+// QR Scan & Open — Electron Main Process (v2.3.0)
 // Features:
 //   1. Global hotkey → capture screen → overlay drag-to-select → decode
 //   2. In-app scan: paste from clipboard or drag-drop image → decode instantly
@@ -7,6 +7,7 @@
 //   4. Main window with scan history, settings, manual trigger
 //   5. System tray for background operation (app stays alive on all platforms)
 //   6. All processing local — no data sent to any server
+//   7. Overlay reuses mainWindow (no separate window created)
 // ============================================================
 
 const { app, BrowserWindow, globalShortcut, screen, desktopCapturer, ipcMain, Tray, Menu, nativeImage, shell, clipboard, Notification } = require("electron");
@@ -15,10 +16,11 @@ const fs = require("fs");
 const { execSync } = require("child_process");
 
 let mainWindow = null;
-let overlayWindow = null;
 let tray = null;
 let isQuiting = false; // set true when we actually want to quit (so window-close hides don't block it)
 let lastScreenshot = null; // NativeImage of the full screen capture
+let isInOverlayMode = false;   // true while mainWindow is showing the scan overlay
+let savedWindowState = null;    // saved bounds/state to restore after overlay
 
 const isMac = process.platform === "darwin";
 const isWin = process.platform === "win32";
@@ -131,6 +133,7 @@ function createMainWindow() {
     fullscreenable: false,
     titleBarStyle: isMac ? "hiddenInset" : "default",
     backgroundColor: "#f8fafc",
+    transparent: true,        // allows switching to transparent overlay mode
     icon: path.join(__dirname, "icons", "icon128.png"),
     webPreferences: {
       preload: path.join(__dirname, "renderer", "preload.js"),
@@ -346,46 +349,44 @@ async function triggerScan() {
     const tempPath = path.join(app.getPath("temp"), "qr-scan-screenshot.png");
     fs.writeFileSync(tempPath, lastScreenshot.toPNG());
 
-    // Show the overlay window
-    createOverlayWindow(tempPath, { width, height, scaleFactor });
+    // Transform mainWindow into overlay mode (no new window created)
+    enterOverlayMode(tempPath, { width, height, scaleFactor });
   } catch (err) {
     console.error("Scan error:", err);
     showNotification("QR Scan Error", err.message || "Scan failed");
   }
 }
 
-function createOverlayWindow(screenshotPath, displayInfo) {
-  if (overlayWindow) {
-    overlayWindow.close();
-    overlayWindow = null;
-  }
+// ============================================================
+// Screen Overlay — reuses mainWindow (no separate window)
+// ============================================================
+
+function enterOverlayMode(screenshotPath, displayInfo) {
+  if (!mainWindow || isInOverlayMode) return;
+  isInOverlayMode = true;
 
   const { width, height } = displayInfo;
 
-  overlayWindow = new BrowserWindow({
-    width,
-    height,
-    x: 0,
-    y: 0,
-    fullscreen: true,
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    resizable: false,
-    movable: false,
-    minimizable: false,
-    maximizable: false,
-    skipTaskbar: true,
-    hasShadow: false,
-    backgroundColor: "#00000000",
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: path.join(__dirname, "overlay-preload.js"),
-    },
-  });
+  // Save current window state so we can restore it after scanning
+  savedWindowState = {
+    bounds: mainWindow.getBounds(),
+    resizable: mainWindow.isResizable(),
+    alwaysOnTop: mainWindow.isAlwaysOnTop(),
+  };
 
-  overlayWindow.loadFile(path.join(__dirname, "overlay.html"), {
+  // Transform mainWindow into a fullscreen transparent overlay
+  mainWindow.setAlwaysOnTop(true, "screen-saver");
+  mainWindow.setResizable(false);
+  mainWindow.setBounds({ x: 0, y: 0, width, height });
+  // Use setBackgroundMaterial for transparency on macOS / DWM blur on Windows
+  try {
+    mainWindow.setBackgroundMaterial("acrylic");
+  } catch (e) {
+    // fallback: just rely on transparent: true + CSS background
+  }
+
+  // Load overlay.html into the SAME window (replaces index.html temporarily)
+  mainWindow.loadFile(path.join(__dirname, "overlay.html"), {
     query: {
       screenshot: screenshotPath,
       width: String(width),
@@ -393,35 +394,42 @@ function createOverlayWindow(screenshotPath, displayInfo) {
       scaleFactor: String(displayInfo.scaleFactor),
     },
   });
+}
 
-  overlayWindow.once("ready-to-show", () => {
-    overlayWindow.show();
-    overlayWindow.focus();
-  });
+function exitOverlayMode() {
+  if (!isInOverlayMode || !mainWindow) return;
+  isInOverlayMode = false;
 
-  overlayWindow.on("closed", () => {
-    overlayWindow = null;
-  });
+  // Restore normal window appearance
+  mainWindow.setAlwaysOnTop(savedWindowState ? savedWindowState.alwaysOnTop : false);
+  mainWindow.setResizable(savedWindowState ? savedWindowState.resizable : true);
+
+  try {
+    mainWindow.setBackgroundMaterial("none");
+  } catch (e) { /* ignore */ }
+
+  // Restore original bounds and reload the normal app UI
+  if (savedWindowState && savedWindowState.bounds) {
+    mainWindow.setBounds(savedWindowState.bounds);
+  }
+  savedWindowState = null;
+
+  // Reload main app UI
+  mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
 }
 
 // ============================================================
 // IPC Handlers
 // ============================================================
 
-// Overlay closed without a selection
+// Overlay closed without a selection — restore main window
 ipcMain.handle("overlay-cancel", () => {
-  if (overlayWindow) {
-    overlayWindow.close();
-    overlayWindow = null;
-  }
+  exitOverlayMode();
 });
 
-// Overlay finished — close it
+// Overlay finished — restore main window
 ipcMain.handle("overlay-done", () => {
-  if (overlayWindow) {
-    overlayWindow.close();
-    overlayWindow = null;
-  }
+  exitOverlayMode();
 });
 
 // Renderer requests: trigger scan

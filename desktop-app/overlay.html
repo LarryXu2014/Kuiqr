@@ -163,8 +163,15 @@
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
-      // Load screenshot
+      // Load screenshot — with error handling so we never show a silent black screen
       img.src = "file://" + screenshotPath;
+      img.onerror = () => {
+        // Screenshot failed to load — show clear error instead of black void
+        document.getElementById("root").style.background = "#1e1e2e";
+        hint.textContent = "⚠ Screen capture failed — check Screen Recording permission in System Settings";
+        hint.style.background = "#dc2626";
+        hint.style.opacity = "1";
+      };
 
       // Cancel button
       cancelBtn.addEventListener("click", (e) => {
