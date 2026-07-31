@@ -26,6 +26,13 @@ contextBridge.exposeInMainWorld("qrAPI", {
 
   // Tab switching from tray/main process
   onSwitchTab: (callback) => ipcRenderer.on("switch-tab", (e, tab) => callback(tab)),
+
+  // Hidden decode worker (macOS native scan path): main sends the captured PNG,
+  // the renderer decodes it and reports the result back.
+  onDecodeBuffer: (callback) => ipcRenderer.on("decode-buffer", (e, buffer) => callback(buffer)),
+
+  // Tell the main process this renderer is ready to receive decode jobs.
+  markRendererReady: () => ipcRenderer.send("renderer-ready"),
 });
 
 // Overlay API — used when overlay.html is loaded into the same mainWindow

@@ -1,26 +1,32 @@
 // ============================================================
-// QR Scan & Open — Electron Main Process (v2.3.0)
+// QR Scan & Open — Electron Main Process (v2.3.2)
 // Features:
-//   1. Global hotkey → capture screen → overlay drag-to-select → decode
-//   2. In-app scan: paste from clipboard or drag-drop image → decode instantly
-//   3. Auto-detect keyboard shortcut recorder in Settings
-//   4. Main window with scan history, settings, manual trigger
-//   5. System tray for background operation (app stays alive on all platforms)
-//   6. All processing local — no data sent to any server
-//   7. Overlay reuses mainWindow (no separate window created)
+//   1. Global hotkey → scan
+//   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
+//      system draws the crosshair/dim overlay itself. The app stays in the
+//      background; no Electron window is ever opened while scanning, and the
+//      captured image exists only in memory.
+//   3. Windows / other: Electron overlay that reuses the main window.
+//   4. In-app scan: paste from clipboard or drag-drop image → decode instantly
+//   5. Auto-detect keyboard shortcut recorder in Settings
+//   6. Main window with scan history, settings, manual trigger
+//   7. System tray for background operation (app stays alive on all platforms)
+//   8. All processing local — no data sent to any server
 // ============================================================
 
 const { app, BrowserWindow, globalShortcut, screen, desktopCapturer, ipcMain, Tray, Menu, nativeImage, shell, clipboard, Notification } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const { execSync } = require("child_process");
+const { execSync, spawn } = require("child_process");
 
 let mainWindow = null;
 let tray = null;
 let isQuiting = false; // set true when we actually want to quit (so window-close hides don't block it)
-let lastScreenshot = null; // NativeImage of the full screen capture
-let isInOverlayMode = false;   // true while mainWindow is showing the scan overlay
-let savedWindowState = null;    // saved bounds/state to restore after overlay
+let lastScreenshot = null; // NativeImage of the full screen capture (Windows overlay path)
+let isInOverlayMode = false;   // true while mainWindow is showing the scan overlay (Windows)
+let savedWindowState = null;    // saved bounds/state to restore after overlay (Windows)
+let rendererReady = false;      // set when the renderer signals it's listening for decode jobs
+let pendingDecodeBuffer = null; // captured PNG waiting for the renderer to be ready
 
 const isMac = process.platform === "darwin";
 const isWin = process.platform === "win32";
@@ -127,13 +133,15 @@ function createMainWindow() {
     height: 640,
     minWidth: 380,
     minHeight: 500,
-    show: true, // visible on launch so the user is never "windowless"
+    show: false, // start hidden — the app lives in the background (tray); scanning never shows it
     resizable: true,
     maximizable: false,
     fullscreenable: false,
     titleBarStyle: isMac ? "hiddenInset" : "default",
     backgroundColor: "#f8fafc",
-    transparent: true,        // allows switching to transparent overlay mode
+    // macOS uses the native screencapture UI (no overlay), so an opaque window is fine.
+    // Windows reuses this window as a transparent overlay, so it must be transparent there.
+    transparent: !isMac,
     icon: path.join(__dirname, "icons", "icon128.png"),
     webPreferences: {
       preload: path.join(__dirname, "renderer", "preload.js"),
@@ -309,52 +317,124 @@ async function triggerScan() {
 
     // Extension-priority: if the user enabled it AND a browser is the foreground
     // app, let the browser extension handle the shortcut. This avoids a double
-    // overlay and stops this app from stealing focus / minimizing the browser.
+    // trigger and stops this app from stealing focus / minimizing the browser.
     if (settings.browserExtensionPriority && isForegroundAppBrowser()) {
       console.log("QR Scan: foreground is a browser — deferring to the browser extension.");
       return;
     }
 
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width, height } = primaryDisplay.size;
-    const scaleFactor = primaryDisplay.scaleFactor;
-
-    const sources = await desktopCapturer.getSources({
-      types: ["screen"],
-      thumbnailSize: {
-        width: Math.round(width * scaleFactor),
-        height: Math.round(height * scaleFactor),
-      },
-    });
-
-    if (!sources || sources.length === 0) {
-      showNotification("QR Scan", "Could not capture the screen.");
-      return;
+    if (isMac) {
+      // Native macOS selection UI — no Electron window is ever involved.
+      await scanMacNative();
+    } else {
+      // Windows / other: Electron overlay that reuses the main window.
+      await scanWithOverlay();
     }
+  } catch (err) {
+    console.error("Scan error:", err);
+    showNotification("QR Scan Error", err.message || "Scan failed");
+  }
+}
 
-    // Use the first screen source (primary display)
-    const source = sources[0];
-    lastScreenshot = source.thumbnail;
+// ── macOS: native screen-selection experience ────────────────────────────────
+// We shell out to `screencapture -i` — the SAME tool the built-in macOS
+// screenshot uses. The system draws the crosshair + dim overlay itself. The app
+// window is never opened, shown, or brought to the front. The captured region is
+// loaded into memory, decoded, and discarded. Esc cancels (no file is written).
+const SCREENCAPTURE_BIN = "/usr/sbin/screencapture";
 
-    // On macOS the screen can be blank if Screen Recording permission is missing.
-    if (lastScreenshot.isEmpty()) {
+async function scanMacNative() {
+  if (!fs.existsSync(SCREENCAPTURE_BIN)) {
+    showNotification("QR Scan", "Native screen capture is not available on this system.");
+    return;
+  }
+
+  const tmpPath = path.join(app.getPath("temp"), `qr-scan-${Date.now()}.png`);
+
+  // -x : no shutter sound
+  // -i : interactive — drag a rectangle (or click a window), exactly like the
+  //      built-in screenshot tool. Pressing Esc cancels and writes NO file.
+  const code = await runScreencapture(tmpPath);
+
+  // Cancelled (Esc) or nothing selected → no file written → silently return to idle.
+  if (code !== 0 || !fs.existsSync(tmpPath)) {
+    return;
+  }
+
+  let buffer = null;
+  try {
+    const ni = nativeImage.createFromPath(tmpPath);
+    if (ni.isEmpty()) {
       showNotification(
         "Screen capture blocked",
         "Please grant Screen Recording permission in System Settings → Privacy & Security, then try again."
       );
       return;
     }
-
-    // Save screenshot to a temp file for the overlay to load
-    const tempPath = path.join(app.getPath("temp"), "qr-scan-screenshot.png");
-    fs.writeFileSync(tempPath, lastScreenshot.toPNG());
-
-    // Transform mainWindow into overlay mode (no new window created)
-    enterOverlayMode(tempPath, { width, height, scaleFactor });
-  } catch (err) {
-    console.error("Scan error:", err);
-    showNotification("QR Scan Error", err.message || "Scan failed");
+    buffer = fs.readFileSync(tmpPath);
+  } finally {
+    // The captured image exists only in memory from here on.
+    try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
   }
+
+  if (!buffer) return;
+
+  // Decode in the hidden renderer (it hosts the proven robust QR decoder).
+  // The app stays in the background — no window is shown.
+  if (rendererReady && mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send("decode-buffer", buffer);
+  } else {
+    // Renderer not ready yet — stash and flush once it signals ready.
+    pendingDecodeBuffer = buffer;
+  }
+}
+
+function runScreencapture(tmpPath) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (c) => { if (!done) { done = true; resolve(c); } };
+    const child = spawn(SCREENCAPTURE_BIN, ["-x", "-i", tmpPath]);
+    child.on("close", (code) => finish(code === null ? -1 : code));
+    child.on("error", () => finish(-1));
+    // Failsafe: if screencapture hangs (e.g. a permission prompt), don't block forever.
+    setTimeout(() => finish(-1), 60000);
+  });
+}
+
+// ── Windows / other: Electron overlay (reuses the main window) ───────────────
+async function scanWithOverlay() {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.size;
+  const scaleFactor = primaryDisplay.scaleFactor;
+
+  const sources = await desktopCapturer.getSources({
+    types: ["screen"],
+    thumbnailSize: {
+      width: Math.round(width * scaleFactor),
+      height: Math.round(height * scaleFactor),
+    },
+  });
+
+  if (!sources || sources.length === 0) {
+    showNotification("QR Scan", "Could not capture the screen.");
+    return;
+  }
+
+  const source = sources[0];
+  lastScreenshot = source.thumbnail;
+
+  if (lastScreenshot.isEmpty()) {
+    showNotification(
+      "Screen capture blocked",
+      "Please grant Screen Recording permission in System Settings → Privacy & Security, then try again."
+    );
+    return;
+  }
+
+  const tempPath = path.join(app.getPath("temp"), "qr-scan-screenshot.png");
+  fs.writeFileSync(tempPath, lastScreenshot.toPNG());
+
+  enterOverlayMode(tempPath, { width, height, scaleFactor });
 }
 
 // ============================================================
@@ -471,9 +551,14 @@ ipcMain.handle("copy-clipboard", (event, text) => {
   clipboard.writeText(text);
 });
 
-// Overlay decodes the QR locally and sends the decoded string (or null).
+// Overlay / renderer decodes the QR locally and sends the decoded string (or null).
 // The main process applies the side effects: open URL / copy text / history / notification.
-ipcMain.handle("decoded", (event, data) => {
+ipcMain.handle("decoded", (event, data) => applyDecodedResult(data));
+
+// Single source of truth for what happens after a QR code is decoded (or not):
+// open the URL / copy the text / record history / notify. Used by BOTH the
+// in-app scan path and the native macOS scan path.
+function applyDecodedResult(data) {
   const settings = loadSettings();
 
   if (!data) {
@@ -504,6 +589,16 @@ ipcMain.handle("decoded", (event, data) => {
     showNotification("QR Found — Copied to Clipboard", text.slice(0, 100));
   }
   return { result: "text", data: text };
+}
+
+// Renderer tells us it's ready to receive decode jobs (so we never lose a
+// captured image if a scan happens before the page has finished loading).
+ipcMain.on("renderer-ready", () => {
+  rendererReady = true;
+  if (pendingDecodeBuffer && mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send("decode-buffer", pendingDecodeBuffer);
+    pendingDecodeBuffer = null;
+  }
 });
 
 // ============================================================

@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Desktop App Renderer Logic (v2.3.1)
+// QR Scan & Open — Desktop App Renderer Logic (v2.3.2)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -24,6 +24,26 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Listen for external tab switches (from tray)
   window.qrAPI.onSwitchTab((tab) => switchTab(tab));
+
+  // Tell the main process this renderer is ready to receive decode jobs (so a
+  // scan that happens right after launch is never dropped).
+  window.qrAPI.markRendererReady();
+
+  // ── Hidden decode worker (macOS native scan path) ──
+  // The main process captured the screen with the NATIVE macOS selection UI and
+  // sends the PNG here. We decode it with the same robust decoder and report the
+  // result back. The app window stays hidden the whole time — this just runs the
+  // decoder in the background. No preview is ever shown.
+  window.qrAPI.onDecodeBuffer(async (buffer) => {
+    try {
+      const text = await decodeBufferToText(buffer);
+      await window.qrAPI.onDecoded(text || null);
+      await loadHistory(); // refresh history silently if the window is open
+    } catch (err) {
+      console.error("Hidden decode failed:", err);
+      await window.qrAPI.onDecoded(null);
+    }
+  });
 
   // ── In-App Scan: Paste from Clipboard ──
   const pasteBtn = document.getElementById("paste-btn");
@@ -317,6 +337,25 @@ function invertBin(imageData) {
     d[i] = 255 - d[i]; d[i + 1] = 255 - d[i + 1]; d[i + 2] = 255 - d[i + 2];
   }
   return out;
+}
+
+// ============================================================
+// Hidden decode worker: decode a captured PNG buffer (from the main process).
+// Reuses the same robust decoder as the in-app scanner.
+// ============================================================
+
+async function decodeBufferToText(buffer) {
+  // Electron serializes the Node Buffer to a Uint8Array across the bridge.
+  const arr = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const blob = new Blob([arr], { type: "image/png" });
+  const bmp = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  canvas.width = bmp.width;
+  canvas.height = bmp.height;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(bmp, 0, 0);
+  const result = decodeImageRobust(ctx, canvas.width, canvas.height);
+  return result ? result.data.trim() : null;
 }
 
 // ============================================================
