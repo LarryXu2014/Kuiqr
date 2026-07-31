@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Electron Main Process (v2.3.4)
+// QR Scan & Open — Electron Main Process (v2.3.5)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -427,6 +427,20 @@ ipcMain.handle("open-automation-settings", () => {
       exec('open "x-apple.systempreferences:com.apple.preference.security"');
     } catch { /* ignore */ }
     return { ok: false, reason: String((err && err.message) || err) };
+  }
+});
+
+// Check whether the Automation permission has already been granted (macOS only).
+// The renderer calls this on the Settings tab to decide whether to show or hide
+// the "macOS Automation permission" row — once granted it stays granted, so
+// there's no point showing a button the user no longer needs.
+ipcMain.handle("check-automation-permission", () => {
+  if (!isMac) return { granted: true }; // non-mac: irrelevant, hide the row
+  try {
+    isForegroundAppBrowser(); // will throw if permission was denied
+    return { granted: true };
+  } catch {
+    return { granted: false };
   }
 });
 

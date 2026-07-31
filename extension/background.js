@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Background Service Worker (v2.3.4)
+// QR Scan & Open — Background Service Worker (v2.3.5)
 // Features:
 //   1. Right-click image → "Scan QR Code" (direct decode)
 //   2. Keyboard shortcut Cmd/Ctrl+Shift+Y → capture screen + inject overlay
@@ -117,6 +117,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "decodeCropped") {
     (async () => {
       try {
+        // Notify that scanning has started (same sequence as desktop app)
+        notify("QR Scan", "Scanning\u2026");
         const data = await decodeDataUrl(msg.dataUrl);
         if (!data) {
           log("decodeCropped: no QR found");

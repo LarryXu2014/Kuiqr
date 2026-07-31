@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Desktop App Renderer Logic (v2.3.4)
+// QR Scan & Open — Desktop App Renderer Logic (v2.3.5)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -124,7 +124,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   const autoRow = document.getElementById("automation-permission-row");
   if (autoRow) {
     if (currentPlatform && currentPlatform.isMac) {
-      autoRow.classList.remove("hidden");
+      // Check if permission is already granted — if so, hide the row entirely.
+      try {
+        const perm = await window.qrAPI.checkAutomationPermission();
+        if (perm && perm.granted) {
+          autoRow.classList.add("hidden");
+        } else {
+          autoRow.classList.remove("hidden");
+        }
+      } catch {
+        autoRow.classList.remove("hidden"); // show on error so user can still grant
+      }
     } else {
       autoRow.classList.add("hidden");
     }

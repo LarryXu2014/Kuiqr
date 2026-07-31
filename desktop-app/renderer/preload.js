@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld("qrAPI", {
   // macOS: open System Settings → Privacy & Security → Automation
   openAutomationSettings: () => ipcRenderer.invoke("open-automation-settings"),
 
+  // macOS: check if Automation permission is already granted (to hide the settings row)
+  checkAutomationPermission: () => ipcRenderer.invoke("check-automation-permission"),
+
   // Tab switching from tray/main process
   onSwitchTab: (callback) => ipcRenderer.on("switch-tab", (e, tab) => callback(tab)),
 

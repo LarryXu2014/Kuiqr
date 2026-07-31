@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open - Popup Script (v2.3.4)
+// QR Scan & Open - Popup Script (v2.3.5)
 //   - Shows/sets the customizable shortcut (Record)
 //   - Generate QR codes from any text/URL
 //   - Scan history
