@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Electron Main Process (v2.3.5)
+// QR Scan & Open — Electron Main Process (v2.3.6)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the

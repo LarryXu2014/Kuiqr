@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open - Popup Script (v2.3.5)
+// QR Scan & Open - Popup Script (v2.3.6)
 //   - Shows/sets the customizable shortcut (Record)
 //   - Generate QR codes from any text/URL
 //   - Scan history
@@ -30,6 +30,17 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 3000);
       });
       setTimeout(() => window.close(), 200);
+    });
+  }
+
+  // Open the browser's shortcut-management page (extension popups can't navigate
+  // to chrome:// URLs via a plain anchor, so we open it in a new tab instead).
+  const shortcutsLink = document.getElementById("shortcuts-link");
+  if (shortcutsLink) {
+    shortcutsLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+      window.close();
     });
   }
 });

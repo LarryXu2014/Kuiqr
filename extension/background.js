@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Background Service Worker (v2.3.5)
+// QR Scan & Open — Background Service Worker (v2.3.6)
 // Features:
 //   1. Right-click image → "Scan QR Code" (direct decode)
 //   2. Keyboard shortcut Cmd/Ctrl+Shift+Y → capture screen + inject overlay
@@ -74,10 +74,24 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 // ── Keyboard Shortcut ──
-// The actual trigger is implemented in content.js (a customizable, recorded
-// key combo). content.js sends { action: "showOverlay" } here, which performs
-// the screen capture + overlay. (The old chrome.commands approach was fixed
-// and not customizable, so it was removed.)
+// The PRIMARY, reliable trigger is chrome.commands (declared in manifest.json as
+// "trigger-scan", suggested key Cmd/Ctrl+Shift+Y). Chrome registers it at the
+// browser level — it fires regardless of which tab/page has focus and does NOT
+// depend on a content script or on a page-level keydown listener. This is far
+// more robust than the old content.js page-keydown approach, which only fired
+// when the OS delivered the keystroke to the focused page.
+//
+// content.js ALSO listens for a *custom* recorded shortcut (only when the user
+// changed it from the default). The default key is owned exclusively by
+// chrome.commands, so the two never double-fire.
+chrome.commands.onCommand.addListener((command) => {
+  if (command === "trigger-scan") {
+    captureAndShowOverlay().catch((err) => {
+      log("trigger-scan command error:", err);
+      notifyError(err && err.message ? err.message : "Scan failed");
+    });
+  }
+});
 
 // ── Popup handler: show overlay ──
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

@@ -1,10 +1,13 @@
 // ============================================================
-// QR Scan & Open — Content Script (v2.3.5)
+// QR Scan & Open — Content Script (v2.3.6)
 // Runs in the page context on every allowed site.
 //  1. Copies text to the clipboard when asked by the background
 //     (the service worker cannot write the clipboard itself).
-//  2. Implements the customizable global shortcut: when the user's
-//     saved key combo is pressed on a page, it triggers a scan.
+//  2. Supports a CUSTOM recorded shortcut: when the user has changed
+//     the key combo away from the default (in the popup), pressing it
+//     on a page triggers a scan. The DEFAULT key (Cmd/Ctrl+Shift+Y) is
+//     owned exclusively by chrome.commands (manifest.json) so the two
+//     paths never double-fire.
 //     While the popup is recording a new shortcut (recordingShortcut
 //     flag in storage), detection is fully suppressed so re-pressing
 //     the combo does NOT start a scan — it is captured by the recorder.
@@ -54,10 +57,14 @@
   });
 
   // ── Customizable shortcut trigger ──
+  // NOTE: the DEFAULT key (Cmd/Ctrl+Shift+Y) is handled by chrome.commands at the
+  // browser level (see background.js). We only act here when the user has recorded
+  // a CUSTOM shortcut (storedShortcut !== DEFAULT), so the two never double-fire.
   document.addEventListener(
     "keydown",
     (e) => {
       if (recording) return; // popup is recording a new shortcut — never trigger a scan
+      if (storedShortcut === DEFAULT_SHORTCUT) return; // default key → chrome.commands owns it
       const combo = normalize(e);
       if (!combo) return;
       if (isEditable(e.target)) return; // don't fire while the user is typing in a field
