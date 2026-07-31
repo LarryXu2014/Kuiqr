@@ -216,10 +216,13 @@ function createTray() {
 // while `shortcutSuspended` is true (we just remember the intent). resumeShortcut()
 // re-registers with whatever is currently saved.
 let shortcutSuspended = false;
+let appShortcutActive = false;   // true when an OS-level global shortcut is currently registered
+let fgMonitorTimer = null;       // polls the foreground app to toggle the global shortcut (priority mode)
 
 function suspendShortcut() {
   shortcutSuspended = true;
   globalShortcut.unregisterAll();
+  appShortcutActive = false;
 }
 
 function resumeShortcut() {
@@ -227,13 +230,14 @@ function resumeShortcut() {
   registerShortcut();
 }
 
-function registerShortcut() {
-  // Don't actually register while the user is recording a new shortcut.
-  if (shortcutSuspended) return;
+// Registers the actual OS-level global shortcut (one of the candidates). Exposed
+// so the foreground monitor can re-register after the user switches away from a
+// browser. Returns true if a shortcut is now active.
+function registerAppShortcut() {
+  globalShortcut.unregisterAll();
+  appShortcutActive = false;
 
   const settings = loadSettings();
-  globalShortcut.unregisterAll();
-
   // Try the user's saved shortcut first, then fall back to a few guaranteed-valid
   // accelerators so the hotkey always works even if a stored value became invalid.
   const candidates = [
@@ -251,19 +255,88 @@ function registerShortcut() {
         triggerScan();
       });
       if (ok) {
+        appShortcutActive = true;
         console.log("QR Scan: registered global shortcut:", accel);
-        return;
+        return true;
       }
     } catch (err) {
       console.error("QR Scan: failed to register", accel, err);
     }
   }
+  return false;
+}
 
-  // Nothing registered — tell the user they can still use the tray / in-app button.
-  showNotification(
-    "QR Scan & Open",
-    "Global shortcut unavailable. Use the tray icon or the 'Select Screen Area' button to scan."
-  );
+function registerShortcut() {
+  // Don't actually register while the user is recording a new shortcut.
+  if (shortcutSuspended) return;
+
+  const settings = loadSettings();
+  const priority = !!settings.browserExtensionPriority;
+
+  // ── Browser-extension priority ──────────────────────────────────────────────
+  // The browser extension reacts to Cmd/Ctrl+Shift+Y through a page-keydown
+  // listener in content.js — which only fires when the OS delivers the keystroke
+  // to the browser. If THIS app holds the shortcut as a global hotkey, the OS
+  // routes the key to the app and the extension never sees it. So when priority
+  // is on we must NOT hold the global shortcut while a browser is the foreground
+  // app: we release it (so the extension gets the key) and hold it only when the
+  // user is in a non-browser app. A monitor toggles this as the user switches apps.
+  if (priority && isMac) {
+    if (isForegroundAppBrowser()) {
+      // Browser is foreground right now → release so the extension receives it.
+      globalShortcut.unregisterAll();
+      appShortcutActive = false;
+    } else {
+      // Non-browser foreground → hold the shortcut so this app scans on it.
+      registerAppShortcut();
+    }
+    startForegroundMonitor();
+    return;
+  }
+
+  // Priority off (or non-mac): always hold the global shortcut.
+  stopForegroundMonitor();
+  const ok = registerAppShortcut();
+  if (!ok) {
+    // Nothing registered — tell the user they can still use the tray / in-app button.
+    showNotification(
+      "QR Scan & Open",
+      "Global shortcut unavailable. Use the tray icon or the 'Select Screen Area' button to scan."
+    );
+  }
+}
+
+// ── Foreground-app monitor (browser-extension priority mode) ─────────────────
+// Toggles the OS-level global shortcut based on which app is frontmost so that,
+// with priority enabled, a browser keeps the shortcut (extension fires) and a
+// non-browser app yields it to this app. Polling is used because Electron does
+// not expose a reliable foreground-app-change event without native code.
+function startForegroundMonitor() {
+  if (fgMonitorTimer) return;
+  fgMonitorTimer = setInterval(syncShortcutToForegroundApp, 300);
+  syncShortcutToForegroundApp();
+}
+
+function stopForegroundMonitor() {
+  if (fgMonitorTimer) {
+    clearInterval(fgMonitorTimer);
+    fgMonitorTimer = null;
+  }
+}
+
+function syncShortcutToForegroundApp() {
+  if (shortcutSuspended) return; // recording a new shortcut — leave unregistered
+  const browser = isForegroundAppBrowser();
+  if (browser) {
+    // Release so the browser extension can receive the keystroke.
+    if (appShortcutActive) {
+      globalShortcut.unregisterAll();
+      appShortcutActive = false;
+    }
+  } else {
+    // Re-claim the shortcut for this app.
+    if (!appShortcutActive) registerAppShortcut();
+  }
 }
 
 function reregisterShortcut() {
@@ -313,16 +386,6 @@ function isForegroundAppBrowser() {
 
 async function triggerScan() {
   try {
-    const settings = loadSettings();
-
-    // Extension-priority: if the user enabled it AND a browser is the foreground
-    // app, let the browser extension handle the shortcut. This avoids a double
-    // trigger and stops this app from stealing focus / minimizing the browser.
-    if (settings.browserExtensionPriority && isForegroundAppBrowser()) {
-      console.log("QR Scan: foreground is a browser — deferring to the browser extension.");
-      return;
-    }
-
     if (isMac) {
       // Native macOS selection UI — no Electron window is ever involved.
       await scanMacNative();
@@ -378,6 +441,12 @@ async function scanMacNative() {
   }
 
   if (!buffer) return;
+
+  // Indicate scanning has started (respects the "show notifications" setting).
+  try {
+    const s = loadSettings();
+    if (s.showNotification) showNotification("QR Scan", "Scanning…");
+  } catch { /* ignore */ }
 
   // Decode in the hidden renderer (it hosts the proven robust QR decoder).
   // The app stays in the background — no window is shown.
@@ -605,13 +674,28 @@ ipcMain.on("renderer-ready", () => {
 // Notifications
 // ============================================================
 
+// Keep a reference to every Notification we create. Electron destroys a
+// notification that has no JS reference, which silently prevents it from ever
+// being displayed — a common reason "notifications don't appear". We hold the
+// reference for a while, then release it.
+const activeNotifications = [];
+
 function showNotification(title, body) {
-  if (Notification.isSupported()) {
-    new Notification({
+  if (!Notification.isSupported()) return;
+  try {
+    const n = new Notification({
       title,
       body,
       icon: path.join(__dirname, "icons", "icon128.png"),
-    }).show();
+    });
+    n.show();
+    activeNotifications.push(n);
+    setTimeout(() => {
+      const i = activeNotifications.indexOf(n);
+      if (i !== -1) activeNotifications.splice(i, 1);
+    }, 15000);
+  } catch (err) {
+    console.error("QR Scan: notification failed:", err);
   }
 }
 

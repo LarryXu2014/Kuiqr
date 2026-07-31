@@ -3,7 +3,7 @@
 > Scan QR codes instantly — right-click, press a keyboard shortcut, or use your camera. Works everywhere.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Version](https://img.shields.io/badge/Version-2.3.2-green.svg)
+![Version](https://img.shields.io/badge/Version-2.3.3-green.svg)
 
 All QR decoding happens **locally on your device** using the [jsQR](https://github.com/cozmo/jsQR) library with robust multi-strategy preprocessing for artistic and decorative QR codes. No images, URLs, or scan data are ever sent to any server.
 
@@ -14,7 +14,7 @@ All QR decoding happens **locally on your device** using the [jsQR](https://gith
 ### macOS (Apple Silicon / M1, M2, M3, M4)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.2-mac-arm64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.3-mac-arm64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
 ```
 
 After dragging to Applications, **first launch only**: open Terminal and run:
@@ -25,7 +25,7 @@ xattr -cr /Applications/QR\ Scan\ \&\ Open.app && open /Applications/QR\ Scan\ \
 ### macOS (Intel)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.2-mac-x64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.3-mac-x64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
 ```
 
 After dragging to Applications, **first launch only**:
@@ -38,7 +38,7 @@ xattr -cr /Applications/QR\ Scan\ \&\ Open.app && open /Applications/QR\ Scan\ \
 ### Windows (x64)
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.2-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"; Start-Process "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"
+Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.3-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"; Start-Process "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"
 ```
 
 ### Chrome / Edge / Brave Extension
@@ -72,7 +72,7 @@ GitHub's release server (`objects.githubusercontent.com`) is throttled in some r
 
 ```bash
 # Replace any GitHub releases URL prefix with ghproxy.com
-curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.2-mac-arm64.dmg" -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.3-mac-arm64.dmg" -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
 ```
 If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 
@@ -84,11 +84,11 @@ If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
 | Chrome / Edge / Brave      | [qr-scan-extension.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-extension.zip)                           | 84 KB | Verified |
 | Firefox (109+)             | [qr-scan-firefox.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-firefox.zip)                               | 84 KB | Verified |
-| macOS (Apple Silicon)      | [QR-Scan-Open-2.3.2-mac-arm64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.2-mac-arm64.dmg)     | ~95 MB | Verified |
-| macOS (Apple Silicon, ZIP) | [QR-Scan-Open-2.3.2-mac-arm64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.2-mac-arm64.zip)     | ~92 MB | Verified |
-| macOS (Intel)              | [QR-Scan-Open-2.3.2-mac-x64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.2-mac-x64.dmg)         | ~100 MB | Verified |
-| macOS (Intel, ZIP)         | [QR-Scan-Open-2.3.2-mac-x64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.2-mac-x64.zip)         | ~97 MB | Verified |
-| Windows (x64)              | [QR-Scan-Open-2.3.2-windows-x64.exe](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.2-windows-x64.exe) | ~70 MB | Verified |
+| macOS (Apple Silicon)      | [QR-Scan-Open-2.3.3-mac-arm64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.3-mac-arm64.dmg)     | ~95 MB | Verified |
+| macOS (Apple Silicon, ZIP) | [QR-Scan-Open-2.3.3-mac-arm64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.3-mac-arm64.zip)     | ~92 MB | Verified |
+| macOS (Intel)              | [QR-Scan-Open-2.3.3-mac-x64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.3-mac-x64.dmg)         | ~100 MB | Verified |
+| macOS (Intel, ZIP)         | [QR-Scan-Open-2.3.3-mac-x64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.3-mac-x64.zip)         | ~97 MB | Verified |
+| Windows (x64)              | [QR-Scan-Open-2.3.3-windows-x64.exe](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.3-windows-x64.exe) | ~70 MB | Verified |
 
 All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 
@@ -114,7 +114,7 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 - **Screen capture scan** — Global hotkey `Cmd/Ctrl+Shift+Y` opens the native macOS screen-selection (crosshair → drag a rectangle → release). On Windows it uses an in-app transparent overlay. The app window never appears during a scan.
 - **Auto-detect shortcut recorder** — Click "Press keys to record" in Settings to set any hotkey combo (Cmd+Shift+A, etc.)
 - **Generate QR codes** — New **Generate** tab: enter text/URL, pick error-correction level, and copy or download the QR image
-- **Browser-extension priority** — When a browser is the foreground app and both the app and the extension use the same shortcut, the app steps aside so the extension handles it (toggle in Settings; macOS only)
+- **Browser-extension priority** — When enabled (Settings; macOS only), the app **releases its global shortcut whenever a browser is the foreground app**, so the browser extension's own `Cmd/Ctrl+Shift+Y` fires instead — no double-trigger and no app window popping up. Outside browsers the app keeps the shortcut and scans as normal. Requires macOS **Automation** permission (System Settings → Privacy & Security → Automation → QR Scan & Open) so the app can detect the frontmost app.
 - **Fixed Quit** — "Quit" from the tray now fully exits the app (previously it had to be force-quit)
 - **System tray** — Runs in background; click tray icon to show/hide window
 - **Settings tab** — Customize shortcut (auto-record), browser-extension priority, auto-open URL, notifications, history size
@@ -190,6 +190,10 @@ All processing happens on your device. Zero server communication.
 ---
 
 ## What's New
+
+### v2.3.3
+- **Fixed: Browser-extension priority actually works now** — Previously the desktop app grabbed `Cmd/Ctrl+Shift+Y` as an OS-level global shortcut, which stole the keystroke from the browser extension (its `content.js` keydown listener never received it), so the extension couldn't trigger. Now, with priority enabled, the app **releases the global shortcut whenever a browser is the foreground app** and re-claims it outside browsers. The browser extension cleanly receives the hotkey. Requires macOS Automation permission so the app can detect the frontmost app.
+- **Fixed: Notifications now appear** — Notifications were being garbage-collected before they displayed (the `Notification` object wasn't retained). They are now held for 15s so the "Scanning…" / "Opening URL" / "No QR Found" notifications actually show. Added a **"Scanning…" notification** so you get feedback the moment a capture is taken.
 
 ### v2.3.2
 - **macOS scan now uses the native screen-selection UI** — Pressing the shortcut (or the tray "Scan Screen" / in-app button) now invokes the **built-in macOS screenshot selection** (`screencapture -i`). The system draws the crosshair and dim overlay itself — exactly like the native macOS QR-scan workflow. The QR Scan & Open app window is **never opened, shown, or brought to the front** during a scan.

@@ -163,7 +163,7 @@
       <div class="setting-item">
         <div class="setting-info">
           <div class="setting-label">Browser extension priority</div>
-          <div class="setting-desc">When a web browser is the frontmost app, let the QR Scan &amp; Open extension handle the shortcut instead of this app. Prevents a double scan and keeps your browser focused.</div>
+          <div class="setting-desc">When a web browser is the frontmost app, this app releases the global shortcut so the QR Scan &amp; Open extension handles it instead (no double scan, no app window popping up). Requires macOS Automation permission (System Settings → Privacy &amp; Security → Automation) so the app can detect the frontmost app.</div>
         </div>
         <label class="toggle">
           <input type="checkbox" id="setting-browserpriority" />
@@ -194,7 +194,7 @@
 
     <div class="about-section">
       <h3>About</h3>
-      <p>QR Scan &amp; Open v2.3.2</p>
+      <p>QR Scan &amp; Open v2.3.3</p>
       <p>All processing is local. No data is sent to any server.</p>
       <p class="platform-info" id="platform-info"></p>
     </div>
