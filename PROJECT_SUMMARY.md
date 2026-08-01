@@ -1,4 +1,4 @@
-# Quiqr — Project Summary
+# Kuiqr — Project Summary
 
 > **Purpose:** This file captures the full state of the project so it can be continued in a new chat.
 > Read this file first to understand everything that has been done and what remains.
@@ -7,7 +7,7 @@
 
 ## 1. Project Overview
 
-**Quiqr** is a cross-platform QR code scanning suite with multiple deliverables:
+**Kuiqr** is a cross-platform QR code scanning suite with multiple deliverables:
 
 1. **Browser Extension** (Chrome/Edge/Brave) — right-click scan + keyboard shortcut drag-to-select
 2. **Firefox Extension** — same features, MV3-compatible with `background.scripts`
@@ -67,8 +67,8 @@ qr-scanner/
 │   ├── js/jsQR.js                   # QR decoding library
 │   └── icons/                       # PWA icons
 │
-├── quiqr-extension.zip            # Packaged Chrome extension (70KB)
-├── quiqr-firefox.zip              # Packaged Firefox extension (71KB)
+├── kuiqr-extension.zip            # Packaged Chrome extension (70KB)
+├── kuiqr-firefox.zip              # Packaged Firefox extension (71KB)
 ├── README.md                        # Main readme (needs updating for new structure)
 ├── PROJECT_SUMMARY.md               # THIS FILE
 └── .gitignore                       # (NEEDS CREATING)
@@ -97,7 +97,7 @@ qr-scanner/
 - **Status:** Code is ready. Needs testing in Firefox.
 - **Key differences from Chrome version:**
   - `manifest.json`: uses `background.scripts: ["jsQR.js", "background.js"]` instead of `background.service_worker`
-  - `browser_specific_settings.gecko.id`: "quiqr@quiqr.app"
+  - `browser_specific_settings.gecko.id`: "kuiqr@kuiqr.app"
   - `strict_min_version`: "109.0" (MV3 support)
   - No `alarms` permission needed (Firefox doesn't kill background pages like Chrome MV3)
 - **Testing instructions:** See `firefox/FIREFOX_INSTALL_GUIDE.md`
@@ -134,7 +134,7 @@ qr-scanner/
 - **Status:** Single-page HTML site with all download options.
 - **Cards:** Chrome/Edge, Firefox, macOS App, Windows App, Web App (PWA)
 - **Features:** Platform detection, responsive design, feature grid, how-it-works section, privacy banner
-- **GitHub links:** Point to `https://github.com/quiqr/quiqr` (repo not created yet)
+- **GitHub links:** Point to `https://github.com/kuiqr/kuiqr` (repo not created yet)
 
 ---
 
@@ -146,12 +146,12 @@ qr-scanner/
 4. Electron desktop app — built for macOS (arm64 + x64) and Windows (x64)
 5. Landing page — complete with platform cards
 6. Web app (PWA) — camera / upload / paste scanning
-7. Extension zips packaged — quiqr-extension.zip, quiqr-firefox.zip
+7. Extension zips packaged — kuiqr-extension.zip, kuiqr-firefox.zip
 8. "Scan whole page" removed from popup (user requested)
 
 ## 5. What's PENDING
 
-1. **Set up GitHub repository** — push to `LarryXu2014/Quiqr`, create releases with binaries
+1. **Set up GitHub repository** — push to `LarryXu2014/Kuiqr`, create releases with binaries
 2. **Test Firefox extension** — load in Firefox, verify overlay injection works
 3. **Update README.md** — reflect current structure (firefox/, desktop-app/)
 4. **Redeploy web app** if CloudStudio sandbox expired
@@ -234,8 +234,8 @@ When starting a new chat, paste this:
 - Firefox: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/firefox/`
 - Desktop app: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/desktop-app/`
 - Web app: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/web-app/`
-- Chrome zip: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/quiqr-extension.zip`
-- Firefox zip: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/quiqr-firefox.zip`
+- Chrome zip: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/kuiqr-extension.zip`
+- Firefox zip: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/kuiqr-firefox.zip`
 - This summary: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/PROJECT_SUMMARY.md`
 
 ### Build Commands
@@ -257,11 +257,11 @@ cd /Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/desktop-app
 
 # Package Chrome extension zip
 cd /Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/extension
-zip -r ../quiqr-extension.zip . -x "*.DS_Store"
+zip -r ../kuiqr-extension.zip . -x "*.DS_Store"
 
 # Package Firefox extension zip
 cd /Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/firefox
-zip -r ../quiqr-firefox.zip . -x "*.DS_Store"
+zip -r ../kuiqr-firefox.zip . -x "*.DS_Store"
 ```
 
 ---

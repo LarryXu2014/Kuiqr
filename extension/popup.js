@@ -1,5 +1,5 @@
 // ============================================================
-// Quiqr - Popup Script (v2.4.0)
+// Kuiqr - Popup Script (v2.4.0)
 //   - Shows/sets the customizable shortcut (Record)
 //   - Generate QR codes from any text/URL
 //   - Scan history

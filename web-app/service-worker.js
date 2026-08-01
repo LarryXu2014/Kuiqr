@@ -1,5 +1,5 @@
 // ============================================================
-// Quiqr — Service Worker (Offline Support)
+// Kuiqr — Service Worker (Offline Support)
 // ============================================================
 
 const CACHE_NAME = "qr-scanner-v1";
