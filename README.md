@@ -45,7 +45,7 @@ Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Kuiqr/releases/latest/dow
 
 ```bash
 # Download and extract
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension.zip -o /tmp/kuiqr-extension.zip && unzip -q /tmp/kuiqr-extension.zip -d ~/kuiqr-extension && echo "Extension extracted to ~/kuiqr-extension — load it from chrome://extensions > Load unpacked"
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension-2.4.0.zip -o /tmp/kuiqr-extension-2.4.0.zip && unzip -q /tmp/kuiqr-extension-2.4.0.zip -d ~/kuiqr-extension && echo "Extension extracted to ~/kuiqr-extension — load it from chrome://extensions > Load unpacked"
 ```
 
 > **After installing:** Open the extension popup, click **Record**, and press your shortcut (default **Cmd+Shift+Y** on Mac, **Ctrl+Shift+Y** on Windows). The shortcut is captured right in the popup — no need to touch `chrome://extensions/shortcuts`.
@@ -82,8 +82,8 @@ If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 
 | Platform                   | File                                                                                                                                           | Size  | Status |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
-| Chrome / Edge / Brave      | [kuiqr-extension.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension.zip)                           | 84 KB | Verified |
-| Firefox (109+)             | [kuiqr-firefox.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-firefox.zip)                               | 84 KB | Verified |
+| Chrome / Edge / Brave      | [kuiqr-extension-2.4.0.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension-2.4.0.zip)                           | 84 KB | Verified |
+| Firefox (109+)             | [kuiqr-firefox-2.4.0.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-firefox-2.4.0.zip)                               | 84 KB | Verified |
 | macOS (Apple Silicon)      | [Kuiqr-2.4.0-mac-arm64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.0-mac-arm64.dmg)     | ~95 MB | Verified |
 | macOS (Apple Silicon, ZIP) | [Kuiqr-2.4.0-mac-arm64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.0-mac-arm64.zip)     | ~92 MB | Verified |
 | macOS (Intel)              | [Kuiqr-2.4.0-mac-x64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.0-mac-x64.dmg)         | ~100 MB | Verified |
@@ -133,7 +133,7 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 
 ### Chrome / Edge / Brave / Opera
 
-1. Download `kuiqr-extension.zip` and unzip it
+1. Download `kuiqr-extension-2.4.0.zip` and unzip it
 2. Open `chrome://extensions` (or `edge://extensions`)
 3. Turn on **Developer mode** (top-right corner)
 4. Click **Load unpacked**
@@ -143,7 +143,7 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 
 ### Firefox
 
-1. Download `kuiqr-firefox.zip` and unzip it
+1. Download `kuiqr-firefox-2.4.0.zip` and unzip it
 2. Open `about:debugging#/runtime/this-firefox`
 3. Click **Load Temporary Add-on**
 4. Select `manifest.json` inside the unzipped folder
@@ -311,12 +311,12 @@ No build step needed — pure static files. Load directly from the folder.
 
 ```bash
 # Chrome / Edge / Brave zip (straight from the source folder)
-cd extension && zip -r ../kuiqr-extension.zip . -x "*.DS_Store"
+cd extension && zip -r ../kuiqr-extension-2.4.0.zip . -x "*.DS_Store"
 
 # Firefox zip — copy source, inject a Gecko ID, then zip
 rm -rf /tmp/ff-build && cp -r extension /tmp/ff-build
 python3 -c "import json; p='/tmp/ff-build/manifest.json'; m=json.load(open(p)); m['browser_specific_settings']={'gecko':{'id':'kuiqr@local'}}; json.dump(m,open(p,'w'),indent=2)"
-cd /tmp/ff-build && zip -r /path/to/kuiqr-firefox.zip . -x "*.DS_Store"
+cd /tmp/ff-build && zip -r /path/to/kuiqr-firefox-2.4.0.zip . -x "*.DS_Store"
 ```
 
 ---

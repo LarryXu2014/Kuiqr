@@ -42,8 +42,8 @@ git push origin v2.1.0
 
 | File | Platform |
 |------|----------|
-| `kuiqr-extension.zip` | Chrome / Edge / Brave / Opera |
-| `kuiqr-firefox.zip` | Firefox 109+ |
+| `kuiqr-extension-2.4.0.zip` | Chrome / Edge / Brave / Opera |
+| `kuiqr-firefox-2.4.0.zip` | Firefox 109+ |
 | `Kuiqr-2.1.0-mac-arm64.dmg` | macOS Apple Silicon (M1/M2/M3/M4) |
 | `Kuiqr-2.1.0-mac-arm64.zip` | macOS Apple Silicon (zip format) |
 | `Kuiqr-2.1.0-mac-x64.dmg` | macOS Intel |
@@ -72,8 +72,8 @@ Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Kuiqr/releases/latest/dow
 ```
 
 6. **Upload these files** from your local `releases/` folder:
-   - `kuiqr-extension.zip` (69 KB)
-   - `kuiqr-firefox.zip` (68 KB)
+   - `kuiqr-extension-2.4.0.zip` (69 KB)
+   - `kuiqr-firefox-2.4.0.zip` (68 KB)
    - `Kuiqr-2.1.0-mac-arm64.dmg` (91 MB)
    - `Kuiqr-2.1.0-mac-arm64.zip` (87 MB)
    - `Kuiqr-2.1.0-windows-x64.exe` (67 MB)

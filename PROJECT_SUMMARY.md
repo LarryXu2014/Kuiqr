@@ -67,8 +67,8 @@ qr-scanner/
 │   ├── js/jsQR.js                   # QR decoding library
 │   └── icons/                       # PWA icons
 │
-├── kuiqr-extension.zip            # Packaged Chrome extension (70KB)
-├── kuiqr-firefox.zip              # Packaged Firefox extension (71KB)
+├── kuiqr-extension-2.4.0.zip            # Packaged Chrome extension (70KB)
+├── kuiqr-firefox-2.4.0.zip              # Packaged Firefox extension (71KB)
 ├── README.md                        # Main readme (needs updating for new structure)
 ├── PROJECT_SUMMARY.md               # THIS FILE
 └── .gitignore                       # (NEEDS CREATING)
@@ -146,7 +146,7 @@ qr-scanner/
 4. Electron desktop app — built for macOS (arm64 + x64) and Windows (x64)
 5. Landing page — complete with platform cards
 6. Web app (PWA) — camera / upload / paste scanning
-7. Extension zips packaged — kuiqr-extension.zip, kuiqr-firefox.zip
+7. Extension zips packaged — kuiqr-extension-2.4.0.zip, kuiqr-firefox-2.4.0.zip
 8. "Scan whole page" removed from popup (user requested)
 
 ## 5. What's PENDING
@@ -234,8 +234,8 @@ When starting a new chat, paste this:
 - Firefox: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/firefox/`
 - Desktop app: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/desktop-app/`
 - Web app: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/web-app/`
-- Chrome zip: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/kuiqr-extension.zip`
-- Firefox zip: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/kuiqr-firefox.zip`
+- Chrome zip: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/kuiqr-extension-2.4.0.zip`
+- Firefox zip: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/kuiqr-firefox-2.4.0.zip`
 - This summary: `/Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/PROJECT_SUMMARY.md`
 
 ### Build Commands
@@ -257,11 +257,11 @@ cd /Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/desktop-app
 
 # Package Chrome extension zip
 cd /Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/extension
-zip -r ../kuiqr-extension.zip . -x "*.DS_Store"
+zip -r ../kuiqr-extension-2.4.0.zip . -x "*.DS_Store"
 
 # Package Firefox extension zip
 cd /Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner/firefox
-zip -r ../kuiqr-firefox.zip . -x "*.DS_Store"
+zip -r ../kuiqr-firefox-2.4.0.zip . -x "*.DS_Store"
 ```
 
 ---
