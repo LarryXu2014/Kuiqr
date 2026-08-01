@@ -172,7 +172,7 @@ function createMainWindow() {
 }
 
 function showMainWindow() {
-  if (!mainWindow) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
     createMainWindow();
     mainWindow.once("ready-to-show", () => {
       mainWindow.show();
@@ -199,7 +199,7 @@ function createTray() {
     { label: "Scan Screen", click: () => triggerScan() },
     { type: "separator" },
     { label: "Show Window", click: () => showMainWindow() },
-    { label: "Settings", click: () => { showMainWindow(); mainWindow.webContents.send("switch-tab", "settings"); } },
+    { label: "Settings", click: () => { showMainWindow(); mainWindow?.webContents?.send("switch-tab", "settings"); } },
     { type: "separator" },
     { label: "Quit", click: () => { isQuiting = true; globalShortcut.unregisterAll(); app.quit(); } },
   ]);
@@ -571,7 +571,7 @@ async function scanWithOverlay() {
 // ============================================================
 
 function enterOverlayMode(screenshotPath, displayInfo) {
-  if (!mainWindow || isInOverlayMode) return;
+  if (!mainWindow || mainWindow.isDestroyed() || isInOverlayMode) return;
   isInOverlayMode = true;
 
   const { width, height } = displayInfo;
