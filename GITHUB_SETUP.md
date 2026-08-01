@@ -1,6 +1,6 @@
 # GitHub Setup Guide
 
-Your repo is already created at **https://github.com/LarryXu2014/Qapture**
+Your repo is already created at **https://github.com/LarryXu2014/Quiqr**
 
 ## Step 1: Push the Code
 
@@ -10,7 +10,7 @@ Open Terminal and run:
 cd /Users/stit/WorkBuddy/2026-07-14-23-07-50/qr-scanner
 
 # Add your GitHub remote
-git remote add origin https://github.com/LarryXu2014/Qapture.git
+git remote add origin https://github.com/LarryXu2014/Quiqr.git
 
 # Push everything
 git push -u origin main --force
@@ -23,10 +23,10 @@ git push origin v2.1.0
 
 ## Step 2: Create a GitHub Release with Binaries
 
-1. Go to https://github.com/LarryXu2014/Qapture/releases
+1. Go to https://github.com/LarryXu2014/Quiqr/releases
 2. Click **Create a new release**
 3. Choose tag: `v2.1.0`
-4. Release title: `v2.1.0 — Robust Qapture for All Platforms`
+4. Release title: `v2.1.0 — Robust Quiqr for All Platforms`
 5. Description (copy-paste this):
 
 ```markdown
@@ -42,47 +42,47 @@ git push origin v2.1.0
 
 | File | Platform |
 |------|----------|
-| `qapture-extension.zip` | Chrome / Edge / Brave / Opera |
-| `qapture-firefox.zip` | Firefox 109+ |
-| `Qapture-2.1.0-mac-arm64.dmg` | macOS Apple Silicon (M1/M2/M3/M4) |
-| `Qapture-2.1.0-mac-arm64.zip` | macOS Apple Silicon (zip format) |
-| `Qapture-2.1.0-mac-x64.dmg` | macOS Intel |
-| `Qapture-2.1.0-windows-x64.exe` | Windows x64 (portable, no install) |
+| `quiqr-extension.zip` | Chrome / Edge / Brave / Opera |
+| `quiqr-firefox.zip` | Firefox 109+ |
+| `Quiqr-2.1.0-mac-arm64.dmg` | macOS Apple Silicon (M1/M2/M3/M4) |
+| `Quiqr-2.1.0-mac-arm64.zip` | macOS Apple Silicon (zip format) |
+| `Quiqr-2.1.0-mac-x64.dmg` | macOS Intel |
+| `Quiqr-2.1.0-windows-x64.exe` | Windows x64 (portable, no install) |
 
 ## Quick Install
 
 **macOS Apple Silicon (Terminal):**
 ```
-curl -L https://github.com/LarryXu2014/Qapture/releases/latest/download/Qapture-2.1.0-mac-arm64.dmg -o ~/Downloads/Qapture.dmg && open ~/Downloads/Qapture.dmg
+curl -L https://github.com/LarryXu2014/Quiqr/releases/latest/download/Quiqr-2.1.0-mac-arm64.dmg -o ~/Downloads/Quiqr.dmg && open ~/Downloads/Quiqr.dmg
 ```
-After dragging to Applications, first launch: `xattr -cr /Applications/QR\ Scan\ \&\ Open.app`
+After dragging to Applications, first launch: `xattr -cr /Applications/Quiqr.app`
 
 **macOS Intel (Terminal):**
 ```
-curl -L https://github.com/LarryXu2014/Qapture/releases/latest/download/Qapture-2.1.0-mac-x64.dmg -o ~/Downloads/Qapture.dmg && open ~/Downloads/Qapture.dmg
+curl -L https://github.com/LarryXu2014/Quiqr/releases/latest/download/Quiqr-2.1.0-mac-x64.dmg -o ~/Downloads/Quiqr.dmg && open ~/Downloads/Quiqr.dmg
 ```
-After dragging to Applications, first launch: `xattr -cr /Applications/QR\ Scan\ \&\ Open.app`
+After dragging to Applications, first launch: `xattr -cr /Applications/Quiqr.app`
 
 **Windows (PowerShell):**
 ```
-Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Qapture/releases/latest/download/Qapture-2.1.0-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\Qapture.exe"; Start-Process "$env:USERPROFILE\Downloads\Qapture.exe"
+Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Quiqr/releases/latest/download/Quiqr-2.1.0-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\Quiqr.exe"; Start-Process "$env:USERPROFILE\Downloads\Quiqr.exe"
 ```
 
-> **macOS "damaged" error?** This is a Gatekeeper false positive (not actual corruption). Run: `xattr -cr /Applications/QR\ Scan\ \&\ Open.app` — one-time fix, 2 seconds.
+> **macOS "damaged" error?** This is a Gatekeeper false positive (not actual corruption). Run: `xattr -cr /Applications/Quiqr.app` — one-time fix, 2 seconds.
 ```
 
 6. **Upload these files** from your local `releases/` folder:
-   - `qapture-extension.zip` (69 KB)
-   - `qapture-firefox.zip` (68 KB)
-   - `Qapture-2.1.0-mac-arm64.dmg` (91 MB)
-   - `Qapture-2.1.0-mac-arm64.zip` (87 MB)
-   - `Qapture-2.1.0-windows-x64.exe` (67 MB)
+   - `quiqr-extension.zip` (69 KB)
+   - `quiqr-firefox.zip` (68 KB)
+   - `Quiqr-2.1.0-mac-arm64.dmg` (91 MB)
+   - `Quiqr-2.1.0-mac-arm64.zip` (87 MB)
+   - `Quiqr-2.1.0-windows-x64.exe` (67 MB)
 
 7. Click **Publish release**
 
 ## Step 3: Done!
 
-Your repo is live at **https://github.com/LarryXu2014/Qapture**
+Your repo is live at **https://github.com/LarryXu2014/Quiqr**
 
 People can now:
 - Copy the curl command from the README to install instantly

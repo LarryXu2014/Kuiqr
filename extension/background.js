@@ -1,5 +1,5 @@
 // ============================================================
-// Qapture — Background Service Worker (v2.4.0)
+// Quiqr — Background Service Worker (v2.4.0)
 // Features:
 //   1. Right-click image → "Scan QR Code" (direct decode)
 //   2. Keyboard shortcut Cmd/Ctrl+Shift+Y → capture screen + inject overlay
@@ -15,7 +15,7 @@ if (typeof importScripts === "function") {
 }
 
 function log(...args) {
-  console.log("[Qapture]", ...args);
+  console.log("[Quiqr]", ...args);
 }
 
 log("Service worker started v1.6.0");
@@ -132,7 +132,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
       try {
         // Notify that scanning has started (same sequence as desktop app)
-        notify("Qapture", "Scanning\u2026");
+        notify("Quiqr", "Scanning\u2026");
         const data = await decodeDataUrl(msg.dataUrl);
         if (!data) {
           log("decodeCropped: no QR found");
@@ -734,7 +734,7 @@ function notify(title, message) {
 }
 
 function notifyError(message) {
-  notify("Qapture Error", message);
+  notify("Quiqr Error", message);
 }
 
 async function saveToHistory(data, srcUrl, type, error) {

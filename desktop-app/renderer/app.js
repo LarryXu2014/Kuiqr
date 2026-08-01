@@ -1,5 +1,5 @@
 // ============================================================
-// Qapture — Desktop App Renderer Logic (v2.4.0)
+// Quiqr — Desktop App Renderer Logic (v2.4.0)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)

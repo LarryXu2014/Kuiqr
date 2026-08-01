@@ -1,5 +1,5 @@
 // ============================================================
-// Qapture — Electron Main Process (v2.4.0)
+// Quiqr — Electron Main Process (v2.4.0)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -193,7 +193,7 @@ function createTray() {
   const trayIcon = nativeImage.createFromPath(iconPath);
 
   tray = new Tray(trayIcon);
-  tray.setToolTip("Qapture");
+  tray.setToolTip("Quiqr");
 
   const contextMenu = Menu.buildFromTemplate([
     { label: "Scan Screen", click: () => triggerScan() },
@@ -264,11 +264,11 @@ function registerAppShortcut() {
       });
       if (ok) {
         appShortcutActive = true;
-        console.log("Qapture: registered global shortcut:", accel);
+        console.log("Quiqr: registered global shortcut:", accel);
         return true;
       }
     } catch (err) {
-      console.error("Qapture: failed to register", accel, err);
+      console.error("Quiqr: failed to register", accel, err);
     }
   }
   return false;
@@ -308,7 +308,7 @@ function registerShortcut() {
   if (!ok) {
     // Nothing registered — tell the user they can still use the tray / in-app button.
     showNotification(
-      "Qapture",
+      "Quiqr",
       "Global shortcut unavailable. Use the tray icon or the 'Select Screen Area' button to scan."
     );
   }
@@ -397,7 +397,7 @@ function isForegroundAppBrowser() {
 // ============================================================
 // The browser-extension priority feature needs to know which app is frontmost,
 // which we read via AppleScript / System Events. The FIRST time the app does this,
-// macOS shows its OWN native alert ("Qapture wants to control System
+// macOS shows its OWN native alert ("Quiqr wants to control System
 // Events"). We deliberately run that osascript once at launch so the user is asked
 // for the permission up front — there is no custom dialog, just the OS popup.
 // (macOS only prompts once per app. If it was already granted or denied the alert
@@ -455,7 +455,7 @@ async function triggerScan() {
     }
   } catch (err) {
     console.error("Scan error:", err);
-    showNotification("Qapture Error", err.message || "Scan failed");
+    showNotification("Quiqr Error", err.message || "Scan failed");
   }
 }
 
@@ -468,7 +468,7 @@ const SCREENCAPTURE_BIN = "/usr/sbin/screencapture";
 
 async function scanMacNative() {
   if (!fs.existsSync(SCREENCAPTURE_BIN)) {
-    showNotification("Qapture", "Native screen capture is not available on this system.");
+    showNotification("Quiqr", "Native screen capture is not available on this system.");
     return;
   }
 
@@ -505,7 +505,7 @@ async function scanMacNative() {
   // Indicate scanning has started (respects the "show notifications" setting).
   try {
     const s = loadSettings();
-    if (s.showNotification) showNotification("Qapture", "Scanning…");
+    if (s.showNotification) showNotification("Quiqr", "Scanning…");
   } catch { /* ignore */ }
 
   // Decode in the hidden renderer (it hosts the proven robust QR decoder).
@@ -545,7 +545,7 @@ async function scanWithOverlay() {
   });
 
   if (!sources || sources.length === 0) {
-    showNotification("Qapture", "Could not capture the screen.");
+    showNotification("Quiqr", "Could not capture the screen.");
     return;
   }
 
@@ -755,7 +755,7 @@ function showNotification(title, body) {
       if (i !== -1) activeNotifications.splice(i, 1);
     }, 15000);
   } catch (err) {
-    console.error("Qapture: notification failed:", err);
+    console.error("Quiqr: notification failed:", err);
   }
 }
 

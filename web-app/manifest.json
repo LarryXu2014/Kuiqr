@@ -1,6 +1,6 @@
 {
-  "name": "Qapture",
-  "short_name": "Qapture",
+  "name": "Quiqr",
+  "short_name": "Quiqr",
   "description": "Scan QR codes instantly with your camera or by uploading an image. Works on all devices.",
   "start_url": "./",
   "scope": "./",
