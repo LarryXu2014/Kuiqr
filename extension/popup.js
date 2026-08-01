@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open - Popup Script (v2.3.7)
+// Qapture - Popup Script (v2.4.0)
 //   - Shows/sets the customizable shortcut (Record)
 //   - Generate QR codes from any text/URL
 //   - Scan history

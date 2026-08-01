@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Content Script (v2.3.7)
+// Qapture — Content Script (v2.4.0)
 // Runs in the page context on every allowed site.
 //  1. Copies text to the clipboard when asked by the background
 //     (the service worker cannot write the clipboard itself).

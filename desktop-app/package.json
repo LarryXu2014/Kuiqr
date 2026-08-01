@@ -1,9 +1,9 @@
 {
-  "name": "qr-scan-open",
-  "version": "2.3.7",
+  "name": "qapture",
+  "version": "2.4.0",
   "description": "Scan QR codes anywhere on your screen with a global keyboard shortcut. Works on Windows and macOS.",
   "main": "main.js",
-  "author": "QR Scan & Open",
+  "author": "Qapture",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
@@ -17,8 +17,8 @@
     "electron-builder": "^24.13.0"
   },
   "build": {
-    "appId": "com.qrscanopen.app",
-    "productName": "QR Scan & Open",
+    "appId": "com.qapture.app",
+    "productName": "Qapture",
     "directories": {
       "output": "dist"
     },

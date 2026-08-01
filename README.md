@@ -1,9 +1,9 @@
-# QR Scan & Open
+# Qapture
 
 > Scan QR codes instantly — right-click, press a keyboard shortcut, or use your camera. Works everywhere.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Version](https://img.shields.io/badge/Version-2.3.7-green.svg)
+![Version](https://img.shields.io/badge/Version-2.4.0-green.svg)
 
 All QR decoding happens **locally on your device** using the [jsQR](https://github.com/cozmo/jsQR) library with robust multi-strategy preprocessing for artistic and decorative QR codes. No images, URLs, or scan data are ever sent to any server.
 
@@ -14,7 +14,7 @@ All QR decoding happens **locally on your device** using the [jsQR](https://gith
 ### macOS (Apple Silicon / M1, M2, M3, M4)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.7-mac-arm64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+curl -L https://github.com/LarryXu2014/Qapture/releases/latest/download/Qapture-2.4.0-mac-arm64.dmg -o ~/Downloads/Qapture.dmg && open ~/Downloads/Qapture.dmg
 ```
 
 After dragging to Applications, **first launch only**: open Terminal and run:
@@ -25,7 +25,7 @@ xattr -cr /Applications/QR\ Scan\ \&\ Open.app && open /Applications/QR\ Scan\ \
 ### macOS (Intel)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.7-mac-x64.dmg -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+curl -L https://github.com/LarryXu2014/Qapture/releases/latest/download/Qapture-2.4.0-mac-x64.dmg -o ~/Downloads/Qapture.dmg && open ~/Downloads/Qapture.dmg
 ```
 
 After dragging to Applications, **first launch only**:
@@ -38,14 +38,14 @@ xattr -cr /Applications/QR\ Scan\ \&\ Open.app && open /Applications/QR\ Scan\ \
 ### Windows (x64)
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.7-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"; Start-Process "$env:USERPROFILE\Downloads\QR-Scan-Open.exe"
+Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Qapture/releases/latest/download/Qapture-2.4.0-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\Qapture.exe"; Start-Process "$env:USERPROFILE\Downloads\Qapture.exe"
 ```
 
 ### Chrome / Edge / Brave Extension
 
 ```bash
 # Download and extract
-curl -L https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-extension.zip -o /tmp/qr-scan-extension.zip && unzip -q /tmp/qr-scan-extension.zip -d ~/qr-scan-extension && echo "Extension extracted to ~/qr-scan-extension — load it from chrome://extensions > Load unpacked"
+curl -L https://github.com/LarryXu2014/Qapture/releases/latest/download/qapture-extension.zip -o /tmp/qapture-extension.zip && unzip -q /tmp/qapture-extension.zip -d ~/qapture-extension && echo "Extension extracted to ~/qapture-extension — load it from chrome://extensions > Load unpacked"
 ```
 
 > **After installing:** Open the extension popup, click **Record**, and press your shortcut (default **Cmd+Shift+Y** on Mac, **Ctrl+Shift+Y** on Windows). The shortcut is captured right in the popup — no need to touch `chrome://extensions/shortcuts`.
@@ -72,7 +72,7 @@ GitHub's release server (`objects.githubusercontent.com`) is throttled in some r
 
 ```bash
 # Replace any GitHub releases URL prefix with ghproxy.com
-curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.7-mac-arm64.dmg" -o ~/Downloads/QR-Scan-Open.dmg && open ~/Downloads/QR-Scan-Open.dmg
+curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Qapture/releases/latest/download/Qapture-2.4.0-mac-arm64.dmg" -o ~/Downloads/Qapture.dmg && open ~/Downloads/Qapture.dmg
 ```
 If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 
@@ -82,13 +82,13 @@ If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 
 | Platform                   | File                                                                                                                                           | Size  | Status |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
-| Chrome / Edge / Brave      | [qr-scan-extension.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-extension.zip)                           | 84 KB | Verified |
-| Firefox (109+)             | [qr-scan-firefox.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/qr-scan-firefox.zip)                               | 84 KB | Verified |
-| macOS (Apple Silicon)      | [QR-Scan-Open-2.3.7-mac-arm64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.7-mac-arm64.dmg)     | ~95 MB | Verified |
-| macOS (Apple Silicon, ZIP) | [QR-Scan-Open-2.3.7-mac-arm64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.7-mac-arm64.zip)     | ~92 MB | Verified |
-| macOS (Intel)              | [QR-Scan-Open-2.3.7-mac-x64.dmg](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.7-mac-x64.dmg)         | ~100 MB | Verified |
-| macOS (Intel, ZIP)         | [QR-Scan-Open-2.3.7-mac-x64.zip](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.7-mac-x64.zip)         | ~97 MB | Verified |
-| Windows (x64)              | [QR-Scan-Open-2.3.7-windows-x64.exe](https://github.com/LarryXu2014/Local-QR-Scan/releases/latest/download/QR-Scan-Open-2.3.7-windows-x64.exe) | ~70 MB | Verified |
+| Chrome / Edge / Brave      | [qapture-extension.zip](https://github.com/LarryXu2014/Qapture/releases/latest/download/qapture-extension.zip)                           | 84 KB | Verified |
+| Firefox (109+)             | [qapture-firefox.zip](https://github.com/LarryXu2014/Qapture/releases/latest/download/qapture-firefox.zip)                               | 84 KB | Verified |
+| macOS (Apple Silicon)      | [Qapture-2.4.0-mac-arm64.dmg](https://github.com/LarryXu2014/Qapture/releases/latest/download/Qapture-2.4.0-mac-arm64.dmg)     | ~95 MB | Verified |
+| macOS (Apple Silicon, ZIP) | [Qapture-2.4.0-mac-arm64.zip](https://github.com/LarryXu2014/Qapture/releases/latest/download/Qapture-2.4.0-mac-arm64.zip)     | ~92 MB | Verified |
+| macOS (Intel)              | [Qapture-2.4.0-mac-x64.dmg](https://github.com/LarryXu2014/Qapture/releases/latest/download/Qapture-2.4.0-mac-x64.dmg)         | ~100 MB | Verified |
+| macOS (Intel, ZIP)         | [Qapture-2.4.0-mac-x64.zip](https://github.com/LarryXu2014/Qapture/releases/latest/download/Qapture-2.4.0-mac-x64.zip)         | ~97 MB | Verified |
+| Windows (x64)              | [Qapture-2.4.0-windows-x64.exe](https://github.com/LarryXu2014/Qapture/releases/latest/download/Qapture-2.4.0-windows-x64.exe) | ~70 MB | Verified |
 
 All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 
@@ -114,7 +114,7 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 - **Screen capture scan** — Global hotkey `Cmd/Ctrl+Shift+Y` opens the native macOS screen-selection (crosshair → drag a rectangle → release). On Windows it uses an in-app transparent overlay. The app window never appears during a scan.
 - **Auto-detect shortcut recorder** — Click "Press keys to record" in Settings to set any hotkey combo (Cmd+Shift+A, etc.)
 - **Generate QR codes** — New **Generate** tab: enter text/URL, pick error-correction level, and copy or download the QR image
-- **Browser-extension priority** — When enabled (Settings; macOS only), the app **releases its global shortcut whenever a browser is the foreground app**, so the browser extension's own `Cmd/Ctrl+Shift+Y` fires instead — no double-trigger and no app window popping up. Outside browsers the app keeps the shortcut and scans as normal. Requires macOS **Automation** permission (System Settings → Privacy & Security → Automation → QR Scan & Open) so the app can detect the frontmost app.
+- **Browser-extension priority** — When enabled (Settings; macOS only), the app **releases its global shortcut whenever a browser is the foreground app**, so the browser extension's own `Cmd/Ctrl+Shift+Y` fires instead — no double-trigger and no app window popping up. Outside browsers the app keeps the shortcut and scans as normal. Requires macOS **Automation** permission (System Settings → Privacy & Security → Automation → Qapture) so the app can detect the frontmost app.
 - **Fixed Quit** — "Quit" from the tray now fully exits the app (previously it had to be force-quit)
 - **System tray** — Runs in background; click tray icon to show/hide window
 - **Settings tab** — Customize shortcut (auto-record), browser-extension priority, auto-open URL, notifications, history size
@@ -133,7 +133,7 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 
 ### Chrome / Edge / Brave / Opera
 
-1. Download `qr-scan-extension.zip` and unzip it
+1. Download `qapture-extension.zip` and unzip it
 2. Open `chrome://extensions` (or `edge://extensions`)
 3. Turn on **Developer mode** (top-right corner)
 4. Click **Load unpacked**
@@ -143,7 +143,7 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 
 ### Firefox
 
-1. Download `qr-scan-firefox.zip` and unzip it
+1. Download `qapture-firefox.zip` and unzip it
 2. Open `about:debugging#/runtime/this-firefox`
 3. Click **Load Temporary Add-on**
 4. Select `manifest.json` inside the unzipped folder
@@ -153,7 +153,7 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32.
 
 **macOS:**
 1. Download `.dmg`, open it
-2. Drag **QR Scan & Open** to Applications
+2. Drag **Qapture** to Applications
 3. **First launch only** — open Terminal and run: `xattr -cr /Applications/QR\ Scan\ \&\ Open.app`
 4. Double-click to open (or run `open /Applications/QR\ Scan\ \&\ Open.app`)
 
@@ -191,7 +191,7 @@ All processing happens on your device. Zero server communication.
 
 ## What's New
 
-### v2.3.7
+### v2.4.0
 - **Generate tab notifications** — The Generate tab now shows system notifications when a QR code is rendered ("QR Code Generated"), when you download the PNG ("QR Code Downloaded"), and when you copy the text ("Text Copied"). All respect the "Show notifications" setting.
 
 ### v2.3.6
@@ -203,7 +203,7 @@ All processing happens on your device. Zero server communication.
 - **Extension "Scanning…" notification** — The browser extension now shows a system "Scanning…" notification when you select a QR code area (same sequence as the desktop app: Scanning → Found / No QR found).
 
 ### v2.3.4
-- **macOS: ask for Automation permission at launch** — On first open the app triggers macOS's native 'QR Scan & Open wants to control System Events' alert (a real system dialog, not a custom one). This permission lets the app detect the frontmost app so the browser-extension priority feature works. If you previously denied it, use the new Settings button to jump to the right page.
+- **macOS: ask for Automation permission at launch** — On first open the app triggers macOS's native 'Qapture wants to control System Events' alert (a real system dialog, not a custom one). This permission lets the app detect the frontmost app so the browser-extension priority feature works. If you previously denied it, use the new Settings button to jump to the right page.
 - **Settings button to System Settings Automation page** — A new 'Open System Settings → Automation' button (macOS only, in Settings) opens System Settings → Privacy & Security → Automation directly, so you can grant or review the permission.
 
 ### v2.3.3
@@ -211,7 +211,7 @@ All processing happens on your device. Zero server communication.
 - **Fixed: Notifications now appear** — Notifications were being garbage-collected before they displayed (the `Notification` object wasn't retained). They are now held for 15s so the "Scanning…" / "Opening URL" / "No QR Found" notifications actually show. Added a **"Scanning…" notification** so you get feedback the moment a capture is taken.
 
 ### v2.3.2
-- **macOS scan now uses the native screen-selection UI** — Pressing the shortcut (or the tray "Scan Screen" / in-app button) now invokes the **built-in macOS screenshot selection** (`screencapture -i`). The system draws the crosshair and dim overlay itself — exactly like the native macOS QR-scan workflow. The QR Scan & Open app window is **never opened, shown, or brought to the front** during a scan.
+- **macOS scan now uses the native screen-selection UI** — Pressing the shortcut (or the tray "Scan Screen" / in-app button) now invokes the **built-in macOS screenshot selection** (`screencapture -i`). The system draws the crosshair and dim overlay itself — exactly like the native macOS QR-scan workflow. The Qapture app window is **never opened, shown, or brought to the front** during a scan.
 - **No window, no preview, no app in the way** — The captured region is loaded directly into memory, decoded, and discarded. There is no screenshot preview and no Electron window covering your screen. The app stays quietly in the background the whole time.
 - **Esc cancels cleanly** — Pressing Escape (or clicking away) cancels the scan; no screenshot is taken and no QR is processed. The app simply returns to idle.
 - **App launches hidden** — On startup the app lives in the background (menu-bar / tray). Open its window anytime from the tray ("Show Window") or by clicking the dock icon. Scanning never forces the window open, and it is never hidden or minimized after a scan.
@@ -263,7 +263,7 @@ All processing happens on your device. Zero server communication.
 ## File Structure
 
 ```
-Local-QR-Scan/
+Qapture/
 ├── extension/                  # Chrome / Edge / Brave / Firefox (Manifest V3)
 │   ├── manifest.json           # v2.3.0 — same source builds both Chrome & Firefox zips
 │   ├── background.js           # Service worker + robust QR decoder + content-script clipboard delegate
@@ -311,12 +311,12 @@ No build step needed — pure static files. Load directly from the folder.
 
 ```bash
 # Chrome / Edge / Brave zip (straight from the source folder)
-cd extension && zip -r ../qr-scan-extension.zip . -x "*.DS_Store"
+cd extension && zip -r ../qapture-extension.zip . -x "*.DS_Store"
 
 # Firefox zip — copy source, inject a Gecko ID, then zip
 rm -rf /tmp/ff-build && cp -r extension /tmp/ff-build
-python3 -c "import json; p='/tmp/ff-build/manifest.json'; m=json.load(open(p)); m['browser_specific_settings']={'gecko':{'id':'qr-scan-open@local'}}; json.dump(m,open(p,'w'),indent=2)"
-cd /tmp/ff-build && zip -r /path/to/qr-scan-firefox.zip . -x "*.DS_Store"
+python3 -c "import json; p='/tmp/ff-build/manifest.json'; m=json.load(open(p)); m['browser_specific_settings']={'gecko':{'id':'qapture@local'}}; json.dump(m,open(p,'w'),indent=2)"
+cd /tmp/ff-build && zip -r /path/to/qapture-firefox.zip . -x "*.DS_Store"
 ```
 
 ---

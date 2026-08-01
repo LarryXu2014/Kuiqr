@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scanner — Service Worker (Offline Support)
+// Qapture — Service Worker (Offline Support)
 // ============================================================
 
 const CACHE_NAME = "qr-scanner-v1";
