@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Desktop App Renderer Logic (v2.3.6)
+// QR Scan & Open — Desktop App Renderer Logic (v2.3.7)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -743,6 +743,7 @@ function setupGenerate() {
       img.src = dataUrl;
       img.style.display = "block";
       lastDataUrl = dataUrl;
+      window.qrAPI.showNotification("QR Code Generated", "Your QR code is ready to download or copy.");
     } catch (e) {
       img.style.display = "none";
       lastDataUrl = "";
@@ -765,6 +766,7 @@ function setupGenerate() {
       document.body.appendChild(a);
       a.click();
       a.remove();
+      window.qrAPI.showNotification("QR Code Downloaded", "Saved as qrcode.png");
     });
   }
 
@@ -774,6 +776,7 @@ function setupGenerate() {
       window.qrAPI.copyClipboard(input.value);
       copyBtn.textContent = "Copied!";
       setTimeout(() => { copyBtn.textContent = "Copy Text"; }, 1500);
+      window.qrAPI.showNotification("Text Copied", "The QR content has been copied to your clipboard.");
     });
   }
 }

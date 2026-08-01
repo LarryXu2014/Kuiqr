@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Electron Main Process (v2.3.6)
+// QR Scan & Open — Electron Main Process (v2.3.7)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -807,4 +807,12 @@ ipcMain.handle("suspend-shortcut", () => {
 ipcMain.handle("resume-shortcut", () => {
   resumeShortcut();
   return true;
+});
+
+// Renderer requests: show a system notification (respects the "show notifications" setting)
+ipcMain.handle("show-notification", (event, title, body) => {
+  const settings = loadSettings();
+  if (settings.showNotification) {
+    showNotification(title, body);
+  }
 });

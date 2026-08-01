@@ -1,5 +1,5 @@
 // ============================================================
-// QR Scan & Open — Background Service Worker (v2.3.6)
+// QR Scan & Open — Background Service Worker (v2.3.7)
 // Features:
 //   1. Right-click image → "Scan QR Code" (direct decode)
 //   2. Keyboard shortcut Cmd/Ctrl+Shift+Y → capture screen + inject overlay

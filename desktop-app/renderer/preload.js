@@ -39,6 +39,9 @@ contextBridge.exposeInMainWorld("qrAPI", {
 
   // Tell the main process this renderer is ready to receive decode jobs.
   markRendererReady: () => ipcRenderer.send("renderer-ready"),
+
+  // Show a system notification (respects the "show notifications" setting)
+  showNotification: (title, body) => ipcRenderer.invoke("show-notification", title, body),
 });
 
 // Overlay API — used when overlay.html is loaded into the same mainWindow
