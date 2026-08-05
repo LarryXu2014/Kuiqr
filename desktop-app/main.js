@@ -334,6 +334,16 @@ function stopForegroundMonitor() {
 
 function syncShortcutToForegroundApp() {
   if (shortcutSuspended) return; // recording a new shortcut — leave unregistered
+  // Always honour the LIVE setting. When browser-extension priority is OFF the app
+  // must keep the global shortcut at all times — even while a browser is the
+  // foreground app — so we never release it in that case. (Previously the monitor
+  // released the shortcut for any browser regardless of this setting, which meant
+  // turning the feature off still left the app unable to scan inside a browser.)
+  const priority = !!loadSettings().browserExtensionPriority;
+  if (!priority || !isMac) {
+    if (!appShortcutActive) registerAppShortcut();
+    return;
+  }
   const browser = isForegroundAppBrowser();
   if (browser) {
     // Release so the browser extension can receive the keystroke.
