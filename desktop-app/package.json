@@ -30,6 +30,7 @@
       "overlay-preload.js",
       "icons/**/*"
     ],
+    "artifactName": "Kuiqr-${version}-mac-${arch}.${ext}",
     "mac": {
       "identity": null,
       "category": "public.app-category.utilities",
@@ -40,6 +41,7 @@
       "icon": "icons/icon512.png"
     },
     "win": {
+      "artifactName": "Kuiqr-${version}-windows-x64.${ext}",
       "target": [
         { "target": "portable", "arch": ["x64"] }
       ],
