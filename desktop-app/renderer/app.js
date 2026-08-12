@@ -531,7 +531,7 @@ async function loadSettingsForm() {
   document.getElementById("setting-autoopen").checked = settings.autoOpenUrl !== false;
   document.getElementById("setting-copytext").checked = settings.copyTextToClipboard !== false;
   document.getElementById("setting-notify").checked = settings.showNotification !== false;
-  document.getElementById("setting-browserpriority").checked = settings.browserExtensionPriority !== false;
+  document.getElementById("setting-browserpriority").checked = !!settings.browserExtensionPriority;
   document.getElementById("setting-maxhistory").value = settings.maxHistory || 50;
 
   // Track the active shortcut and reflect it everywhere

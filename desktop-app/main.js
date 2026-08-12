@@ -44,7 +44,7 @@ const DEFAULT_SETTINGS = {
   showNotification: true,
   maxHistory: 50,
   launchAtLogin: false,
-  browserExtensionPriority: true, // when true and a browser is the foreground app, let the browser extension handle the shortcut
+  browserExtensionPriority: false, // when true and a browser is the foreground app, let the browser extension handle the shortcut
 };
 
 function loadSettings() {
@@ -199,7 +199,15 @@ function createTray() {
     { label: "Scan Screen", click: () => triggerScan() },
     { type: "separator" },
     { label: "Show Window", click: () => showMainWindow() },
-    { label: "Settings", click: () => { showMainWindow(); mainWindow?.webContents?.send("switch-tab", "settings"); } },
+    { label: "Settings", click: () => {
+      showMainWindow();
+      // Defer the tab switch until the window is actually shown and focused.
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+          mainWindow.webContents.send("switch-tab", "settings");
+        }
+      }, 50);
+    }},
     { type: "separator" },
     { label: "Quit", click: () => { isQuiting = true; globalShortcut.unregisterAll(); app.quit(); } },
   ]);
@@ -465,7 +473,12 @@ async function triggerScan() {
     }
   } catch (err) {
     console.error("Scan error:", err);
-    showNotification("Kuiqr Error", err.message || "Scan failed");
+    // Don't crash the app on scan errors — just notify.
+    try {
+      showNotification("Kuiqr Error", err.message || "Scan failed");
+    } catch {
+      // Notification itself failed; ignore.
+    }
   }
 }
 
