@@ -85,12 +85,21 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // changed it from the default). The default key is owned exclusively by
 // chrome.commands, so the two never double-fire.
 chrome.commands.onCommand.addListener((command) => {
-  if (command === "trigger-scan") {
+  if (command !== "trigger-scan") return;
+  // While the popup is recording a NEW shortcut, the default key (Cmd/Ctrl+Shift+Y)
+  // must NOT start a scan — it is being captured by the recorder. We suppress it
+  // here because chrome.commands is the browser-level owner of the default key and
+  // is not affected by the content-script's `recording` guard.
+  chrome.storage.local.get("recordingShortcut", (res) => {
+    if (res.recordingShortcut) {
+      log("trigger-scan ignored: popup is recording a new shortcut");
+      return;
+    }
     captureAndShowOverlay().catch((err) => {
       log("trigger-scan command error:", err);
       notifyError(err && err.message ? err.message : "Scan failed");
     });
-  }
+  });
 });
 
 // ── Popup handler: show overlay ──
