@@ -123,12 +123,9 @@ body {
   width: 72px;
   height: 72px;
   margin: 0 auto 10px;
-  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+  display: block;
+  object-fit: contain;
   border-radius: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--primary);
 }
 
 .scan-hero h1 {
@@ -745,6 +742,94 @@ body {
 
 .hidden {
   display: none !important;
+}
+
+/* ---- Modals ---- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  -webkit-app-region: no-drag;
+}
+
+.modal-card {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: min(92%, 360px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  -webkit-app-region: no-drag;
+}
+
+.modal-card h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.modal-card p {
+  font-size: 13px;
+  color: var(--text-light);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.modal-card .modal-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-actions .btn-save,
+.modal-actions .btn-text {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(135deg, #db2777, #7c3aed);
+}
+
+.btn-danger {
+  color: var(--error);
+}
+
+.btn-danger:hover {
+  background: #fef2f2;
+}
+
+.modal-status {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-light);
+  text-align: center;
+}
+
+.modal-status.hidden {
+  display: none;
 }
 
 /* ---- Generate QR tab ---- */

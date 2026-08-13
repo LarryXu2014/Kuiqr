@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Electron Main Process (v2.4.0)
+// Kuiqr — Electron Main Process (v2.4.1.0)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -45,12 +45,25 @@ const DEFAULT_SETTINGS = {
   maxHistory: 50,
   launchAtLogin: false,
   browserExtensionPriority: false, // when true and a browser is the foreground app, let the browser extension handle the shortcut
+  extensionPromptShown: false,     // whether the first-launch browser-extension download prompt has been shown
+  extensionDownloaded: false,        // whether the user has downloaded the extension zip through the app
 };
 
 function loadSettings() {
   try {
     const data = fs.readFileSync(SETTINGS_PATH, "utf-8");
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
+    const stored = JSON.parse(data);
+
+    // One-time migration: pre-2.4.1 settings didn't have a version field and may
+    // carry an old browserExtensionPriority value from a previous install. Reset
+    // it to OFF for those users; afterwards we respect whatever they choose.
+    if (stored._version == null) {
+      stored.browserExtensionPriority = false;
+      stored._version = 1;
+      saveSettings({ ...DEFAULT_SETTINGS, ...stored });
+    }
+
+    return { ...DEFAULT_SETTINGS, ...stored };
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -128,6 +141,7 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   isQuiting = true;
+  stopForegroundMonitor();
   globalShortcut.unregisterAll();
 });
 
@@ -136,6 +150,7 @@ app.on("before-quit", () => {
 // ============================================================
 
 function createMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) return; // already exists
   mainWindow = new BrowserWindow({
     width: 420,
     height: 640,
@@ -189,10 +204,17 @@ function showMainWindow() {
 // ============================================================
 
 function createTray() {
+  if (tray) return; // guard against double creation
+
   const iconPath = path.join(__dirname, "icons", isMac ? "icon16.png" : "icon32.png");
   const trayIcon = nativeImage.createFromPath(iconPath);
+  // If the icon file is missing, createFromPath returns an empty NativeImage.
+  // Use a tiny fallback so the tray still works (and we can see it).
+  if (trayIcon.isEmpty()) {
+    console.warn("Kuiqr: tray icon not found at", iconPath);
+  }
 
-  tray = new Tray(trayIcon);
+  tray = new Tray(trayIcon.isEmpty() ? nativeImage.createEmpty() : trayIcon);
   tray.setToolTip("Kuiqr");
 
   const contextMenu = Menu.buildFromTemplate([
@@ -212,12 +234,35 @@ function createTray() {
     { label: "Quit", click: () => { isQuiting = true; globalShortcut.unregisterAll(); app.quit(); } },
   ]);
 
-  tray.setContextMenu(contextMenu);
-  tray.on("click", () => {
-    if (mainWindow && mainWindow.isVisible()) {
-      mainWindow.hide();
-    } else {
-      showMainWindow();
+  // On macOS, setContextMenu makes left-click pop the menu, which conflicts with
+  // a toggle-on-click handler and feels broken. Show the menu on right-click only
+  // and use left-click to show/hide the main window.
+  tray.on("click", (event) => {
+    try {
+      if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      const visible = mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible();
+      if (visible) {
+        mainWindow.hide();
+      } else {
+        showMainWindow();
+      }
+    } catch (err) {
+      console.error("Kuiqr: tray click handler error:", err);
+      // Last resort: try to show the window
+      try { showMainWindow(); } catch { /* ignore */ }
+    }
+  });
+
+  tray.on("right-click", (event) => {
+    try {
+      if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      tray.popUpContextMenu(contextMenu);
+    } catch (err) {
+      console.error("Kuiqr: tray right-click handler error:", err);
     }
   });
 }
@@ -604,9 +649,13 @@ function enterOverlayMode(screenshotPath, displayInfo) {
     bounds: mainWindow.getBounds(),
     resizable: mainWindow.isResizable(),
     alwaysOnTop: mainWindow.isAlwaysOnTop(),
+    wasVisible: mainWindow.isVisible(),
   };
 
-  // Transform mainWindow into a fullscreen transparent overlay
+  // Transform mainWindow into a fullscreen transparent overlay.
+  // The window may be hidden (tray-only mode), so show + focus it first.
+  mainWindow.show();
+  mainWindow.focus();
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   mainWindow.setResizable(false);
   mainWindow.setBounds({ x: 0, y: 0, width, height });
@@ -629,12 +678,14 @@ function enterOverlayMode(screenshotPath, displayInfo) {
 }
 
 function exitOverlayMode() {
-  if (!isInOverlayMode || !mainWindow) return;
+  if (!isInOverlayMode || !mainWindow || mainWindow.isDestroyed()) return;
   isInOverlayMode = false;
 
   // Restore normal window appearance
-  mainWindow.setAlwaysOnTop(savedWindowState ? savedWindowState.alwaysOnTop : false);
-  mainWindow.setResizable(savedWindowState ? savedWindowState.resizable : true);
+  try {
+    mainWindow.setAlwaysOnTop(savedWindowState ? savedWindowState.alwaysOnTop : false);
+    mainWindow.setResizable(savedWindowState ? savedWindowState.resizable : true);
+  } catch (e) { /* ignore */ }
 
   try {
     mainWindow.setBackgroundMaterial("none");
@@ -642,12 +693,25 @@ function exitOverlayMode() {
 
   // Restore original bounds and reload the normal app UI
   if (savedWindowState && savedWindowState.bounds) {
-    mainWindow.setBounds(savedWindowState.bounds);
+    try { mainWindow.setBounds(savedWindowState.bounds); } catch { /* ignore */ }
   }
+  const wasVisible = savedWindowState && savedWindowState.wasVisible;
   savedWindowState = null;
 
   // Reload main app UI
-  mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
+  try {
+    mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
+  } catch { /* ignore */ }
+
+  // If the window was hidden before the overlay scan, hide it again so the app
+  // returns to the background after scanning.
+  if (!wasVisible) {
+    try {
+      mainWindow.once("ready-to-show", () => mainWindow.hide());
+      // Fallback: hide after a short delay if ready-to-show already fired
+      setTimeout(() => { try { mainWindow.hide(); } catch {} }, 200);
+    } catch { /* ignore */ }
+  }
 }
 
 // ============================================================
@@ -676,7 +740,10 @@ ipcMain.handle("get-settings", () => {
 
 // Renderer requests: save settings
 ipcMain.handle("save-settings", (event, settings) => {
-  const merged = { ...DEFAULT_SETTINGS, ...settings };
+  // Merge with current stored settings so fields the renderer doesn't send
+  // (e.g. extensionPromptShown, _version) are preserved.
+  const current = loadSettings();
+  const merged = { ...DEFAULT_SETTINGS, ...current, ...settings };
   saveSettings(merged);
   reregisterShortcut();
   return merged;
@@ -837,5 +904,51 @@ ipcMain.handle("show-notification", (event, title, body) => {
   const settings = loadSettings();
   if (settings.showNotification) {
     showNotification(title, body);
+  }
+});
+
+// ============================================================
+// IPC: First-launch browser-extension download prompt
+// ============================================================
+
+ipcMain.handle("should-show-extension-prompt", () => {
+  const settings = loadSettings();
+  return { show: settings.extensionPromptShown !== true };
+});
+
+ipcMain.handle("mark-extension-prompt-shown", () => {
+  const settings = loadSettings();
+  settings.extensionPromptShown = true;
+  saveSettings(settings);
+  return { ok: true };
+});
+
+// Downloads the appropriate extension zip to the user's Downloads folder.
+// browserType is "chrome" or "firefox". Returns { ok, path? }.
+ipcMain.handle("download-extension", async (event, browserType) => {
+  const settings = loadSettings();
+  try {
+    const version = "2.4.1.0";
+    const filename = browserType === "firefox"
+      ? `kuiqr-firefox-${version}.zip`
+      : `kuiqr-extension-${version}.zip`;
+    const url = `https://github.com/LarryXu2014/Kuiqr/releases/download/v${version}/${filename}`;
+    const destPath = path.join(app.getPath("downloads"), filename);
+
+    // Use Node's native fetch (Electron 30 / Node 20+) — follows redirects.
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Download failed: HTTP ${response.status}`);
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(destPath, buffer);
+
+    settings.extensionDownloaded = true;
+    saveSettings(settings);
+
+    return { ok: true, path: destPath, filename };
+  } catch (err) {
+    console.error("Kuiqr: extension download failed:", err);
+    return { ok: false, reason: err.message || String(err) };
   }
 });

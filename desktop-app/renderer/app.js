@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Desktop App Renderer Logic (v2.4.0)
+// Kuiqr — Desktop App Renderer Logic (v2.4.1.0)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -11,19 +11,22 @@
 let currentPlatform = null;
 let currentShortcut = "CommandOrControl+Shift+Y"; // the active saved shortcut (kept in sync)
 let isRecordingShortcut = false; // true while the user is recording a new shortcut
+let savedSettingsSnapshot = null; // snapshot of settings when the Settings tab was loaded
+let settingsDirty = false;        // true when form values differ from savedSettingsSnapshot
+let pendingTabTarget = null;      // tab the user is trying to switch to while dirty
 
 document.addEventListener("DOMContentLoaded", async () => {
   // Detect platform
   currentPlatform = await window.qrAPI.getPlatform();
   updatePlatformUI();
 
-  // Tab navigation
+  // Tab navigation — respect unsaved settings changes
   document.querySelectorAll(".tab").forEach((tab) => {
-    tab.addEventListener("click", () => switchTab(tab.dataset.tab));
+    tab.addEventListener("click", () => requestSwitchTab(tab.dataset.tab));
   });
 
   // Listen for external tab switches (from tray)
-  window.qrAPI.onSwitchTab((tab) => switchTab(tab));
+  window.qrAPI.onSwitchTab((tab) => requestSwitchTab(tab));
 
   // Tell the main process this renderer is ready to receive decode jobs (so a
   // scan that happens right after launch is never dropped).
@@ -119,6 +122,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("save-settings-btn").addEventListener("click", saveSettings);
   setupShortcutRecorder();
   setupGenerate();
+  setupSettingsDirtyTracking();
+  setupUnsavedPrompt();
+
+  // ── First-launch browser extension download prompt ──
+  setupExtensionPrompt();
 
   // ── macOS Automation permission: show the row + wire the Settings button ──
   const autoRow = document.getElementById("automation-permission-row");
@@ -159,6 +167,24 @@ document.addEventListener("DOMContentLoaded", async () => {
 // Tab Navigation
 // ============================================================
 
+function getCurrentTab() {
+  const active = document.querySelector(".tab.active");
+  return active ? active.dataset.tab : null;
+}
+
+function requestSwitchTab(tabName) {
+  if (tabName === getCurrentTab()) return;
+
+  // If we're leaving the settings tab with unsaved changes, ask first.
+  if (getCurrentTab() === "settings" && settingsDirty) {
+    pendingTabTarget = tabName;
+    showUnsavedPrompt();
+    return;
+  }
+
+  switchTab(tabName);
+}
+
 function switchTab(tabName) {
   document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
   document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
@@ -168,6 +194,125 @@ function switchTab(tabName) {
 
   if (tab) tab.classList.add("active");
   if (content) content.classList.add("active");
+}
+
+// ============================================================
+// Settings dirty-state tracking + discard prompt
+// ============================================================
+
+function getSettingsFormValues() {
+  return {
+    autoOpenUrl: document.getElementById("setting-autoopen").checked,
+    copyTextToClipboard: document.getElementById("setting-copytext").checked,
+    showNotification: document.getElementById("setting-notify").checked,
+    browserExtensionPriority: document.getElementById("setting-browserpriority").checked,
+    maxHistory: parseInt(document.getElementById("setting-maxhistory").value, 10) || 50,
+    shortcut: currentShortcut,
+  };
+}
+
+function updateSettingsDirtyState() {
+  if (!savedSettingsSnapshot) return;
+  const current = getSettingsFormValues();
+  const dirty =
+    current.autoOpenUrl !== savedSettingsSnapshot.autoOpenUrl ||
+    current.copyTextToClipboard !== savedSettingsSnapshot.copyTextToClipboard ||
+    current.showNotification !== savedSettingsSnapshot.showNotification ||
+    current.browserExtensionPriority !== savedSettingsSnapshot.browserExtensionPriority ||
+    current.maxHistory !== savedSettingsSnapshot.maxHistory ||
+    current.shortcut !== savedSettingsSnapshot.shortcut;
+
+  settingsDirty = dirty;
+  const saveBtn = document.getElementById("save-settings-btn");
+  if (saveBtn) {
+    saveBtn.textContent = dirty ? "Save Settings*" : "Save Settings";
+  }
+}
+
+function markSettingsClean() {
+  settingsDirty = false;
+  savedSettingsSnapshot = getSettingsFormValues();
+  const saveBtn = document.getElementById("save-settings-btn");
+  if (saveBtn) saveBtn.textContent = "Save Settings";
+}
+
+function setupSettingsDirtyTracking() {
+  const ids = ["setting-autoopen", "setting-copytext", "setting-notify", "setting-browserpriority", "setting-maxhistory"];
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", updateSettingsDirtyState);
+  });
+  // Also watch for shortcut changes (recorder updates currentShortcut and calls updateSettingsDirtyState)
+}
+
+function setupUnsavedPrompt() {
+  const prompt = document.getElementById("unsaved-prompt");
+  const stayBtn = document.getElementById("unsaved-stay");
+  const discardBtn = document.getElementById("unsaved-discard");
+  if (!prompt || !stayBtn || !discardBtn) return;
+
+  stayBtn.addEventListener("click", () => {
+    prompt.classList.add("hidden");
+    pendingTabTarget = null;
+  });
+
+  discardBtn.addEventListener("click", async () => {
+    prompt.classList.add("hidden");
+    // Reload saved values so we don't leave stale changes visible
+    await loadSettingsForm();
+    if (pendingTabTarget) {
+      switchTab(pendingTabTarget);
+      pendingTabTarget = null;
+    }
+  });
+}
+
+function showUnsavedPrompt() {
+  const prompt = document.getElementById("unsaved-prompt");
+  if (prompt) prompt.classList.remove("hidden");
+}
+
+// ============================================================
+// First-launch browser extension download prompt
+// ============================================================
+
+async function setupExtensionPrompt() {
+  try {
+    const { show } = await window.qrAPI.shouldShowExtensionPrompt();
+    if (!show) return;
+
+    const prompt = document.getElementById("extension-prompt");
+    const chromeBtn = document.getElementById("ext-download-chrome");
+    const firefoxBtn = document.getElementById("ext-download-firefox");
+    const laterBtn = document.getElementById("ext-prompt-later");
+    const status = document.getElementById("ext-download-status");
+    if (!prompt) return;
+
+    prompt.classList.remove("hidden");
+
+    const closePrompt = () => {
+      prompt.classList.add("hidden");
+      window.qrAPI.markExtensionPromptShown();
+    };
+
+    const doDownload = async (type) => {
+      status.textContent = "Downloading…";
+      status.classList.remove("hidden");
+      const res = await window.qrAPI.downloadExtension(type);
+      if (res.ok) {
+        status.innerHTML = `<b>Downloaded:</b> ${escapeHtml(res.filename)}<br><span style="color:var(--text-muted)">Install steps: unzip the file, then load the folder as an unpacked extension.</span>`;
+      } else {
+        status.textContent = "Download failed: " + (res.reason || "unknown error");
+      }
+      // Keep prompt open so the user can read the instructions
+    };
+
+    if (chromeBtn) chromeBtn.addEventListener("click", () => doDownload("chrome"));
+    if (firefoxBtn) firefoxBtn.addEventListener("click", () => doDownload("firefox"));
+    if (laterBtn) laterBtn.addEventListener("click", closePrompt);
+  } catch (err) {
+    console.error("Extension prompt setup failed:", err);
+  }
 }
 
 // ============================================================
@@ -537,6 +682,19 @@ async function loadSettingsForm() {
   // Track the active shortcut and reflect it everywhere
   currentShortcut = settings.shortcut || "CommandOrControl+Shift+Y";
   updateShortcutDisplay(currentShortcut);
+
+  // Show the current shortcut in the recorder button label so it doesn't say
+  // "Press keys to record…" forever.
+  const recordLabel = document.getElementById("shortcut-record-label");
+  if (recordLabel) {
+    recordLabel.textContent = `Current: ${formatShortcutForDisplay(currentShortcut)} — click to change`;
+  }
+
+  // Snapshot form values so we can detect unsaved changes.
+  savedSettingsSnapshot = getSettingsFormValues();
+  settingsDirty = false;
+  const saveBtn = document.getElementById("save-settings-btn");
+  if (saveBtn) saveBtn.textContent = "Save Settings";
 }
 
 // Update both the "Current:" label and the scan button's kbd to match a shortcut
@@ -546,6 +704,7 @@ function updateShortcutDisplay(accelerator) {
   if (curVal) curVal.textContent = displayKbd;
   const scDisplay = document.getElementById("shortcut-display");
   if (scDisplay) scDisplay.textContent = displayKbd;
+  updateSettingsDirtyState();
 }
 
 function formatShortcutForDisplay(accelerator) {
@@ -690,6 +849,13 @@ async function persistShortcut(accelerator) {
   };
   await window.qrAPI.saveSettings(settings); // main saves + re-registers (suspended → applied on resume)
   currentShortcut = accelerator;
+  markSettingsClean();
+
+  // Update the recorder button so it reflects the new shortcut.
+  const recordLabel = document.getElementById("shortcut-record-label");
+  if (recordLabel) {
+    recordLabel.textContent = `Current: ${formatShortcutForDisplay(currentShortcut)} — click to change`;
+  }
 }
 
 async function saveSettings() {
@@ -706,6 +872,7 @@ async function saveSettings() {
   await window.qrAPI.saveSettings(settings);
   currentShortcut = settings.shortcut;
   updateShortcutDisplay(currentShortcut);
+  markSettingsClean();
 
   const savedMsg = document.getElementById("settings-saved");
   savedMsg.classList.remove("hidden");
@@ -743,7 +910,7 @@ function setupGenerate() {
       img.src = dataUrl;
       img.style.display = "block";
       lastDataUrl = dataUrl;
-      window.qrAPI.showNotification("QR Code Generated", "Your QR code is ready to download or copy.");
+      // Don't notify on every keystroke — only when the user explicitly downloads/copies.
     } catch (e) {
       img.style.display = "none";
       lastDataUrl = "";

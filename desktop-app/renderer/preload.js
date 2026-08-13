@@ -42,6 +42,11 @@ contextBridge.exposeInMainWorld("qrAPI", {
 
   // Show a system notification (respects the "show notifications" setting)
   showNotification: (title, body) => ipcRenderer.invoke("show-notification", title, body),
+
+  // First-launch browser-extension download prompt
+  shouldShowExtensionPrompt: () => ipcRenderer.invoke("should-show-extension-prompt"),
+  markExtensionPromptShown: () => ipcRenderer.invoke("mark-extension-prompt-shown"),
+  downloadExtension: (browserType) => ipcRenderer.invoke("download-extension", browserType),
 });
 
 // Overlay API — used when overlay.html is loaded into the same mainWindow

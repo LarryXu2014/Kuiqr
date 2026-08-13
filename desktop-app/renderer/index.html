@@ -35,9 +35,7 @@
   <!-- ===== Scan Tab ===== -->
   <div id="tab-scan" class="tab-content active">
     <div class="scan-hero">
-      <div class="hero-icon">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M7 7h.01M17 7h.01M17 17h.01M10 10h4v4h-4z"/></svg>
-      </div>
+      <img src="hero-icon.png" alt="Kuiqr" class="hero-icon" />
       <h1>Kuiqr</h1>
       <p class="hero-subtitle">Scan QR codes from your screen, clipboard, or an image file</p>
     </div>
@@ -202,7 +200,7 @@
 
     <div class="about-section">
       <h3>About</h3>
-      <p>Kuiqr v2.4.0</p>
+      <p>Kuiqr v2.4.1.0</p>
       <p>All processing is local. No data is sent to any server.</p>
       <p class="platform-info" id="platform-info"></p>
     </div>
@@ -238,6 +236,35 @@
     <div class="generate-buttons">
       <button id="gen-download" class="btn-save">Download PNG</button>
       <button id="gen-copy" class="btn-text">Copy Text</button>
+    </div>
+  </div>
+
+  <!-- First-launch browser-extension download prompt -->
+  <div id="extension-prompt" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card">
+      <h3>Get the browser extension</h3>
+      <p>Kuiqr works best with its browser extension. Would you like to download it now?</p>
+      <p class="modal-hint">You can install it later from the README if you change your mind.</p>
+      <div class="modal-actions">
+        <button id="ext-download-chrome" class="btn-save">Download for Chrome / Edge / Brave</button>
+        <button id="ext-download-firefox" class="btn-save btn-secondary">Download for Firefox</button>
+        <button id="ext-prompt-later" class="btn-text">Not now</button>
+      </div>
+      <div id="ext-download-status" class="modal-status hidden"></div>
+    </div>
+  </div>
+
+  <!-- Unsaved settings confirmation -->
+  <div id="unsaved-prompt" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card">
+      <h3>Unsaved changes</h3>
+      <p>You have unsaved settings changes. Do you want to discard them?</p>
+      <div class="modal-actions">
+        <button id="unsaved-stay" class="btn-save">Keep editing</button>
+        <button id="unsaved-discard" class="btn-text btn-danger">Discard changes</button>
+      </div>
     </div>
   </div>
 
