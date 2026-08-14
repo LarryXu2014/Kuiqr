@@ -16,7 +16,7 @@
 //      provides a Settings button to jump to System Settings → Privacy & Security → Automation
 // ============================================================
 
-const { app, BrowserWindow, globalShortcut, screen, desktopCapturer, ipcMain, Tray, Menu, nativeImage, shell, clipboard, Notification } = require("electron");
+const { app, BrowserWindow, globalShortcut, screen, desktopCapturer, ipcMain, Tray, Menu, nativeImage, shell, clipboard, Notification, net } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { execSync, spawn, exec } = require("child_process");
@@ -935,8 +935,16 @@ ipcMain.handle("download-extension", async (event, browserType) => {
     const url = `https://github.com/LarryXu2014/Kuiqr/releases/download/v${version}/${filename}`;
     const destPath = path.join(app.getPath("downloads"), filename);
 
-    // Use Node's native fetch (Electron 30 / Node 20+) — follows redirects.
-    const response = await fetch(url);
+    // Download via Electron's net module (Chromium networking stack), which
+    // respects the system proxy settings. Falls back to Node's native fetch.
+    let response;
+    try {
+      response = await net.fetch(url);
+    } catch (netErr) {
+      console.warn("Kuiqr: net.fetch failed, falling back to native fetch:", netErr.message || netErr);
+      response = await fetch(url);
+    }
+
     if (!response.ok) {
       throw new Error(`Download failed: HTTP ${response.status}`);
     }
