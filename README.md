@@ -226,19 +226,13 @@ All processing happens on your device. Zero server communication.
 ## What's New
 
 ### v2.4.1.2
-- **Removed the "Show notifications" setting** — The toggle was non-functional, so it has been removed. Scan-result notifications (found URL / copied text / no QR / scanning feedback) now always appear.
-- **Unsaved-changes prompt now saves** — Leaving Settings with unsaved changes now offers **Save changes** (saves and continues) instead of **Discard changes**, plus **Keep editing** to stay. You can no longer lose edits by accident.
-- **Added a Linux build** — Kuiqr now ships **AppImage (x64 + arm64)** for Linux, in addition to macOS and Windows.
+- **Removed the "Show notifications" setting** — the toggle never worked, so it's gone. Scan-result notifications now always appear when a code is found.
+- **Unsaved-changes prompt now says "Save changes"** — leaving Settings with unsaved edits offers **Save changes** (primary) + **Keep editing** instead of the dangerous "Discard changes". Your settings can no longer be lost by accident.
+- **Added a Linux build** — first-class builds: AppImage and `.deb` for both x64 and arm64.
+- **Bug fix: overlay temp file cleanup** — the temporary screenshot from an overlay scan is now deleted after each scan (it was previously left on disk).
 
 ### v2.4.1.1
-- **Fixed: tray/menu bar icon no longer quits the app** — Left-click now reliably shows/hides the main window; the context menu is shown on right-click (macOS). Wrapped handlers in try/catch to prevent crashes.
-- **Settings unsaved-changes guard** — If you change a setting and try to leave the Settings tab without saving, the app now asks whether to keep editing or discard changes.
-- **Browser extension priority defaults to OFF** — Fresh installs (and migrated pre-2.4.1 settings) now default to OFF, so the desktop app's global shortcut works in browsers out of the box.
-- **First-launch browser extension download prompt** — On first open, the app asks if you want to download the Chrome/Edge/Brave or Firefox extension zip; it saves the file to your Downloads folder and shows install instructions.
-- **Homebrew install option** — You can now install on macOS with `brew install --cask kuiqr` (after tapping `LarryXu2014/kuiqr`).
-- **Updated app and extension icons** — The new QR-KR logo is now used everywhere, including the in-app hero icon.
-- **Windows overlay fix** — The transparent overlay now correctly shows/focuses the window when scanning from a hidden tray state.
-- **Less notification noise** — The Generate tab no longer sends a notification on every keystroke; notifications only appear when you download or copy.
+- **Fixed: rapid tray-icon clicks no longer quit the app (macOS)** — Kuiqr now runs as a pure menu-bar / background app (no Dock icon), so repeated menu-bar clicks can't terminate it.
 
 ### v2.4.0
 - **Generate tab notifications** — The Generate tab now shows system notifications when a QR code is rendered ("QR Code Generated"), when you download the PNG ("QR Code Downloaded"), and when you copy the text ("Text Copied"). All respect the "Show notifications" setting.
