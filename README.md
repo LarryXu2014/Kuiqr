@@ -62,7 +62,7 @@ Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Kuiqr/releases/latest/dow
 
 ```bash
 # x64
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.2-linux-x64.AppImage -o ~/Downloads/Kuiqr.AppImage && chmod +x ~/Downloads/Kuiqr.AppImage && ~/Downloads/Kuiqr.AppImage
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.2-linux-x86_64.AppImage -o ~/Downloads/Kuiqr.AppImage && chmod +x ~/Downloads/Kuiqr.AppImage && ~/Downloads/Kuiqr.AppImage
 # arm64
 curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.2-linux-arm64.AppImage -o ~/Downloads/Kuiqr.AppImage && chmod +x ~/Downloads/Kuiqr.AppImage && ~/Downloads/Kuiqr.AppImage
 ```
@@ -117,9 +117,9 @@ If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 | macOS (Intel)              | [Kuiqr-2.4.1.2-mac-x64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.2-mac-x64.dmg)         | ~100 MB | Verified |
 | macOS (Intel, ZIP)         | [Kuiqr-2.4.1.2-mac-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.2-mac-x64.zip)         | ~97 MB | Verified |
 | Windows (x64)              | [Kuiqr-2.4.1.2-windows-x64.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.2-windows-x64.exe) | ~70 MB | Verified |
-| Linux (x64, AppImage)      | [Kuiqr-2.4.1.2-linux-x64.AppImage](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.2-linux-x64.AppImage) | ~90 MB | Verified |
+| Linux (x64, AppImage)      | [Kuiqr-2.4.1.2-linux-x86_64.AppImage](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.2-linux-x86_64.AppImage) | ~90 MB | Verified |
 | Linux (arm64, AppImage)    | [Kuiqr-2.4.1.2-linux-arm64.AppImage](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.2-linux-arm64.AppImage) | ~90 MB | Verified |
-| Linux (x64, .deb)          | [Kuiqr-2.4.1.2-linux-x64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.2-linux-x64.deb) | ~90 MB | Verified |
+| Linux (x64, .deb)          | [Kuiqr-2.4.1.2-linux-amd64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.2-linux-amd64.deb) | ~90 MB | Verified |
 | Linux (arm64, .deb)        | [Kuiqr-2.4.1.2-linux-arm64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.2-linux-arm64.deb) | ~90 MB | Verified |
 
 All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32, AppImage runs headless.
