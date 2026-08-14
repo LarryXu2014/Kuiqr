@@ -1,7 +1,7 @@
 {
   "name": "kuiqr",
   "version": "2.4.1",
-  "description": "Scan QR codes anywhere on your screen with a global keyboard shortcut. Works on Windows and macOS.",
+  "description": "Scan QR codes anywhere on your screen with a global keyboard shortcut. Works on Windows, macOS, and Linux.",
   "main": "main.js",
   "author": "Kuiqr",
   "license": "MIT",
@@ -10,7 +10,11 @@
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win",
-    "build:all": "electron-builder --mac --win"
+    "build:linux": "electron-builder --linux AppImage --x64",
+    "build:linux-arm": "electron-builder --linux AppImage --arm64",
+    "build:linux-deb": "electron-builder --linux deb --x64",
+    "build:linux-deb-arm": "electron-builder --linux deb --arm64",
+    "build:all": "electron-builder --mac --win --linux"
   },
   "devDependencies": {
     "electron": "^30.0.0",
@@ -19,7 +23,7 @@
   "build": {
     "appId": "com.kuiqr.app",
     "productName": "Kuiqr",
-    "buildVersion": "2.4.1.1",
+    "buildVersion": "2.4.1.2",
     "directories": {
       "output": "dist"
     },
@@ -47,6 +51,18 @@
         { "target": "portable", "arch": ["x64"] }
       ],
       "icon": "icons/icon512.png"
+    },
+    "linux": {
+      "artifactName": "Kuiqr-${buildVersion}-linux-${arch}.${ext}",
+      "target": [
+        { "target": "AppImage", "arch": ["x64", "arm64"] },
+        { "target": "deb", "arch": ["x64", "arm64"] }
+      ],
+      "icon": "icons/icon512.png",
+      "category": "Utility",
+      "maintainer": "Kuiqr",
+      "description": "Scan QR codes anywhere on your screen with a global keyboard shortcut.",
+      "synopsis": "Screen-region QR code scanner with a global hotkey."
     }
   }
 }

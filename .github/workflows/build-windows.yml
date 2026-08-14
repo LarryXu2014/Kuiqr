@@ -38,6 +38,6 @@ jobs:
           # Create the release (as a draft) if it does not already exist, so the
           # upload never fails because the release is missing.
           if ! gh release view "v${VERSION}" >/dev/null 2>&1; then
-            gh release create "v${VERSION}" --draft --title "v${VERSION}" --notes "Kuiqr v${VERSION}"
+            gh release create "v${VERSION}" --draft --title "v${VERSION}" --notes "Kuiqr v${VERSION}" || true
           fi
           gh release upload "v${VERSION}" "desktop-app/dist/Kuiqr-${VERSION}-windows-x64.exe" --clobber

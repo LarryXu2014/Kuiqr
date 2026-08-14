@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Desktop App Renderer Logic (v2.4.1.1)
+// Kuiqr — Desktop App Renderer Logic (v2.4.1.2)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -204,7 +204,6 @@ function getSettingsFormValues() {
   return {
     autoOpenUrl: document.getElementById("setting-autoopen").checked,
     copyTextToClipboard: document.getElementById("setting-copytext").checked,
-    showNotification: document.getElementById("setting-notify").checked,
     browserExtensionPriority: document.getElementById("setting-browserpriority").checked,
     maxHistory: parseInt(document.getElementById("setting-maxhistory").value, 10) || 50,
     shortcut: currentShortcut,
@@ -217,7 +216,6 @@ function updateSettingsDirtyState() {
   const dirty =
     current.autoOpenUrl !== savedSettingsSnapshot.autoOpenUrl ||
     current.copyTextToClipboard !== savedSettingsSnapshot.copyTextToClipboard ||
-    current.showNotification !== savedSettingsSnapshot.showNotification ||
     current.browserExtensionPriority !== savedSettingsSnapshot.browserExtensionPriority ||
     current.maxHistory !== savedSettingsSnapshot.maxHistory ||
     current.shortcut !== savedSettingsSnapshot.shortcut;
@@ -237,7 +235,7 @@ function markSettingsClean() {
 }
 
 function setupSettingsDirtyTracking() {
-  const ids = ["setting-autoopen", "setting-copytext", "setting-notify", "setting-browserpriority", "setting-maxhistory"];
+  const ids = ["setting-autoopen", "setting-copytext", "setting-browserpriority", "setting-maxhistory"];
   ids.forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("change", updateSettingsDirtyState);
@@ -247,23 +245,24 @@ function setupSettingsDirtyTracking() {
 
 function setupUnsavedPrompt() {
   const prompt = document.getElementById("unsaved-prompt");
+  const saveBtn = document.getElementById("unsaved-save");
   const stayBtn = document.getElementById("unsaved-stay");
-  const discardBtn = document.getElementById("unsaved-discard");
-  if (!prompt || !stayBtn || !discardBtn) return;
+  if (!prompt || !saveBtn || !stayBtn) return;
 
-  stayBtn.addEventListener("click", () => {
+  // Save changes, then proceed to the tab the user wanted to switch to.
+  saveBtn.addEventListener("click", async () => {
     prompt.classList.add("hidden");
-    pendingTabTarget = null;
-  });
-
-  discardBtn.addEventListener("click", async () => {
-    prompt.classList.add("hidden");
-    // Reload saved values so we don't leave stale changes visible
-    await loadSettingsForm();
+    await saveSettings();
     if (pendingTabTarget) {
       switchTab(pendingTabTarget);
       pendingTabTarget = null;
     }
+  });
+
+  // Keep editing: cancel the switch and stay on Settings.
+  stayBtn.addEventListener("click", () => {
+    prompt.classList.add("hidden");
+    pendingTabTarget = null;
   });
 }
 
@@ -675,7 +674,6 @@ async function loadSettingsForm() {
 
   document.getElementById("setting-autoopen").checked = settings.autoOpenUrl !== false;
   document.getElementById("setting-copytext").checked = settings.copyTextToClipboard !== false;
-  document.getElementById("setting-notify").checked = settings.showNotification !== false;
   document.getElementById("setting-browserpriority").checked = !!settings.browserExtensionPriority;
   document.getElementById("setting-maxhistory").value = settings.maxHistory || 50;
 
@@ -843,7 +841,6 @@ async function persistShortcut(accelerator) {
     shortcut: accelerator,
     autoOpenUrl: document.getElementById("setting-autoopen").checked,
     copyTextToClipboard: document.getElementById("setting-copytext").checked,
-    showNotification: document.getElementById("setting-notify").checked,
     browserExtensionPriority: document.getElementById("setting-browserpriority").checked,
     maxHistory: parseInt(document.getElementById("setting-maxhistory").value, 10) || 50,
   };
@@ -864,7 +861,6 @@ async function saveSettings() {
     shortcut: recordBtn.dataset.shortcut || (await window.qrAPI.getSettings()).shortcut || "CommandOrControl+Shift+Y",
     autoOpenUrl: document.getElementById("setting-autoopen").checked,
     copyTextToClipboard: document.getElementById("setting-copytext").checked,
-    showNotification: document.getElementById("setting-notify").checked,
     browserExtensionPriority: document.getElementById("setting-browserpriority").checked,
     maxHistory: parseInt(document.getElementById("setting-maxhistory").value, 10) || 50,
   };

@@ -1,0 +1,72 @@
+name: Build Linux
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: desktop-app
+        run: npm install
+
+      # AppImage for x64 — the primary, reliable build.
+      - name: Build Linux AppImage (x64)
+        working-directory: desktop-app
+        run: npm run build:linux
+
+      # AppImage for arm64 — best effort (cross-arch build can be flaky on CI).
+      - name: Build Linux AppImage (arm64) — best effort
+        working-directory: desktop-app
+        continue-on-error: true
+        run: npm run build:linux-arm
+
+      # fpm is required to package .deb files; install it before the deb steps.
+      - name: Install fpm (needed to package .deb)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev rubygems build-essential
+          sudo gem install --no-document fpm
+
+      # .deb for x64 — best effort.
+      - name: Build Linux .deb (x64) — best effort
+        working-directory: desktop-app
+        continue-on-error: true
+        run: npm run build:linux-deb
+
+      # .deb for arm64 — best effort.
+      - name: Build Linux .deb (arm64) — best effort
+        working-directory: desktop-app
+        continue-on-error: true
+        run: npm run build:linux-deb-arm
+
+      - name: Ensure release exists and upload
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./desktop-app/package.json').build.buildVersion")
+          # Create the release (as a draft) if it does not already exist, so the
+          # upload never fails because the release is missing. `|| true` keeps us
+          # safe if the Windows workflow already created it (or a race occurred).
+          if ! gh release view "v${VERSION}" >/dev/null 2>&1; then
+            gh release create "v${VERSION}" --draft --title "v${VERSION}" --notes "Kuiqr v${VERSION}" || true
+          fi
+          for f in desktop-app/dist/Kuiqr-${VERSION}-linux-*; do
+            [ -e "$f" ] && gh release upload "v${VERSION}" "$f" --clobber
+          done

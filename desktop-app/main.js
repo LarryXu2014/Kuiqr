@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Electron Main Process (v2.4.1.1)
+// Kuiqr — Electron Main Process (v2.4.1.2)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -29,6 +29,7 @@ let isInOverlayMode = false;   // true while mainWindow is showing the scan over
 let savedWindowState = null;    // saved bounds/state to restore after overlay (Windows)
 let rendererReady = false;      // set when the renderer signals it's listening for decode jobs
 let pendingDecodeBuffer = null; // captured PNG waiting for the renderer to be ready
+let lastOverlayScreenshotPath = null; // temp screenshot for the Windows/Linux overlay (cleaned up after)
 
 const isMac = process.platform === "darwin";
 const isWin = process.platform === "win32";
@@ -45,7 +46,6 @@ const DEFAULT_SETTINGS = {
   shortcut: "CommandOrControl+Shift+Y",
   autoOpenUrl: true,
   copyTextToClipboard: true,
-  showNotification: true,
   maxHistory: 50,
   launchAtLogin: false,
   browserExtensionPriority: false, // when true and a browser is the foreground app, let the browser extension handle the shortcut
@@ -581,10 +581,9 @@ async function scanMacNative() {
 
   if (!buffer) return;
 
-  // Indicate scanning has started (respects the "show notifications" setting).
+  // Indicate scanning has started.
   try {
-    const s = loadSettings();
-    if (s.showNotification) showNotification("Kuiqr", "Scanning…");
+    showNotification("Kuiqr", "Scanning…");
   } catch { /* ignore */ }
 
   // Decode in the hidden renderer (it hosts the proven robust QR decoder).
@@ -641,6 +640,7 @@ async function scanWithOverlay() {
 
   const tempPath = path.join(app.getPath("temp"), "qr-scan-screenshot.png");
   fs.writeFileSync(tempPath, lastScreenshot.toPNG());
+  lastOverlayScreenshotPath = tempPath;
 
   enterOverlayMode(tempPath, { width, height, scaleFactor });
 }
@@ -713,6 +713,12 @@ function exitOverlayMode() {
   try {
     mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
   } catch { /* ignore */ }
+
+  // Clean up the temp screenshot we wrote for the overlay scan.
+  if (lastOverlayScreenshotPath) {
+    try { fs.unlinkSync(lastOverlayScreenshotPath); } catch { /* ignore */ }
+    lastOverlayScreenshotPath = null;
+  }
 
   // If the window was hidden before the overlay scan, hide it again so the app
   // returns to the background after scanning.
@@ -792,9 +798,7 @@ function applyDecodedResult(data) {
   const settings = loadSettings();
 
   if (!data) {
-    if (settings.showNotification) {
-      showNotification("No QR Found", "No QR code detected in the selected area.");
-    }
+    showNotification("No QR Found", "No QR code detected in the selected area.");
     return { result: "none" };
   }
 
@@ -805,9 +809,7 @@ function applyDecodedResult(data) {
     const targetUrl = text.startsWith("http") ? text : `https://${text}`;
     shell.openExternal(targetUrl);
     addToHistory(text, "url");
-    if (settings.showNotification) {
-      showNotification("QR Found — Opening URL", text.slice(0, 100));
-    }
+    showNotification("QR Found — Opening URL", text.slice(0, 100));
     return { result: "url", data: text };
   }
 
@@ -815,9 +817,7 @@ function applyDecodedResult(data) {
     clipboard.writeText(text);
   }
   addToHistory(text, "text");
-  if (settings.showNotification) {
-    showNotification("QR Found — Copied to Clipboard", text.slice(0, 100));
-  }
+  showNotification("QR Found — Copied to Clipboard", text.slice(0, 100));
   return { result: "text", data: text };
 }
 
@@ -910,12 +910,9 @@ ipcMain.handle("resume-shortcut", () => {
   return true;
 });
 
-// Renderer requests: show a system notification (respects the "show notifications" setting)
+// Renderer requests: show a system notification
 ipcMain.handle("show-notification", (event, title, body) => {
-  const settings = loadSettings();
-  if (settings.showNotification) {
-    showNotification(title, body);
-  }
+  showNotification(title, body);
 });
 
 // ============================================================
