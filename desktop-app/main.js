@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Electron Main Process (v2.4.1.0)
+// Kuiqr — Electron Main Process (v2.4.1.1)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -32,6 +32,10 @@ let pendingDecodeBuffer = null; // captured PNG waiting for the renderer to be r
 
 const isMac = process.platform === "darwin";
 const isWin = process.platform === "win32";
+
+// App version — read from package.json so release bumps are picked up automatically.
+// (Used for the first-launch extension-download URLs, which live in the vX.Y.Z release.)
+const APP_VERSION = require("./package.json").build.buildVersion;
 
 // ── Settings (stored next to the app's userData) ──
 const SETTINGS_PATH = path.join(app.getPath("userData"), "settings.json");
@@ -111,6 +115,13 @@ if (!gotSingleInstanceLock) {
   });
 
   app.whenReady().then(() => {
+    // On macOS, run as a pure menu-bar (background) app: no Dock icon, so there is
+    // no Dock window/quit interplay that can terminate the app when the window is
+    // hidden via rapid tray clicks. The tray icon remains fully functional.
+    if (isMac && app.dock && typeof app.dock.hide === "function") {
+      try { app.dock.hide(); } catch { /* ignore */ }
+    }
+
     createMainWindow(); // shows itself on launch
     createTray();
     registerShortcut();
@@ -928,7 +939,7 @@ ipcMain.handle("mark-extension-prompt-shown", () => {
 ipcMain.handle("download-extension", async (event, browserType) => {
   const settings = loadSettings();
   try {
-    const version = "2.4.1.0";
+    const version = APP_VERSION;
     const filename = browserType === "firefox"
       ? `kuiqr-firefox-${version}.zip`
       : `kuiqr-extension-${version}.zip`;

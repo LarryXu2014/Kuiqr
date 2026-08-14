@@ -19,7 +19,7 @@
   "build": {
     "appId": "com.kuiqr.app",
     "productName": "Kuiqr",
-    "buildVersion": "2.4.1.0",
+    "buildVersion": "2.4.1.1",
     "directories": {
       "output": "dist"
     },
