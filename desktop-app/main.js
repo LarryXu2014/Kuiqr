@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Electron Main Process (v2.4.1.2)
+// Kuiqr — Electron Main Process (v2.4.1.3)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -34,9 +34,11 @@ let lastOverlayScreenshotPath = null; // temp screenshot for the Windows/Linux o
 const isMac = process.platform === "darwin";
 const isWin = process.platform === "win32";
 
-// App version — read from package.json so release bumps are picked up automatically.
-// (Used for the first-launch extension-download URLs, which live in the vX.Y.Z release.)
-const APP_VERSION = require("./package.json").build.buildVersion;
+// App version — use Electron's app.getVersion(), which returns build.buildVersion
+// when present (electron-builder uses it for artifacts and the packaged app).
+// Reading package.json directly fails in the built app because electron-builder strips
+// the build config from the copied package.json.
+const APP_VERSION = app.getVersion();
 
 // ── Settings (stored next to the app's userData) ──
 const SETTINGS_PATH = path.join(app.getPath("userData"), "settings.json");
