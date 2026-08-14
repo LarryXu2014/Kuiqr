@@ -29,10 +29,15 @@ jobs:
         working-directory: desktop-app
         run: npm run build:win
 
-      - name: Upload to GitHub release
+      - name: Ensure release exists and upload
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           VERSION=$(node -p "require('./desktop-app/package.json').build.buildVersion")
+          # Create the release (as a draft) if it does not already exist, so the
+          # upload never fails because the release is missing.
+          if ! gh release view "v${VERSION}" >/dev/null 2>&1; then
+            gh release create "v${VERSION}" --draft --title "v${VERSION}" --notes "Kuiqr v${VERSION}"
+          fi
           gh release upload "v${VERSION}" "desktop-app/dist/Kuiqr-${VERSION}-windows-x64.exe" --clobber
