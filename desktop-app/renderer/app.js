@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Desktop App Renderer Logic (v2.4.1.2)
+// Kuiqr — Desktop App Renderer Logic (v2.4.1.5)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -38,13 +38,36 @@ document.addEventListener("DOMContentLoaded", async () => {
   // result back. The app window stays hidden the whole time — this just runs the
   // decoder in the background. No preview is ever shown.
   window.qrAPI.onDecodeBuffer(async (buffer) => {
+    const settings = await window.qrAPI.getSettings();
     try {
       const text = await decodeBufferToText(buffer);
       await window.qrAPI.onDecoded(text || null);
+
+      // Show popup for all result types if enabled
+      if (settings.showScanPopup !== false) {
+        if (text) {
+          showScanPopup(text, "success");
+        } else {
+          showScanPopup(
+            "No QR code detected in the selected area.",
+            "no-qr",
+            "Try selecting a different area with a clearer view of the QR code."
+          );
+        }
+      }
       await loadHistory(); // refresh history silently if the window is open
     } catch (err) {
       console.error("Hidden decode failed:", err);
       await window.qrAPI.onDecoded(null);
+
+      // Show error popup if enabled
+      if (settings.showScanPopup !== false) {
+        showScanPopup(
+          "Image could not be processed.",
+          "error",
+          "The selected area may be too small, corrupted, or unsupported."
+        );
+      }
     }
   });
 
@@ -205,6 +228,7 @@ function getSettingsFormValues() {
     autoOpenUrl: document.getElementById("setting-autoopen").checked,
     copyTextToClipboard: document.getElementById("setting-copytext").checked,
     browserExtensionPriority: document.getElementById("setting-browserpriority").checked,
+    showScanPopup: document.getElementById("setting-showscanpopup").checked,
     maxHistory: parseInt(document.getElementById("setting-maxhistory").value, 10) || 50,
     shortcut: currentShortcut,
   };
@@ -217,6 +241,7 @@ function updateSettingsDirtyState() {
     current.autoOpenUrl !== savedSettingsSnapshot.autoOpenUrl ||
     current.copyTextToClipboard !== savedSettingsSnapshot.copyTextToClipboard ||
     current.browserExtensionPriority !== savedSettingsSnapshot.browserExtensionPriority ||
+    current.showScanPopup !== savedSettingsSnapshot.showScanPopup ||
     current.maxHistory !== savedSettingsSnapshot.maxHistory ||
     current.shortcut !== savedSettingsSnapshot.shortcut;
 
@@ -235,7 +260,7 @@ function markSettingsClean() {
 }
 
 function setupSettingsDirtyTracking() {
-  const ids = ["setting-autoopen", "setting-copytext", "setting-browserpriority", "setting-maxhistory"];
+  const ids = ["setting-autoopen", "setting-copytext", "setting-browserpriority", "setting-showscanpopup", "setting-maxhistory"];
   ids.forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("change", updateSettingsDirtyState);
@@ -246,8 +271,8 @@ function setupSettingsDirtyTracking() {
 function setupUnsavedPrompt() {
   const prompt = document.getElementById("unsaved-prompt");
   const saveBtn = document.getElementById("unsaved-save");
-  const stayBtn = document.getElementById("unsaved-stay");
-  if (!prompt || !saveBtn || !stayBtn) return;
+  const discardBtn = document.getElementById("unsaved-discard");
+  if (!prompt || !saveBtn || !discardBtn) return;
 
   // Save changes, then proceed to the tab the user wanted to switch to.
   saveBtn.addEventListener("click", async () => {
@@ -259,10 +284,15 @@ function setupUnsavedPrompt() {
     }
   });
 
-  // Keep editing: cancel the switch and stay on Settings.
-  stayBtn.addEventListener("click", () => {
+  // Discard changes: revert the settings form to the saved values,
+  // then proceed with the pending tab switch.
+  discardBtn.addEventListener("click", async () => {
     prompt.classList.add("hidden");
-    pendingTabTarget = null;
+    await loadSettingsForm(); // resets form + dirty flag from saved settings
+    if (pendingTabTarget) {
+      switchTab(pendingTabTarget);
+      pendingTabTarget = null;
+    }
   });
 }
 
@@ -368,7 +398,7 @@ function loadImageFile(file) {
 
 function showPreviewAndDecode(dataUrl) {
   const img = new Image();
-  img.onload = () => {
+  img.onload = async () => {
     // Show preview
     const container = document.getElementById("image-preview-container");
     const canvas = document.getElementById("preview-canvas");
@@ -385,11 +415,33 @@ function showPreviewAndDecode(dataUrl) {
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
     // Decode using jsQR (loaded via script tag)
-    const result = decodeImageRobust(ctx, canvas.width, canvas.height);
-    if (result) {
-      handleDecodedResult(result);
-    } else {
-      showResult("no-qr", "No QR code detected", "Try a clearer image or use screen-area selection instead.");
+    try {
+      const result = decodeImageRobust(ctx, canvas.width, canvas.height);
+      if (result) {
+        await handleDecodedResult(result);
+      } else {
+        showResult("no-qr", "No QR code detected", "Try a clearer image or use screen-area selection instead.");
+        // Also show popup for no-qr case if enabled
+        const settings = await window.qrAPI.getSettings();
+        if (settings.showScanPopup !== false) {
+          showScanPopup(
+            "No QR code detected in this image.",
+            "no-qr",
+            "Try a clearer image or use screen-area selection instead."
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Decode error:", err);
+      showResult("error", "Failed to decode image", err.message);
+      const settings = await window.qrAPI.getSettings();
+      if (settings.showScanPopup !== false) {
+        showScanPopup(
+          "Image could not be processed.",
+          "error",
+          "The file may be corrupted or in an unsupported format."
+        );
+      }
     }
   };
   img.onerror = () => {
@@ -551,6 +603,12 @@ async function handleDecodedResult(qrResult) {
     showResult("text", text, null, false);
   }
 
+  // Show scan success popup if enabled
+  const settings = await window.qrAPI.getSettings();
+  if (settings.showScanPopup !== false) {
+    showScanPopup(text, "success");
+  }
+
   // Apply side effects via main process
   const response = await window.qrAPI.onDecoded(text);
 
@@ -609,6 +667,104 @@ function showResult(type, data, sub, isUrl) {
 function hideResult() {
   document.getElementById("scan-result").classList.add("hidden");
 }
+
+// ============================================================
+// In-app scan result popup (not a system notification)
+// ============================================================
+
+let scanPopupTimer = null;
+
+/**
+ * Show the in-app scan result popup at the top of the window.
+ * Displays success, no-qr, or error states with auto-hide.
+ * Does NOT use system notifications or notification permission APIs.
+ * @param {string} text - The main content to display
+ * @param {string} type - One of: "success", "no-qr", "error"
+ * @param {string} [hint] - Optional hint text for no-qr/error states
+ */
+function showScanPopup(text, type = "success", hint = null) {
+  const popup = document.getElementById("scan-popup");
+  const iconEl = document.getElementById("scan-popup-icon");
+  const titleEl = document.getElementById("scan-popup-title");
+  const content = document.getElementById("scan-popup-content");
+  const hintEl = document.getElementById("scan-popup-hint");
+
+  if (!popup || !content) return;
+
+  // Clear any pending hide timer
+  if (scanPopupTimer) {
+    clearTimeout(scanPopupTimer);
+    scanPopupTimer = null;
+  }
+
+  // Set type attribute for styling
+  popup.setAttribute("data-type", type);
+
+  // Configure icon and title based on type
+  const config = {
+    success: { icon: "✅", title: "QR Code Scanned" },
+    "no-qr": { icon: "❌", title: "No QR Code Found" },
+    error: { icon: "⚠️", title: "Scan Failed" }
+  };
+
+  const cfg = config[type] || config.success;
+  if (iconEl) iconEl.textContent = cfg.icon;
+  if (titleEl) titleEl.textContent = cfg.title;
+
+  // Set content (escape HTML to prevent injection)
+  content.textContent = text;
+
+  // Set hint if provided
+  if (hintEl) {
+    if (hint) {
+      hintEl.textContent = hint;
+      hintEl.style.display = "block";
+    } else {
+      hintEl.style.display = "none";
+    }
+  }
+
+  // Show with animation
+  popup.classList.remove("hidden");
+  // Force reflow so the transition runs from the 'hidden' state
+  void popup.offsetWidth;
+  popup.classList.add("visible");
+
+  // Auto-hide after delay (success: 3s, errors: 4s for readability)
+  const delay = type === "success" ? 3000 : 4000;
+  scanPopupTimer = setTimeout(() => {
+    hideScanPopup();
+  }, delay);
+}
+
+/**
+ * Hide the scan success popup with fade-out animation.
+ */
+function hideScanPopup() {
+  const popup = document.getElementById("scan-popup");
+  if (!popup) return;
+
+  popup.classList.remove("visible");
+  // After transition ends, add 'hidden' to remove from accessibility tree
+  setTimeout(() => {
+    popup.classList.add("hidden");
+  }, 250);
+
+  if (scanPopupTimer) {
+    clearTimeout(scanPopupTimer);
+    scanPopupTimer = null;
+  }
+}
+
+// Close button click handler (set up after DOMContentLoaded)
+document.addEventListener("DOMContentLoaded", () => {
+  const closeBtn = document.getElementById("scan-popup-close");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      hideScanPopup();
+    });
+  }
+});
 
 // ============================================================
 // History
@@ -675,6 +831,7 @@ async function loadSettingsForm() {
   document.getElementById("setting-autoopen").checked = settings.autoOpenUrl !== false;
   document.getElementById("setting-copytext").checked = settings.copyTextToClipboard !== false;
   document.getElementById("setting-browserpriority").checked = !!settings.browserExtensionPriority;
+  document.getElementById("setting-showscanpopup").checked = settings.showScanPopup !== false;
   document.getElementById("setting-maxhistory").value = settings.maxHistory || 50;
 
   // Track the active shortcut and reflect it everywhere
@@ -862,6 +1019,7 @@ async function saveSettings() {
     autoOpenUrl: document.getElementById("setting-autoopen").checked,
     copyTextToClipboard: document.getElementById("setting-copytext").checked,
     browserExtensionPriority: document.getElementById("setting-browserpriority").checked,
+    showScanPopup: document.getElementById("setting-showscanpopup").checked,
     maxHistory: parseInt(document.getElementById("setting-maxhistory").value, 10) || 50,
   };
 

@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Electron Main Process (v2.4.1.4)
+// Kuiqr — Electron Main Process (v2.4.1.5)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -64,6 +64,7 @@ const DEFAULT_SETTINGS = {
   browserExtensionPriority: false, // when true and a browser is the foreground app, let the browser extension handle the shortcut
   extensionPromptShown: false,     // whether the first-launch browser-extension download prompt has been shown
   extensionDownloaded: false,        // whether the user has downloaded the extension zip through the app
+  showScanPopup: true,              // show the in-app scan success popup after decoding a QR code
 };
 
 function loadSettings() {
@@ -807,11 +808,15 @@ ipcMain.handle("decoded", (event, data) => applyDecodedResult(data));
 // Single source of truth for what happens after a QR code is decoded (or not):
 // open the URL / copy the text / record history / notify. Used by BOTH the
 // in-app scan path and the native macOS scan path.
+// NOTE: When showScanPopup is enabled, we skip system notifications — the
+// renderer shows an in-app popup instead. For "no QR found", we never show
+// a system notification (annoying); the popup handles all feedback.
 function applyDecodedResult(data) {
   const settings = loadSettings();
+  const usePopup = settings.showScanPopup !== false;
 
   if (!data) {
-    showNotification("No QR Found", "No QR code detected in the selected area.");
+    // No system notification — the renderer shows in-app popup instead
     return { result: "none" };
   }
 
@@ -822,7 +827,10 @@ function applyDecodedResult(data) {
     const targetUrl = text.startsWith("http") ? text : `https://${text}`;
     shell.openExternal(targetUrl);
     addToHistory(text, "url");
-    showNotification("QR Found — Opening URL", text.slice(0, 100));
+    // Only show system notification if in-app popup is disabled
+    if (!usePopup) {
+      showNotification("QR Found — Opening URL", text.slice(0, 100));
+    }
     return { result: "url", data: text };
   }
 
@@ -830,7 +838,10 @@ function applyDecodedResult(data) {
     clipboard.writeText(text);
   }
   addToHistory(text, "text");
-  showNotification("QR Found — Copied to Clipboard", text.slice(0, 100));
+  // Only show system notification if in-app popup is disabled
+  if (!usePopup) {
+    showNotification("QR Found — Copied to Clipboard", text.slice(0, 100));
+  }
   return { result: "text", data: text };
 }
 

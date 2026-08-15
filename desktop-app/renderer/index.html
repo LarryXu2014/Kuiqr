@@ -160,6 +160,17 @@
 
       <div class="setting-item">
         <div class="setting-info">
+          <div class="setting-label">Show scan success popup</div>
+          <div class="setting-desc">Display a popup at the top of the window after successfully scanning a QR code</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="setting-showscanpopup" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-info">
           <div class="setting-label">Browser extension priority</div>
           <div class="setting-desc">When a web browser is the frontmost app, this app releases the global shortcut so the Kuiqr extension handles it instead (no double scan, no app window popping up). Requires macOS Automation permission (System Settings → Privacy &amp; Security → Automation) so the app can detect the frontmost app.</div>
         </div>
@@ -252,9 +263,20 @@
       <p>You have unsaved settings changes. Save them before leaving?</p>
       <div class="modal-actions">
         <button id="unsaved-save" class="btn-save">Save changes</button>
-        <button id="unsaved-stay" class="btn-text">Keep editing</button>
+        <button id="unsaved-discard" class="btn-text">Discard changes</button>
       </div>
     </div>
+  </div>
+
+  <!-- In-app scan result popup (no system notifications) -->
+  <div id="scan-popup" class="scan-popup hidden" data-type="success">
+    <div class="scan-popup-header">
+      <span class="scan-popup-icon" id="scan-popup-icon">✅</span>
+      <span class="scan-popup-title" id="scan-popup-title">QR Code Scanned</span>
+      <button id="scan-popup-close" class="scan-popup-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="scan-popup-content" id="scan-popup-content"></div>
+    <div class="scan-popup-hint" id="scan-popup-hint"></div>
   </div>
 
   <!-- jsQR library for in-app decoding; qrcode-generator for generating -->
