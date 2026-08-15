@@ -24,9 +24,9 @@
   "build": {
     "appId": "com.kuiqr.app",
     "productName": "Kuiqr",
-    "buildVersion": "2.4.1.5",
+    "buildVersion": "2.4.1.6",
     "extraMetadata": {
-      "buildVersion": "2.4.1.5"
+      "buildVersion": "2.4.1.6"
     },
     "directories": {
       "output": "dist"
@@ -38,6 +38,13 @@
       "overlay.html",
       "overlay-preload.js",
       "icons/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "native/qr-vision",
+        "to": "native/qr-vision",
+        "filter": ["**/*"]
+      }
     ],
     "artifactName": "Kuiqr-${buildVersion}-mac-${arch}.${ext}",
     "mac": {

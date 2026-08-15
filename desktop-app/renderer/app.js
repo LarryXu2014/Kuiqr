@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Desktop App Renderer Logic (v2.4.1.5)
+// Kuiqr — Desktop App Renderer Logic (v2.4.1.6)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -20,6 +20,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   currentPlatform = await window.qrAPI.getPlatform();
   updatePlatformUI();
 
+  // Show the real app build version in the About section (fixes a bug where it
+  // was hardcoded to an old version).
+  try {
+    const appVer = await window.qrAPI.getAppVersion();
+    const aboutEl = document.getElementById("about-version");
+    if (aboutEl && appVer) aboutEl.textContent = "Kuiqr v" + appVer;
+  } catch (e) { /* non-fatal */ }
+
   // Tab navigation — respect unsaved settings changes
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.addEventListener("click", () => requestSwitchTab(tab.dataset.tab));
@@ -38,37 +46,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   // result back. The app window stays hidden the whole time — this just runs the
   // decoder in the background. No preview is ever shown.
   window.qrAPI.onDecodeBuffer(async (buffer) => {
-    const settings = await window.qrAPI.getSettings();
     try {
       const text = await decodeBufferToText(buffer);
       await window.qrAPI.onDecoded(text || null);
-
-      // Show popup for all result types if enabled
-      if (settings.showScanPopup !== false) {
-        if (text) {
-          showScanPopup(text, "success");
-        } else {
-          showScanPopup(
-            "No QR code detected in the selected area.",
-            "no-qr",
-            "Try selecting a different area with a clearer view of the QR code."
-          );
-        }
-      }
+      // Success/no-QR feedback is delivered as a NATIVE OS notification by the
+      // main process (applyDecodedResult) — not an in-app popup.
       await loadHistory(); // refresh history silently if the window is open
     } catch (err) {
       console.error("Hidden decode failed:", err);
       await window.qrAPI.onDecoded(null);
-
-      // Show error popup if enabled
-      if (settings.showScanPopup !== false) {
-        showScanPopup(
-          "Image could not be processed.",
-          "error",
-          "The selected area may be too small, corrupted, or unsupported."
-        );
-      }
+      // Surface the failure as a native system notification.
+      window.qrAPI.showNotification("Kuiqr — Scan Failed", "The captured image could not be processed.");
     }
+  });
+
+  // ── macOS Vision fast-path result ──
+  // The main process already decoded the capture with native Vision, applied
+  // side effects (open URL / copy text / history), and sends us the text so the
+  // UI can show the popup and refresh history.
+  window.qrAPI.onNativeDecoded(async (text) => {
+    // The main process already delivered the scan result as a native OS
+    // notification; we just refresh the history list.
+    await loadHistory();
   });
 
   // ── In-App Scan: Paste from Clipboard ──
@@ -421,27 +420,12 @@ function showPreviewAndDecode(dataUrl) {
         await handleDecodedResult(result);
       } else {
         showResult("no-qr", "No QR code detected", "Try a clearer image or use screen-area selection instead.");
-        // Also show popup for no-qr case if enabled
-        const settings = await window.qrAPI.getSettings();
-        if (settings.showScanPopup !== false) {
-          showScanPopup(
-            "No QR code detected in this image.",
-            "no-qr",
-            "Try a clearer image or use screen-area selection instead."
-          );
-        }
       }
     } catch (err) {
       console.error("Decode error:", err);
       showResult("error", "Failed to decode image", err.message);
-      const settings = await window.qrAPI.getSettings();
-      if (settings.showScanPopup !== false) {
-        showScanPopup(
-          "Image could not be processed.",
-          "error",
-          "The file may be corrupted or in an unsupported format."
-        );
-      }
+      // Surface the failure as a native system notification.
+      window.qrAPI.showNotification("Kuiqr — Scan Failed", err.message || "The file could not be processed.");
     }
   };
   img.onerror = () => {
@@ -456,51 +440,100 @@ function clearPreview() {
 }
 
 // ============================================================
-// Robust QR Decoder (same strategies as overlay)
+// Fast QR Decoder
+//
+// Goals:
+//   1. Instant feedback for empty / uniform areas (<< 50 ms).
+//   2. Most real QR codes decoded in the first 1-3 jsQR calls.
+//   3. Hard / artistic codes get a bounded, time-limited fallback.
+//
+// Timing budgets (can be tuned):
+//   - Fast path:     ~80 ms  (original + small up/down-scales)
+//   - Medium path:  ~200 ms  (grayscale + contrast + a few thresholds)
+//   - Deep path:    ~500 ms  (multi-scale threshold sweep)
+//   - Absolute cap: 800 ms  (never hang on a bad selection)
 // ============================================================
+
+const DECODER_BUDGET_FAST = 80;
+const DECODER_BUDGET_MEDIUM = 220;
+const DECODER_BUDGET_DEEP = 550;
+const DECODER_BUDGET_ABSOLUTE = 800;
 
 function decodeImageRobust(ctx, w, h) {
   const imageData = ctx.getImageData(0, 0, w, h);
+  const start = performance.now();
 
-  // ============================================================
-  // TIER 1 — Fast / "basic" ways. A normal QR code is read here in
-  // 1–3 cheap jsQR calls. We only move to the slow strategies
-  // (threshold sweep + invert) if this tier fails.
-  // ============================================================
+  // Guard against tiny / degenerate captures.
+  if (w < 50 || h < 50) return null;
+
+  // ── Instant reject: uniform / blank / blurry selections ──
+  // If the image has almost no contrast, no QR code can be present.
+  if (looksEmptyOrUniform(imageData)) {
+    return null;
+  }
+
+  // ── FAST PATH ──
+  // 1. Original size, normal + inverted.
   let result = jsQR(imageData.data, w, h, { inversionAttempts: "attemptBoth" });
   if (result) return result;
 
-  // Cheap upscales help small QR codes; jsQR's "attemptBoth" handles inverted codes.
-  for (const s of [1.5, 2, 2.5]) {
+  // 2. Small up-scales help tiny but otherwise clean codes.
+  for (const s of [1.5, 2]) {
+    if (performance.now() - start > DECODER_BUDGET_FAST) break;
     result = tryScaleDecode(ctx, w, h, s, (sd) =>
       jsQR(sd.data, sd.width, sd.height, { inversionAttempts: "attemptBoth" })
     );
     if (result) return result;
   }
 
-  // ============================================================
-  // TIER 2 — Advanced strategies (only reached for hard QR codes:
-  // low contrast, color backgrounds, artistic/decorative codes).
-  // ============================================================
-  const scales = [0.5, 0.75, 1.25, 1.5, 2];
-  for (const s of scales) {
-    const sw = Math.round(w * s);
-    const sh = Math.round(h * s);
-    if (sw < 10 || sh < 10) continue;
+  // 3. Quick down-scale for huge captures where the QR is small.
+  if (w > 600 || h > 600) {
+    if (performance.now() - start <= DECODER_BUDGET_FAST) {
+      result = tryScaleDecode(ctx, w, h, 0.5, (sd) =>
+        jsQR(sd.data, sd.width, sd.height, { inversionAttempts: "attemptBoth" })
+      );
+      if (result) return result;
+    }
+  }
 
-    const sc = document.createElement("canvas");
-    sc.width = sw; sc.height = sh;
-    const sctx = sc.getContext("2d");
-    sctx.drawImage(ctx.canvas, 0, 0, sw, sh);
-    let sd = sctx.getImageData(0, 0, sw, sh);
-    sd = grayscale(sd);
-    sd = stretchContrast(sd);
+  // ── MEDIUM PATH ──
+  // Grayscale + contrast stretch + a few threshold attempts at original size.
+  if (performance.now() - start <= DECODER_BUDGET_MEDIUM) {
+    let gray = grayscale(imageData);
+    gray = stretchContrast(gray);
 
-    result = jsQR(sd.data, sw, sh, { inversionAttempts: "attemptBoth" });
+    result = jsQR(gray.data, w, h, { inversionAttempts: "attemptBoth" });
     if (result) return result;
 
-    for (const thresh of [80, 100, 120, 140, 160]) {
-      const bin = binaryThreshold(sd, thresh);
+    for (const thresh of [100, 128, 160]) {
+      if (performance.now() - start > DECODER_BUDGET_MEDIUM) break;
+      const bin = binaryThreshold(gray, thresh);
+      result = jsQR(bin.data, w, h, { inversionAttempts: "attemptBoth" });
+      if (result) return result;
+    }
+  }
+
+  // ── DEEP PATH ──
+  // Only for hard codes: low contrast, color backgrounds, decorative codes.
+  // Kept bounded so a bad selection never stalls for seconds.
+  const deepScales = [0.75, 1.25, 1.5];
+  for (const s of deepScales) {
+    if (performance.now() - start > DECODER_BUDGET_DEEP) break;
+
+    const sw = Math.round(w * s);
+    const sh = Math.round(h * s);
+    if (sw < 80 || sh < 80) continue;
+
+    const sd = scaleImageData(ctx, w, h, sw, sh);
+    let gray = grayscale(sd);
+    gray = stretchContrast(gray);
+
+    result = jsQR(gray.data, sw, sh, { inversionAttempts: "attemptBoth" });
+    if (result) return result;
+
+    for (const thresh of [80, 110, 140, 170]) {
+      if (performance.now() - start > DECODER_BUDGET_DEEP) break;
+      const bin = binaryThreshold(gray, thresh);
       result = jsQR(bin.data, sw, sh, { inversionAttempts: "attemptBoth" });
       if (result) return result;
 
@@ -510,19 +543,71 @@ function decodeImageRobust(ctx, w, h) {
     }
   }
 
+  // Absolute cap — if we somehow got here, give up so the UI never hangs.
   return null;
+}
+
+// ── Instant empty-area detection ──
+// Samples pixels on a grid. If almost every sample is the same color
+// (within a small tolerance), the area contains no QR code.
+function looksEmptyOrUniform(imageData) {
+  const d = imageData.data;
+  const w = imageData.width;
+  const h = imageData.height;
+  const sampleStep = Math.max(8, Math.floor(Math.min(w, h) / 16));
+  let samples = 0;
+  let rSum = 0, gSum = 0, bSum = 0;
+  let minL = 255, maxL = 0;
+
+  for (let y = 0; y < h; y += sampleStep) {
+    for (let x = 0; x < w; x += sampleStep) {
+      const i = (y * w + x) * 4;
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      rSum += r; gSum += g; bSum += b;
+      if (lum < minL) minL = lum;
+      if (lum > maxL) maxL = lum;
+      samples++;
+    }
+  }
+
+  if (samples === 0) return true;
+
+  // No meaningful contrast -> empty.
+  if (maxL - minL < 18) return true;
+
+  // Very low color variance (e.g. a blank wall / sky).
+  const rAvg = rSum / samples;
+  const gAvg = gSum / samples;
+  const bAvg = bSum / samples;
+  let varianceSum = 0;
+  for (let y = 0; y < h; y += sampleStep) {
+    for (let x = 0; x < w; x += sampleStep) {
+      const i = (y * w + x) * 4;
+      varianceSum += Math.abs(d[i] - rAvg) + Math.abs(d[i + 1] - gAvg) + Math.abs(d[i + 2] - bAvg);
+    }
+  }
+  const avgVariance = varianceSum / samples;
+  if (avgVariance < 12) return true;
+
+  return false;
 }
 
 function tryScaleDecode(ctx, w, h, s, decode) {
   const sw = Math.round(w * s);
   const sh = Math.round(h * s);
   if (sw < 10 || sh < 10) return null;
+  const sd = scaleImageData(ctx, w, h, sw, sh);
+  return decode(sd);
+}
+
+function scaleImageData(ctx, w, h, sw, sh) {
+  // Use the browser's high-quality down/up-scale, then read pixels.
   const sc = document.createElement("canvas");
   sc.width = sw; sc.height = sh;
-  const sctx = sc.getContext("2d");
+  const sctx = sc.getContext("2d", { willReadFrequently: true });
   sctx.drawImage(ctx.canvas, 0, 0, sw, sh);
-  const sd = sctx.getImageData(0, 0, sw, sh);
-  return decode(sd);
+  return sctx.getImageData(0, 0, sw, sh);
 }
 
 function grayscale(imageData) {
@@ -603,11 +688,8 @@ async function handleDecodedResult(qrResult) {
     showResult("text", text, null, false);
   }
 
-  // Show scan success popup if enabled
-  const settings = await window.qrAPI.getSettings();
-  if (settings.showScanPopup !== false) {
-    showScanPopup(text, "success");
-  }
+  // Scan success feedback is delivered as a NATIVE OS notification by the main
+  // process (applyDecodedResult) — not an in-app popup.
 
   // Apply side effects via main process
   const response = await window.qrAPI.onDecoded(text);
@@ -668,103 +750,6 @@ function hideResult() {
   document.getElementById("scan-result").classList.add("hidden");
 }
 
-// ============================================================
-// In-app scan result popup (not a system notification)
-// ============================================================
-
-let scanPopupTimer = null;
-
-/**
- * Show the in-app scan result popup at the top of the window.
- * Displays success, no-qr, or error states with auto-hide.
- * Does NOT use system notifications or notification permission APIs.
- * @param {string} text - The main content to display
- * @param {string} type - One of: "success", "no-qr", "error"
- * @param {string} [hint] - Optional hint text for no-qr/error states
- */
-function showScanPopup(text, type = "success", hint = null) {
-  const popup = document.getElementById("scan-popup");
-  const iconEl = document.getElementById("scan-popup-icon");
-  const titleEl = document.getElementById("scan-popup-title");
-  const content = document.getElementById("scan-popup-content");
-  const hintEl = document.getElementById("scan-popup-hint");
-
-  if (!popup || !content) return;
-
-  // Clear any pending hide timer
-  if (scanPopupTimer) {
-    clearTimeout(scanPopupTimer);
-    scanPopupTimer = null;
-  }
-
-  // Set type attribute for styling
-  popup.setAttribute("data-type", type);
-
-  // Configure icon and title based on type
-  const config = {
-    success: { icon: "✅", title: "QR Code Scanned" },
-    "no-qr": { icon: "❌", title: "No QR Code Found" },
-    error: { icon: "⚠️", title: "Scan Failed" }
-  };
-
-  const cfg = config[type] || config.success;
-  if (iconEl) iconEl.textContent = cfg.icon;
-  if (titleEl) titleEl.textContent = cfg.title;
-
-  // Set content (escape HTML to prevent injection)
-  content.textContent = text;
-
-  // Set hint if provided
-  if (hintEl) {
-    if (hint) {
-      hintEl.textContent = hint;
-      hintEl.style.display = "block";
-    } else {
-      hintEl.style.display = "none";
-    }
-  }
-
-  // Show with animation
-  popup.classList.remove("hidden");
-  // Force reflow so the transition runs from the 'hidden' state
-  void popup.offsetWidth;
-  popup.classList.add("visible");
-
-  // Auto-hide after delay (success: 3s, errors: 4s for readability)
-  const delay = type === "success" ? 3000 : 4000;
-  scanPopupTimer = setTimeout(() => {
-    hideScanPopup();
-  }, delay);
-}
-
-/**
- * Hide the scan success popup with fade-out animation.
- */
-function hideScanPopup() {
-  const popup = document.getElementById("scan-popup");
-  if (!popup) return;
-
-  popup.classList.remove("visible");
-  // After transition ends, add 'hidden' to remove from accessibility tree
-  setTimeout(() => {
-    popup.classList.add("hidden");
-  }, 250);
-
-  if (scanPopupTimer) {
-    clearTimeout(scanPopupTimer);
-    scanPopupTimer = null;
-  }
-}
-
-// Close button click handler (set up after DOMContentLoaded)
-document.addEventListener("DOMContentLoaded", () => {
-  const closeBtn = document.getElementById("scan-popup-close");
-  if (closeBtn) {
-    closeBtn.addEventListener("click", () => {
-      hideScanPopup();
-    });
-  }
-});
 
 // ============================================================
 // History

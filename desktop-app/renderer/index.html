@@ -160,8 +160,8 @@
 
       <div class="setting-item">
         <div class="setting-info">
-          <div class="setting-label">Show scan success popup</div>
-          <div class="setting-desc">Display a popup at the top of the window after successfully scanning a QR code</div>
+          <div class="setting-label">Show scan notifications</div>
+          <div class="setting-desc">Show a native system notification (top-right on macOS, Action Center on Windows) after scanning a QR code</div>
         </div>
         <label class="toggle">
           <input type="checkbox" id="setting-showscanpopup" />
@@ -200,7 +200,7 @@
 
     <div class="about-section">
       <h3>About</h3>
-      <p>Kuiqr v2.4.1.2</p>
+      <p id="about-version">Kuiqr v2.4.1.6</p>
       <p>All processing is local. No data is sent to any server.</p>
       <p class="platform-info" id="platform-info"></p>
     </div>
@@ -268,16 +268,7 @@
     </div>
   </div>
 
-  <!-- In-app scan result popup (no system notifications) -->
-  <div id="scan-popup" class="scan-popup hidden" data-type="success">
-    <div class="scan-popup-header">
-      <span class="scan-popup-icon" id="scan-popup-icon">✅</span>
-      <span class="scan-popup-title" id="scan-popup-title">QR Code Scanned</span>
-      <button id="scan-popup-close" class="scan-popup-close" aria-label="Close">&times;</button>
-    </div>
-    <div class="scan-popup-content" id="scan-popup-content"></div>
-    <div class="scan-popup-hint" id="scan-popup-hint"></div>
-  </div>
+  <!-- Scan feedback is now delivered as native OS notifications (see main.js). -->
 
   <!-- jsQR library for in-app decoding; qrcode-generator for generating -->
   <script src="../jsQR.js"></script>

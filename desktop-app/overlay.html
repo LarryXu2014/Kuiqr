@@ -188,17 +188,30 @@
       });
 
       // ============================================================
-      // Robust QR decode — runs 100% locally (no server, no network)
-      // Multiple scales + grayscale + contrast stretch + threshold + invert
-      // strategies so it also reads artistic / decorative QR codes.
+      // Robust QR decode — runs 100% locally (no server, no network).
+      //
+      // Speed strategy (mirrors the in-app scanner):
+      //   1. Instant reject for blank / uniform areas (<< 50 ms).
+      //   2. FAST PATH  (~80 ms):  original size + small up/down-scales.
+      //   3. MEDIUM PATH (~220 ms): grayscale + contrast + few thresholds.
+      //   4. DEEP PATH  (~550 ms): multi-scale threshold+invert sweep.
+      //   5. ABSOLUTE CAP (800 ms): never let a bad selection hang the UI.
       // ============================================================
+      const DECODER_BUDGET_FAST = 80;
+      const DECODER_BUDGET_MEDIUM = 220;
+      const DECODER_BUDGET_DEEP = 550;
+      const DECODER_BUDGET_ABSOLUTE = 800;
+
       function robustDecode(image) {
         const origW = image.width;
         const origH = image.height;
-        const minDim = Math.min(origW, origH);
+        const start = performance.now();
 
-        // Render the image at a given scale with optional transforms and try to decode it.
-        // Returns the decoded string, or null.
+        // Guard against tiny / degenerate captures.
+        if (origW < 50 || origH < 50) return null;
+
+        // Render the image at a given scale with optional transforms and try to
+        // decode it. Returns the decoded string, or null.
         function tryAt(scale, opts) {
           opts = opts || {};
           let w = Math.round(origW * scale);
@@ -220,10 +233,13 @@
           const imageData = ctx.getImageData(0, 0, w, h);
           const data = imageData.data;
 
-          // Grayscale
-          for (let i = 0; i < data.length; i += 4) {
-            const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-            data[i] = gray; data[i + 1] = gray; data[i + 2] = gray;
+          // Optional grayscale — skipped on the FAST path so jsQR sees true
+          // color (it does its own luminance math and reads better un-grayscaled).
+          if (opts.grayscale) {
+            for (let i = 0; i < data.length; i += 4) {
+              const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+              data[i] = gray; data[i + 1] = gray; data[i + 2] = gray;
+            }
           }
 
           // Contrast stretch (helps low-contrast codes)
@@ -261,48 +277,121 @@
           return (code && code.data) ? code.data : null;
         }
 
-        // ============================================================
-        // TIER 1 — Fast / "basic" ways. A normal QR code is read here
-        // after 1–2 cheap attempts. Only if this fails do we run the
-        // slow threshold/invert sweep below.
-        // ============================================================
-        const baseSizes = [200, 300, 400, 500, 600, 800, 1000];
-        for (const targetSize of baseSizes) {
-          const scale = targetSize / minDim;   // smooth scale toward a readable size
-          if (scale < 0.25) continue;          // never shrink tiny crops below 1/4
-          const r = tryAt(scale);
-          if (r) return r;
+        // Render once at a capped size to both sample for empty/uniform
+        // rejection AND run the fast-path decode on the real image.
+        let probeW = origW, probeH = origH;
+        if (probeW > 1000 || probeH > 1000) {
+          const ratio = Math.min(1000 / probeW, 1000 / probeH);
+          probeW = Math.round(probeW * ratio);
+          probeH = Math.round(probeH * ratio);
         }
-        // Also try the native size + a couple of modest upscales explicitly.
-        for (const s of [1, 1.5, 2]) {
-          const r = tryAt(s);
-          if (r) return r;
+        const probeCanvas = document.createElement("canvas");
+        probeCanvas.width = probeW; probeCanvas.height = probeH;
+        const pctx = probeCanvas.getContext("2d");
+        pctx.imageSmoothingEnabled = true;
+        pctx.imageSmoothingQuality = "high";
+        pctx.drawImage(image, 0, 0, probeW, probeH);
+        const probeData = pctx.getImageData(0, 0, probeW, probeH);
+
+        // ── Instant reject: uniform / blank / blurry selections ──
+        if (looksEmptyOrUniform(probeData)) return null;
+
+        // ── FAST PATH ──
+        // 1. Original size, normal + inverted.
+        let result = jsQR(probeData.data, probeW, probeH, { inversionAttempts: "attemptBoth" });
+        if (result) return result;
+
+        // 2. Small up-scales help tiny but otherwise clean codes.
+        for (const s of [1.5, 2]) {
+          if (performance.now() - start > DECODER_BUDGET_FAST) break;
+          result = tryAt(s);
+          if (result) return result;
         }
 
-        // ============================================================
-        // TIER 2 — Advanced strategies for hard QR codes (only reached
-        // when Tier 1 found nothing).
-        // ============================================================
-        for (const targetSize of baseSizes) {
-          const scale = targetSize / minDim;
-          if (scale < 0.25) continue;
+        // 3. Quick down-scale for huge captures where the QR is small.
+        if (origW > 600 || origH > 600) {
+          if (performance.now() - start <= DECODER_BUDGET_FAST) {
+            result = tryAt(0.5);
+            if (result) return result;
+          }
+        }
 
-          // Contrast-stretched first (cheap, often enough on its own)
-          let r = tryAt(scale, { contrast: true });
-          if (r) return r;
-          r = tryAt(scale, { contrast: true, invert: true });
-          if (r) return r;
+        // ── MEDIUM PATH ──
+        // Grayscale + contrast stretch + a few threshold attempts at native size.
+        if (performance.now() - start <= DECODER_BUDGET_MEDIUM) {
+          result = tryAt(1, { grayscale: true, contrast: true });
+          if (result) return result;
+          for (const thresh of [100, 128, 160]) {
+            if (performance.now() - start > DECODER_BUDGET_MEDIUM) break;
+            result = tryAt(1, { grayscale: true, contrast: true, threshold: thresh });
+            if (result) return result;
+          }
+        }
 
-          // Full threshold sweep (normal + inverted)
-          for (const thresh of [80, 100, 120, 140, 160]) {
-            r = tryAt(scale, { threshold: thresh });
-            if (r) return r;
-            r = tryAt(scale, { threshold: thresh, invert: true });
-            if (r) return r;
+        // ── DEEP PATH ──
+        // Only for hard codes: low contrast, color backgrounds, decorative codes.
+        // Kept bounded so a bad selection never stalls for seconds.
+        const deepScales = [0.75, 1.25, 1.5];
+        for (const s of deepScales) {
+          if (performance.now() - start > DECODER_BUDGET_DEEP) break;
+          result = tryAt(s, { grayscale: true, contrast: true });
+          if (result) return result;
+          for (const thresh of [80, 110, 140, 170]) {
+            if (performance.now() - start > DECODER_BUDGET_DEEP) break;
+            result = tryAt(s, { grayscale: true, contrast: true, threshold: thresh });
+            if (result) return result;
+            result = tryAt(s, { grayscale: true, contrast: true, threshold: thresh, invert: true });
+            if (result) return result;
           }
         }
 
         return null;
+      }
+
+      // ── Instant empty-area detection ──
+      // Samples pixels on a grid. If almost every sample is the same color
+      // (within a small tolerance), the area contains no QR code.
+      function looksEmptyOrUniform(imageData) {
+        const d = imageData.data;
+        const w = imageData.width;
+        const h = imageData.height;
+        const sampleStep = Math.max(8, Math.floor(Math.min(w, h) / 16));
+        let samples = 0;
+        let rSum = 0, gSum = 0, bSum = 0;
+        let minL = 255, maxL = 0;
+
+        for (let y = 0; y < h; y += sampleStep) {
+          for (let x = 0; x < w; x += sampleStep) {
+            const i = (y * w + x) * 4;
+            const r = d[i], g = d[i + 1], b = d[i + 2];
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            rSum += r; gSum += g; bSum += b;
+            if (lum < minL) minL = lum;
+            if (lum > maxL) maxL = lum;
+            samples++;
+          }
+        }
+
+        if (samples === 0) return true;
+
+        // No meaningful contrast -> empty.
+        if (maxL - minL < 18) return true;
+
+        // Very low color variance (e.g. a blank wall / sky).
+        const rAvg = rSum / samples;
+        const gAvg = gSum / samples;
+        const bAvg = bSum / samples;
+        let varianceSum = 0;
+        for (let y = 0; y < h; y += sampleStep) {
+          for (let x = 0; x < w; x += sampleStep) {
+            const i = (y * w + x) * 4;
+            varianceSum += Math.abs(d[i] - rAvg) + Math.abs(d[i + 1] - gAvg) + Math.abs(d[i + 2] - bAvg);
+          }
+        }
+        const avgVariance = varianceSum / samples;
+        if (avgVariance < 12) return true;
+
+        return false;
       }
 
       // ============================================================

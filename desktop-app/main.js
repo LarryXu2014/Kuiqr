@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Electron Main Process (v2.4.1.5)
+// Kuiqr — Electron Main Process (v2.4.1.6)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -45,10 +45,22 @@ const APP_VERSION = app.getVersion();
 const RELEASE_VERSION = (() => {
   try {
     const pkg = require("./package.json");
-    return pkg.buildVersion || pkg.version || APP_VERSION;
+    return pkg.buildVersion || (pkg.build && pkg.build.buildVersion) || pkg.version || APP_VERSION;
   } catch {
     return APP_VERSION;
   }
+})();
+
+// ── macOS native Vision QR helper path ──
+// In dev: native/qr-vision next to main.js. In the packaged app: extraResources
+// copies it to Contents/Resources/native/qr-vision.
+const VISION_HELPER_PATH = (() => {
+  if (!isMac) return null;
+  const devPath = path.join(__dirname, "native", "qr-vision");
+  if (fs.existsSync(devPath)) return devPath;
+  const packagedPath = path.join(process.resourcesPath, "native", "qr-vision");
+  if (fs.existsSync(packagedPath)) return packagedPath;
+  return null;
 })();
 
 // ── Settings (stored next to the app's userData) ──
@@ -64,7 +76,7 @@ const DEFAULT_SETTINGS = {
   browserExtensionPriority: false, // when true and a browser is the foreground app, let the browser extension handle the shortcut
   extensionPromptShown: false,     // whether the first-launch browser-extension download prompt has been shown
   extensionDownloaded: false,        // whether the user has downloaded the extension zip through the app
-  showScanPopup: true,              // show the in-app scan success popup after decoding a QR code
+  showScanPopup: true,              // show a native OS notification after decoding a QR code
 };
 
 function loadSettings() {
@@ -139,6 +151,27 @@ if (!gotSingleInstanceLock) {
     createMainWindow(); // shows itself on launch
     createTray();
     registerShortcut();
+
+    // First launch: surface the browser-extension download prompt. This is a
+    // menu-bar (background) app and the main window starts hidden, so without
+    // this the first-launch prompt would never be seen. Show the window only
+    // while the prompt hasn't been acknowledged yet.
+    try {
+      const launchSettings = loadSettings();
+      if (launchSettings.extensionPromptShown !== true && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.once("ready-to-show", () => {
+          mainWindow.show();
+          mainWindow.focus();
+        });
+        // Fallback in case ready-to-show already fired before we attached.
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        }, 500);
+      }
+    } catch (e) { /* non-fatal */ }
 
     // On macOS, proactively trigger the native "Automation" permission prompt the
     // first time the app opens. macOS only shows its own system alert (we draw no
@@ -577,37 +610,73 @@ async function scanMacNative() {
     return;
   }
 
+  // Validate the capture (also confirms Screen Recording permission is granted).
+  const ni = nativeImage.createFromPath(tmpPath);
+  if (ni.isEmpty()) {
+    try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+    showNotification(
+      "Screen capture blocked",
+      "Please grant Screen Recording permission in System Settings → Privacy & Security, then try again."
+    );
+    return;
+  }
+
+  // ── macOS fast path: native Vision QR detection ──
+  // This is typically < 100 ms and handles the vast majority of clean QR codes
+  // instantly. Only if Vision fails do we fall back to the renderer/jsQR path.
+  if (VISION_HELPER_PATH) {
+    try {
+      const visionText = await runVisionHelper(tmpPath);
+      if (visionText) {
+        try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+        applyDecodedResult(visionText);
+        if (rendererReady && mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send("native-decoded", visionText);
+        }
+        return;
+      }
+    } catch (err) {
+      console.error("Kuiqr: Vision helper failed:", err);
+    }
+  }
+
+  // ── Fallback: decode in the hidden renderer with the robust jsQR pipeline ──
+  // The app stays in the background — no window is shown.
   let buffer = null;
   try {
-    const ni = nativeImage.createFromPath(tmpPath);
-    if (ni.isEmpty()) {
-      showNotification(
-        "Screen capture blocked",
-        "Please grant Screen Recording permission in System Settings → Privacy & Security, then try again."
-      );
-      return;
-    }
     buffer = fs.readFileSync(tmpPath);
   } finally {
-    // The captured image exists only in memory from here on.
     try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
   }
 
   if (!buffer) return;
 
-  // Indicate scanning has started.
-  try {
-    showNotification("Kuiqr", "Scanning…");
-  } catch { /* ignore */ }
-
-  // Decode in the hidden renderer (it hosts the proven robust QR decoder).
-  // The app stays in the background — no window is shown.
   if (rendererReady && mainWindow && mainWindow.webContents) {
     mainWindow.webContents.send("decode-buffer", buffer);
   } else {
     // Renderer not ready yet — stash and flush once it signals ready.
     pendingDecodeBuffer = buffer;
   }
+}
+
+function runVisionHelper(imagePath) {
+  return new Promise((resolve, reject) => {
+    if (!VISION_HELPER_PATH) return resolve(null);
+    let output = "";
+    const child = spawn(VISION_HELPER_PATH, [imagePath]);
+    child.stdout.on("data", (data) => { output += data.toString("utf8"); });
+    child.on("error", (err) => reject(err));
+    child.on("close", (code) => {
+      if (code !== 0) return resolve(null);
+      const text = output.trim();
+      resolve(text || null);
+    });
+    // Vision should be near-instant; guard against hangs.
+    setTimeout(() => {
+      try { child.kill(); } catch { /* ignore */ }
+      resolve(null);
+    }, 2000);
+  });
 }
 
 function runScreencapture(tmpPath) {
@@ -808,15 +877,16 @@ ipcMain.handle("decoded", (event, data) => applyDecodedResult(data));
 // Single source of truth for what happens after a QR code is decoded (or not):
 // open the URL / copy the text / record history / notify. Used by BOTH the
 // in-app scan path and the native macOS scan path.
-// NOTE: When showScanPopup is enabled, we skip system notifications — the
-// renderer shows an in-app popup instead. For "no QR found", we never show
-// a system notification (annoying); the popup handles all feedback.
+// Feedback: success results are delivered as NATIVE OS notifications (top-right on
+// macOS, Action Center on Windows, libnotify on Linux) — the user asked for
+// system pop-ups, not in-app popups. Controlled by the "Show scan notifications"
+// setting (showScanPopup). For "no QR found" we stay silent to avoid spam.
 function applyDecodedResult(data) {
   const settings = loadSettings();
   const usePopup = settings.showScanPopup !== false;
 
   if (!data) {
-    // No system notification — the renderer shows in-app popup instead
+    // No notification at all — avoids spamming the user on empty/declined scans
     return { result: "none" };
   }
 
@@ -827,8 +897,9 @@ function applyDecodedResult(data) {
     const targetUrl = text.startsWith("http") ? text : `https://${text}`;
     shell.openExternal(targetUrl);
     addToHistory(text, "url");
-    // Only show system notification if in-app popup is disabled
-    if (!usePopup) {
+    // Deliver as a native OS notification (user wants system pop-ups, not in-app).
+    // Controlled by the "Show scan notifications" setting.
+    if (usePopup) {
       showNotification("QR Found — Opening URL", text.slice(0, 100));
     }
     return { result: "url", data: text };
@@ -838,8 +909,8 @@ function applyDecodedResult(data) {
     clipboard.writeText(text);
   }
   addToHistory(text, "text");
-  // Only show system notification if in-app popup is disabled
-  if (!usePopup) {
+  // Native OS notification (see note above).
+  if (usePopup) {
     showNotification("QR Found — Copied to Clipboard", text.slice(0, 100));
   }
   return { result: "text", data: text };
@@ -938,6 +1009,9 @@ ipcMain.handle("resume-shortcut", () => {
 ipcMain.handle("show-notification", (event, title, body) => {
   showNotification(title, body);
 });
+
+// Renderer requests: the real app build version (4-part, e.g. "2.4.1.6")
+ipcMain.handle("get-app-version", () => RELEASE_VERSION);
 
 // ============================================================
 // IPC: First-launch browser-extension download prompt
