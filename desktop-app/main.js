@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Electron Main Process (v2.4.1.3)
+// Kuiqr — Electron Main Process (v2.4.1.4)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -34,11 +34,22 @@ let lastOverlayScreenshotPath = null; // temp screenshot for the Windows/Linux o
 const isMac = process.platform === "darwin";
 const isWin = process.platform === "win32";
 
-// App version — use Electron's app.getVersion(), which returns build.buildVersion
-// when present (electron-builder uses it for artifacts and the packaged app).
-// Reading package.json directly fails in the built app because electron-builder strips
-// the build config from the copied package.json.
+// App version — use Electron's app.getVersion(), which returns the npm `version`
+// field (3-part semver, e.g. "2.4.1"). Used for display only.
 const APP_VERSION = app.getVersion();
+
+// Release version — the 4-part build version (e.g. "2.4.1.4") that matches the
+// GitHub release tag and the extension zip filenames. We expose build.buildVersion
+// to the packaged app via electron-builder's extraMetadata (see package.json),
+// so this read works both in dev and in the built app.
+const RELEASE_VERSION = (() => {
+  try {
+    const pkg = require("./package.json");
+    return pkg.buildVersion || pkg.version || APP_VERSION;
+  } catch {
+    return APP_VERSION;
+  }
+})();
 
 // ── Settings (stored next to the app's userData) ──
 const SETTINGS_PATH = path.join(app.getPath("userData"), "settings.json");
@@ -938,7 +949,7 @@ ipcMain.handle("mark-extension-prompt-shown", () => {
 ipcMain.handle("download-extension", async (event, browserType) => {
   const settings = loadSettings();
   try {
-    const version = APP_VERSION;
+    const version = RELEASE_VERSION;
     const filename = browserType === "firefox"
       ? `kuiqr-firefox-${version}.zip`
       : `kuiqr-extension-${version}.zip`;

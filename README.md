@@ -3,7 +3,7 @@
 > Scan QR codes instantly — right-click, press a keyboard shortcut, or use your camera. Works everywhere.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Version](https://img.shields.io/badge/Version-2.4.1.3-green.svg)
+![Version](https://img.shields.io/badge/Version-2.4.1.4-green.svg)
 
 All QR decoding happens **locally on your device** using the [jsQR](https://github.com/cozmo/jsQR) library with robust multi-strategy preprocessing for artistic and decorative QR codes. No images, URLs, or scan data are ever sent to any server.
 
@@ -224,6 +224,9 @@ All processing happens on your device. Zero server communication.
 ---
 
 ## What's New
+
+### v2.4.1.4
+- **Fixed: first-launch extension download no longer HTTP 404** — the in-app "Download for Chrome / Edge / Brave" and "Download for Firefox" buttons now point to the correct `v2.4.1.4` release tag. The app now reads the 4-part build version (via `extraMetadata` in package.json) for download URLs, instead of the 3-part npm version that electron-builder uses for the app's own version.
 
 ### v2.4.1.3
 - **Fixed: app no longer crashes on launch with "Cannot read properties of undefined (reading 'buildVersion')"** — the packaged app now reads its version through Electron's `app.getVersion()` instead of the `build` block that electron-builder strips from the copied `package.json`.
