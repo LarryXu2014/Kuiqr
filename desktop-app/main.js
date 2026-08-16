@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Electron Main Process (v2.4.1.10)
+// Kuiqr — Electron Main Process (v2.4.2.0)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -940,16 +940,125 @@ ipcMain.handle("copy-qr-image", (event, dataUrl) => {
 // The main process applies the side effects: open URL / copy text / history / notification.
 ipcMain.handle("decoded", (event, data) => applyDecodedResult(data));
 
-// Sends an in-app scan-feedback overlay to the renderer.
-function sendScanToast(type, title, content, hint) {
-  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
-    // Reveal the window (it is hidden while the app lives in the menu bar) so the
-    // in-app notification overlay is actually visible to the user. Without this the
-    // overlay is drawn in an invisible window and looks like "nothing happened".
-    showMainWindow();
-    mainWindow.webContents.send("show-scan-toast", type, title, content, hint || "");
-  }
+// ── On-screen scan notification ───────────────────────────────────────────────
+// A REAL on-screen layer: a separate, always-on-top, transparent, borderless
+// BrowserWindow that floats above everything (its own window, not a DOM element
+// inside the app). It never intercepts mouse events, so it never blocks clicks.
+let scanToastWindow = null;
+let scanToastTimer = null;
+let toastReady = false;
+let pendingToast = null;
+
+function createScanToastWindow() {
+  if (scanToastWindow) return;
+  scanToastWindow = new BrowserWindow({
+    width: 360,
+    height: 80,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    movable: false,
+    hasShadow: false,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "renderer", "toast-preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  scanToastWindow.loadFile(path.join(__dirname, "renderer", "toast.html"));
+  // Never intercept clicks — this is a passive overlay layer.
+  scanToastWindow.setIgnoreMouseEvents(true);
+  // Stay visible even above full-screen apps.
+  try {
+    scanToastWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } catch { /* ignore */ }
+  scanToastWindow.on("closed", () => {
+    scanToastWindow = null;
+    toastReady = false;
+    pendingToast = null;
+  });
+  // The toast renderer registers its IPC listener during page load. Wait until the
+  // page has actually finished loading before we send a payload, otherwise the
+  // first notification would be delivered to a window with no listener yet.
+  scanToastWindow.webContents.once("did-finish-load", () => {
+    toastReady = true;
+    if (pendingToast) {
+      const p = pendingToast;
+      pendingToast = null;
+      showScanToastWindow(p.type, p.title, p.content, p.hint);
+    }
+  });
 }
+
+function showScanToastWindow(type, title, content, hint) {
+  if (!scanToastWindow) createScanToastWindow();
+  if (!scanToastWindow || scanToastWindow.isDestroyed()) return;
+
+  const payload = {
+    type: type || "success",
+    title: title || "Kuiqr",
+    content: content || "",
+    hint: hint || "",
+  };
+
+  // Top-right of the primary display.
+  const { width: screenW } = screen.getPrimaryDisplay().workAreaSize;
+  const w = 360;
+  scanToastWindow.setBounds({ x: screenW - w - 20, y: 20, width: w, height: 80 });
+
+  // If the window is still loading its first paint, queue the payload and let the
+  // did-finish-load handler replay it once the listener is live.
+  if (!toastReady) {
+    pendingToast = payload;
+    return;
+  }
+
+  scanToastWindow.webContents.send("show-toast-window", payload);
+  scanToastWindow.show();
+
+  if (scanToastTimer) clearTimeout(scanToastTimer);
+  scanToastTimer = setTimeout(() => {
+    if (scanToastWindow && !scanToastWindow.isDestroyed()) scanToastWindow.hide();
+  }, 4500);
+}
+
+// Sends a scan-feedback notification as a real on-screen layer (a separate
+// always-on-top transparent window), not an in-app DOM overlay.
+function sendScanToast(type, title, content, hint) {
+  showScanToastWindow(type, title, content, hint);
+}
+
+// Renderer can request the same on-screen layer directly (e.g. copy/QR feedback).
+ipcMain.on("show-screen-toast", (event, type, title, content, hint) => {
+  showScanToastWindow(type, title, content, hint);
+});
+
+// Toast window reports its rendered height so we can size the window to fit.
+ipcMain.on("toast-ready", (event, height) => {
+  if (scanToastWindow && !scanToastWindow.isDestroyed() && typeof height === "number") {
+    const b = scanToastWindow.getBounds();
+    scanToastWindow.setBounds({ x: b.x, y: b.y, width: b.width, height });
+  }
+});
+
+// Renderer → main: show the main window and switch to a given tab (used by the
+// in-app right-click menu).
+ipcMain.on("open-tab", (event, tab) => {
+  showMainWindow();
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+    setTimeout(() => mainWindow.webContents.send("switch-tab", tab), 50);
+  }
+});
+
+// Renderer → main: fully quit the app (used by the in-app right-click menu).
+ipcMain.on("quit-app", () => {
+  isQuiting = true;
+  try { globalShortcut.unregisterAll(); } catch { /* ignore */ }
+  app.quit();
+});
 
 // Single source of truth for what happens after a QR code is decoded (or not):
 // open the URL / copy the text / record history / notify. Used by BOTH the
@@ -962,7 +1071,11 @@ function applyDecodedResult(data) {
   const usePopup = settings.showScanPopup !== false;
 
   if (!data) {
-    // No notification at all — avoids spamming the user on empty/declined scans
+    // A real scan that came back empty (no QR in the captured area) — surface it
+    // via the on-screen notification so failures are never silent.
+    if (usePopup) {
+      sendScanToast("no-qr", "No QR Code Found", "The captured area doesn't contain a readable QR code.");
+    }
     return { result: "none" };
   }
 
@@ -973,7 +1086,7 @@ function applyDecodedResult(data) {
     const targetUrl = text.startsWith("http") ? text : `https://${text}`;
     shell.openExternal(targetUrl);
     addToHistory(text, "url");
-    // Deliver as an in-app overlay (user wants in-app notifications, not native).
+    // Deliver as a real on-screen overlay window (not a native OS notification).
     // Controlled by the "Show scan notifications" setting.
     if (usePopup) {
       sendScanToast("url", "QR Found — Opening URL", text.slice(0, 100));
@@ -985,7 +1098,7 @@ function applyDecodedResult(data) {
     clipboard.writeText(text);
   }
   addToHistory(text, "text");
-  // In-app overlay notification.
+  // On-screen overlay window notification.
   if (usePopup) {
     sendScanToast("text", "QR Found — Copied to Clipboard", text.slice(0, 100));
   }
@@ -1086,7 +1199,7 @@ ipcMain.handle("show-notification", (event, title, body) => {
   showNotification(title, body);
 });
 
-// Renderer requests: the real app build version (4-part, e.g. "2.4.1.10")
+// Renderer requests: the real app build version (4-part, e.g. "2.4.2.0")
 ipcMain.handle("get-app-version", () => RELEASE_VERSION);
 
 // ============================================================

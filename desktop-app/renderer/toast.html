@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Kuiqr Scan Toast</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    #card {
+      margin: 0;
+      padding: 12px 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-left: 4px solid #22c55e;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    #card[data-type="url"]     { border-left-color: #3b82f6; }
+    #card[data-type="text"]    { border-left-color: #8b5cf6; }
+    #card[data-type="no-qr"]   { border-left-color: #fb923c; }
+    #card[data-type="error"]   { border-left-color: #ef4444; }
+    #card[data-type="success"] { border-left-color: #22c55e; }
+
+    .icon { font-size: 18px; line-height: 1.4; }
+    .body { flex: 1; min-width: 0; }
+    .title {
+      font-weight: 600;
+      font-size: 13px;
+      color: #111827;
+      margin-bottom: 2px;
+    }
+    #card[data-type="no-qr"] .title { color: #c2410c; }
+    #card[data-type="error"] .title { color: #dc2626; }
+    .content {
+      font-size: 12px;
+      color: #374151;
+      line-height: 1.45;
+      word-break: break-word;
+      max-height: 56px;
+      overflow: hidden;
+    }
+    .hint {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div id="card" data-type="success">
+    <div class="icon" id="t-icon">✅</div>
+    <div class="body">
+      <div class="title" id="t-title">Kuiqr</div>
+      <div class="content" id="t-content"></div>
+      <div class="hint" id="t-hint" style="display:none;"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const icons = {
+        url: "🌐",
+        text: "📋",
+        "no-qr": "❓",
+        error: "❌",
+        success: "✅",
+      };
+
+      function render(p) {
+        p = p || {};
+        const type = p.type || "success";
+        document.getElementById("t-icon").textContent = icons[type] || icons.success;
+        document.getElementById("t-title").textContent = p.title || "Kuiqr";
+        document.getElementById("t-content").textContent = p.content || "";
+        const hint = document.getElementById("t-hint");
+        if (p.hint) {
+          hint.textContent = p.hint;
+          hint.style.display = "";
+        } else {
+          hint.style.display = "none";
+        }
+        document.getElementById("card").setAttribute("data-type", type);
+        // Let the main process size the (transparent) window to fit the card.
+        requestAnimationFrame(() => {
+          const h = document.getElementById("card").offsetHeight;
+          if (window.toastAPI && window.toastAPI.reportHeight) {
+            window.toastAPI.reportHeight(h);
+          }
+        });
+      }
+
+      if (window.toastAPI && window.toastAPI.onShowToast) {
+        window.toastAPI.onShowToast(render);
+      }
+    })();
+  </script>
+</body>
+</html>

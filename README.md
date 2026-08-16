@@ -1,9 +1,9 @@
 # Kuiqr
 
-> Scan QR codes instantly — right-click, press a keyboard shortcut, or use your camera. Works everywhere.
+> Scan QR codes instantly — right-click any image, press a keyboard shortcut, or paste a screenshot. Works on your desktop, in your browser, and on the web.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Version](https://img.shields.io/badge/Version-2.4.1.10-green.svg)
+![Version](https://img.shields.io/badge/Version-2.4.2.0-green.svg)
 
 All QR decoding happens **locally on your device**. On macOS the desktop app uses the native **Apple Vision** framework for instant detection, with a fast bounded jsQR fallback for hard or artistic QR codes. No images, URLs, or scan data are ever sent to any server.
 
@@ -31,7 +31,7 @@ xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
 ### macOS (Apple Silicon / M1, M2, M3, M4)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-mac-arm64.dmg -o ~/Downloads/Kuiqr.dmg && open ~/Downloads/Kuiqr.dmg
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-mac-arm64.dmg -o ~/Downloads/Kuiqr.dmg && open ~/Downloads/Kuiqr.dmg
 ```
 
 After dragging to Applications, **first launch only**: open Terminal and run:
@@ -42,7 +42,7 @@ xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
 ### macOS (Intel)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-mac-x64.dmg -o ~/Downloads/Kuiqr.dmg && open ~/Downloads/Kuiqr.dmg
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-mac-x64.dmg -o ~/Downloads/Kuiqr.dmg && open ~/Downloads/Kuiqr.dmg
 ```
 
 After dragging to Applications, **first launch only**:
@@ -55,25 +55,25 @@ xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
 ### Windows (x64)
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\Kuiqr.exe"; Start-Process "$env:USERPROFILE\Downloads\Kuiqr.exe"
+Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\Kuiqr.exe"; Start-Process "$env:USERPROFILE\Downloads\Kuiqr.exe"
 ```
 
 ### Linux (x64 / arm64) — AppImage
 
 ```bash
 # x64
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-linux-x86_64.AppImage -o ~/Downloads/Kuiqr.AppImage && chmod +x ~/Downloads/Kuiqr.AppImage && ~/Downloads/Kuiqr.AppImage
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-linux-x86_64.AppImage -o ~/Downloads/Kuiqr.AppImage && chmod +x ~/Downloads/Kuiqr.AppImage && ~/Downloads/Kuiqr.AppImage
 # arm64
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-linux-arm64.AppImage -o ~/Downloads/Kuiqr.AppImage && chmod +x ~/Downloads/Kuiqr.AppImage && ~/Downloads/Kuiqr.AppImage
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-linux-arm64.AppImage -o ~/Downloads/Kuiqr.AppImage && chmod +x ~/Downloads/Kuiqr.AppImage && ~/Downloads/Kuiqr.AppImage
 ```
 
-> **Note:** Kuiqr runs in the background and lives in your system tray. On GNOME you may need the [AppIndicator](https://extensions.gnome.org/extension/615/appindicator-support/) extension for the tray icon to appear. A `.deb` package is also provided for Debian/Ubuntu-based distros (`Kuiqr-2.4.1.10-linux-{x64,arm64}.deb`).
+> **Note:** Kuiqr runs in the background and lives in your system tray. On GNOME you may need the [AppIndicator](https://extensions.gnome.org/extension/615/appindicator-support/) extension for the tray icon to appear. A `.deb` package is also provided for Debian/Ubuntu-based distros (`Kuiqr-2.4.2.0-linux-{x64,arm64}.deb`).
 
 ### Chrome / Edge / Brave Extension
 
 ```bash
 # Download and extract
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension-2.4.1.10.zip -o /tmp/kuiqr-extension-2.4.1.10.zip && unzip -q /tmp/kuiqr-extension-2.4.1.10.zip -d ~/kuiqr-extension && echo "Extension extracted to ~/kuiqr-extension — load it from chrome://extensions > Load unpacked"
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension-2.4.2.0.zip -o /tmp/kuiqr-extension-2.4.2.0.zip && unzip -q /tmp/kuiqr-extension-2.4.2.0.zip -d ~/kuiqr-extension && echo "Extension extracted to ~/kuiqr-extension — load it from chrome://extensions > Load unpacked"
 ```
 
 > **After installing:** Open the extension popup, click **Record**, and press your shortcut (default **Cmd+Shift+Y** on Mac, **Ctrl+Shift+Y** on Windows). The shortcut is captured right in the popup — no need to touch `chrome://extensions/shortcuts`.
@@ -100,7 +100,7 @@ GitHub's release server (`objects.githubusercontent.com`) is throttled in some r
 
 ```bash
 # Replace any GitHub releases URL prefix with ghproxy.com
-curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-mac-arm64.dmg" -o ~/Downloads/Kuiqr.dmg && open ~/Downloads/Kuiqr.dmg
+curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-mac-arm64.dmg" -o ~/Downloads/Kuiqr.dmg && open ~/Downloads/Kuiqr.dmg
 ```
 If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 
@@ -110,17 +110,17 @@ If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 
 | Platform                   | File                                                                                                                                           | Size  | Status |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
-| Chrome / Edge / Brave      | [kuiqr-extension-2.4.1.10.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension-2.4.1.10.zip)                           | 84 KB | Verified |
-| Firefox (109+)             | [kuiqr-firefox-2.4.1.10.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-firefox-2.4.1.10.zip)                               | 84 KB | Verified |
-| macOS (Apple Silicon)      | [Kuiqr-2.4.1.10-mac-arm64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-mac-arm64.dmg)     | ~95 MB | Verified |
-| macOS (Apple Silicon, ZIP) | [Kuiqr-2.4.1.10-mac-arm64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-mac-arm64.zip)     | ~92 MB | Verified |
-| macOS (Intel)              | [Kuiqr-2.4.1.10-mac-x64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-mac-x64.dmg)         | ~100 MB | Verified |
-| macOS (Intel, ZIP)         | [Kuiqr-2.4.1.10-mac-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-mac-x64.zip)         | ~97 MB | Verified |
-| Windows (x64)              | [Kuiqr-2.4.1.10-windows-x64.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-windows-x64.exe) | ~70 MB | Verified |
-| Linux (x64, AppImage)      | [Kuiqr-2.4.1.10-linux-x86_64.AppImage](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-linux-x86_64.AppImage) | ~90 MB | Verified |
-| Linux (arm64, AppImage)    | [Kuiqr-2.4.1.10-linux-arm64.AppImage](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-linux-arm64.AppImage) | ~90 MB | Verified |
-| Linux (x64, .deb)          | [Kuiqr-2.4.1.10-linux-amd64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-linux-amd64.deb) | ~90 MB | Verified |
-| Linux (arm64, .deb)        | [Kuiqr-2.4.1.10-linux-arm64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.1.10-linux-arm64.deb) | ~90 MB | Verified |
+| Chrome / Edge / Brave      | [kuiqr-extension-2.4.2.0.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension-2.4.2.0.zip)                           | 84 KB | Verified |
+| Firefox (109+)             | [kuiqr-firefox-2.4.2.0.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-firefox-2.4.2.0.zip)                               | 84 KB | Verified |
+| macOS (Apple Silicon)      | [Kuiqr-2.4.2.0-mac-arm64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-mac-arm64.dmg)     | ~95 MB | Verified |
+| macOS (Apple Silicon, ZIP) | [Kuiqr-2.4.2.0-mac-arm64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-mac-arm64.zip)     | ~92 MB | Verified |
+| macOS (Intel)              | [Kuiqr-2.4.2.0-mac-x64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-mac-x64.dmg)         | ~100 MB | Verified |
+| macOS (Intel, ZIP)         | [Kuiqr-2.4.2.0-mac-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-mac-x64.zip)         | ~97 MB | Verified |
+| Windows (x64)              | [Kuiqr-2.4.2.0-windows-x64.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-windows-x64.exe) | ~70 MB | Verified |
+| Linux (x64, AppImage)      | [Kuiqr-2.4.2.0-linux-x86_64.AppImage](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-linux-x86_64.AppImage) | ~90 MB | Verified |
+| Linux (arm64, AppImage)    | [Kuiqr-2.4.2.0-linux-arm64.AppImage](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-linux-arm64.AppImage) | ~90 MB | Verified |
+| Linux (x64, .deb)          | [Kuiqr-2.4.2.0-linux-amd64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-linux-amd64.deb) | ~90 MB | Verified |
+| Linux (arm64, .deb)        | [Kuiqr-2.4.2.0-linux-arm64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.0-linux-arm64.deb) | ~90 MB | Verified |
 
 All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32, AppImage runs headless.
 
@@ -149,6 +149,7 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32, AppIm
 - **Browser-extension priority** — When enabled (Settings; macOS only), the app **releases its global shortcut whenever a browser is the foreground app**, so the browser extension's own `Cmd/Ctrl+Shift+Y` fires instead — no double-trigger and no app window popping up. Outside browsers the app keeps the shortcut and scans as normal. Requires macOS **Automation** permission (System Settings → Privacy & Security → Automation → Kuiqr) so the app can detect the frontmost app.
 - **Fixed Quit** — "Quit" from the tray now fully exits the app (previously it had to be force-quit)
 - **System tray** — Runs in background; click tray icon to show/hide window
+- **Right-click to scan** — Right-click anywhere in the app window for a quick menu: **Scan QR Code** (triggers a screen-selection scan), Paste Image, Settings, and Quit
 - **Settings tab** — Customize shortcut (auto-record), browser-extension priority, auto-open URL, notifications, history size
 - **Same robust QR decoder** as the extension — a fast tier (direct + cheap upscales, usually 1–3 attempts) handles normal QR codes instantly, with an advanced threshold/invert fallback only for hard artistic/decorative codes
 
@@ -165,7 +166,7 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32, AppIm
 
 ### Chrome / Edge / Brave / Opera
 
-1. Download `kuiqr-extension-2.4.1.10.zip` and unzip it
+1. Download `kuiqr-extension-2.4.2.0.zip` and unzip it
 2. Open `chrome://extensions` (or `edge://extensions`)
 3. Turn on **Developer mode** (top-right corner)
 4. Click **Load unpacked**
@@ -175,7 +176,7 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32, AppIm
 
 ### Firefox
 
-1. Download `kuiqr-firefox-2.4.1.10.zip` and unzip it
+1. Download `kuiqr-firefox-2.4.2.0.zip` and unzip it
 2. Open `about:debugging#/runtime/this-firefox`
 3. Click **Load Temporary Add-on**
 4. Select `manifest.json` inside the unzipped folder
@@ -224,6 +225,13 @@ All processing happens on your device. Zero server communication.
 ---
 
 ## What's New
+
+### v2.4.2.0
+- **Real on-screen scan notification** — scan results now appear as a true always-on-top overlay window (its own layer above everything), not an in-app popup buried inside the app window. It never blocks your clicks.
+- **Notification on scan failure too** — when a capture has no QR code (or fails to decode), you now get a "No QR Code Found" / "Scan Failed" notification instead of silence.
+- **Extension install help after download** — after the browser extension downloads, a step-by-step "load into Chrome/Firefox" guide appears, followed by a visible "Tab closing in 3, 2, 1" countdown.
+- **Right-click to scan inside the app** — right-click anywhere in the Kuiqr window for a quick menu with **Scan QR Code** (screen selection), Paste Image, Settings, and Quit. (Right-click-on-image scanning remains the browser extension's feature.)
+- **Fixed misleading copy** — removed the "use your camera" claim (the desktop app scans screen/clipboard/images; only the web app uses a camera).
 
 ### v2.4.1.10
 - **Fixed: in-app scan notification now visible** — after a scan, the success/error overlay layer was being drawn in the hidden menu-bar window, so it never appeared on screen. The main process now reveals the window before showing the toast, so the notification layer shows on every scan.
@@ -388,12 +396,12 @@ No build step needed — pure static files. Load directly from the folder.
 
 ```bash
 # Chrome / Edge / Brave zip (straight from the source folder)
-cd extension && zip -r ../kuiqr-extension-2.4.1.10.zip . -x "*.DS_Store"
+cd extension && zip -r ../kuiqr-extension-2.4.2.0.zip . -x "*.DS_Store"
 
 # Firefox zip — copy source, inject a Gecko ID, then zip
 rm -rf /tmp/ff-build && cp -r extension /tmp/ff-build
 python3 -c "import json; p='/tmp/ff-build/manifest.json'; m=json.load(open(p)); m['browser_specific_settings']={'gecko':{'id':'kuiqr@local'}}; json.dump(m,open(p,'w'),indent=2)"
-cd /tmp/ff-build && zip -r /path/to/kuiqr-firefox-2.4.1.10.zip . -x "*.DS_Store"
+cd /tmp/ff-build && zip -r /path/to/kuiqr-firefox-2.4.2.0.zip . -x "*.DS_Store"
 ```
 
 ---

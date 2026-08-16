@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Background Service Worker (v2.4.1.10)
+// Kuiqr — Background Service Worker (v2.4.2.0)
 // Features:
 //   1. Right-click image → "Scan QR Code" (direct decode)
 //   2. Keyboard shortcut Cmd/Ctrl+Shift+Y → capture screen + inject overlay

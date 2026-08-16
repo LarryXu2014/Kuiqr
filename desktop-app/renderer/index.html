@@ -207,7 +207,7 @@
 
     <div class="about-section">
       <h3>About</h3>
-      <p id="about-version">Kuiqr v2.4.1.10</p>
+      <p id="about-version">Kuiqr v2.4.2.0</p>
       <p>All processing is local. No data is sent to any server.</p>
       <p class="platform-info" id="platform-info"></p>
     </div>
@@ -260,6 +260,11 @@
         <button id="ext-prompt-later" class="btn-text">Not now</button>
       </div>
       <div id="ext-download-status" class="modal-status hidden"></div>
+      <div id="ext-instructions" class="ext-instructions hidden">
+        <h4>Load it into your browser</h4>
+        <ol class="ext-instr-steps"></ol>
+        <p class="ext-instr-countdown"></p>
+      </div>
     </div>
   </div>
 
@@ -290,15 +295,13 @@
     </div>
   </div>
 
-  <!-- In-app scan feedback overlay (replaces native OS notifications). -->
-  <div id="scan-popup" class="scan-popup hidden" data-type="success">
-    <div class="scan-popup-header">
-      <span class="scan-popup-icon" id="scan-popup-icon">✅</span>
-      <span class="scan-popup-title" id="scan-popup-title">QR Found</span>
-      <button class="scan-popup-close" id="scan-popup-close" aria-label="Close">&times;</button>
-    </div>
-    <div class="scan-popup-content" id="scan-popup-content"></div>
-    <div class="scan-popup-hint" id="scan-popup-hint"></div>
+  <!-- In-app right-click context menu (real right-click scan inside the app) -->
+  <div id="app-context-menu" class="app-context-menu hidden">
+    <div class="ctx-item" data-action="scan">🔍 Scan QR Code</div>
+    <div class="ctx-item" data-action="paste">📋 Paste Image</div>
+    <div class="ctx-item" data-action="settings">⚙️ Settings</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item ctx-danger" data-action="quit">⏻ Quit</div>
   </div>
 
   <!-- jsQR library for in-app decoding; qrcode-generator for generating -->

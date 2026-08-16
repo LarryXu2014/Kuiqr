@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Desktop App Renderer Logic (v2.4.1.10)
+// Kuiqr — Desktop App Renderer Logic (v2.4.2.0)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -55,8 +55,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       await loadHistory(); // refresh history silently if the window is open
     } catch (err) {
       console.error("Hidden decode failed:", err);
-      await window.qrAPI.onDecoded(null);
-      // Surface the failure as an in-app overlay notification.
+      // Surface the failure as an on-screen notification. We don't post a null
+      // result here (the no-QR case is handled separately in applyDecodedResult).
       showScanPopup("error", "Scan Failed", "The captured image could not be processed.");
     }
   });
@@ -66,8 +66,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   // side effects (open URL / copy text / history), and sends us the text so the
   // UI can show the popup and refresh history.
   window.qrAPI.onNativeDecoded(async (text) => {
-    // The main process sends a separate "show-scan-toast" event for the in-app
-    // notification overlay; we just refresh the history list here.
+    // The main process shows the result via its own always-on-top notification
+    // window; here we just refresh the history list.
     await loadHistory();
   });
 
@@ -75,6 +75,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.qrAPI.onShowScanToast((type, title, content, hint) => {
     showScanPopup(type, title, content, hint);
   });
+
+  // In-app right-click context menu (real "right-click to scan" inside the app).
+  setupContextMenu();
 
   // ── In-App Scan: Paste from Clipboard ──
   const pasteBtn = document.getElementById("paste-btn");
@@ -390,7 +393,7 @@ function showExtensionPrompt() {
       try {
         const res = await window.qrAPI.downloadExtension(type);
         if (res.ok) {
-          status.innerHTML = `<b>Downloaded:</b> ${escapeHtml(res.filename)}<br><span style="color:var(--text-muted)">Install steps: unzip the file, then load the folder as an unpacked extension.</span>`;
+          showExtensionInstructions(type, res.filename);
         } else {
           status.textContent = "Download failed: " + (res.reason || "unknown error");
         }
@@ -398,6 +401,59 @@ function showExtensionPrompt() {
         status.textContent = "Download failed: " + ((err && err.message) || "unknown error");
       }
       // Keep the prompt open so the user can read the instructions; "Not now" finishes it.
+    };
+
+    // Shows the "how to load into Chrome/Firefox" steps, then auto-closes the
+    // prompt after a visible "Tab closing in 3, 2, 1" countdown.
+    const showExtensionInstructions = (type, filename) => {
+      const instr = document.getElementById("ext-instructions");
+      const hint = prompt.querySelector(".modal-hint");
+      if (!instr) {
+        status.innerHTML = `<b>Downloaded:</b> ${escapeHtml(filename)}`;
+        return;
+      }
+      const isChrome = type !== "firefox";
+      const steps = isChrome
+        ? [
+            `Unzip the downloaded file (<b>${escapeHtml(filename)}</b>).`,
+            "Open <b>chrome://extensions</b> (or edge://extensions, brave://extensions).",
+            "Turn on <b>Developer mode</b> (top-right corner).",
+            "Click <b>Load unpacked</b> and select the unzipped folder.",
+            "Right-click any QR image → <b>Scan QR Code</b>.",
+          ]
+        : [
+            `Unzip the downloaded file (<b>${escapeHtml(filename)}</b>).`,
+            "Open <b>about:debugging#/runtime/this-firefox</b>.",
+            "Click <b>Load Temporary Add-on</b>.",
+            "Select <b>manifest.json</b> inside the unzipped folder.",
+            "Right-click any QR image → <b>Scan QR Code</b>.",
+          ];
+
+      instr.querySelector(".ext-instr-steps").innerHTML = steps.map((s) => `<li>${s}</li>`).join("");
+
+      // Hide the download controls, show the instructions.
+      status.classList.add("hidden");
+      if (chromeBtn) chromeBtn.classList.add("hidden");
+      if (firefoxBtn) firefoxBtn.classList.add("hidden");
+      if (laterBtn) laterBtn.classList.add("hidden");
+      if (hint) hint.classList.add("hidden");
+      instr.classList.remove("hidden");
+
+      // Countdown "Tab closing in 3, 2, 1" then close the prompt (resolves onboarding).
+      const countdownEl = instr.querySelector(".ext-instr-countdown");
+      let n = 3;
+      const renderCount = () => { if (countdownEl) countdownEl.textContent = `Tab closing in ${n}…`; };
+      renderCount();
+      const iv = setInterval(() => {
+        n -= 1;
+        if (n <= 0) {
+          clearInterval(iv);
+          if (countdownEl) countdownEl.textContent = "Tab closing…";
+          closePrompt();
+        } else {
+          renderCount();
+        }
+      }, 1000);
     };
 
     if (chromeBtn) chromeBtn.addEventListener("click", () => doDownload("chrome"));
@@ -850,61 +906,63 @@ function hideResult() {
 }
 
 // ============================================================
-// In-app scan notification overlay (replaces native system notifications)
+// Scan notification — now a REAL on-screen layer (a separate always-on-top
+// transparent window managed by the main process), not an in-app DOM popup.
+// We just forward the request to the main process.
 // ============================================================
 
 function showScanPopup(type, title, content, hint) {
-  const popup = document.getElementById("scan-popup");
-  const iconEl = document.getElementById("scan-popup-icon");
-  const titleEl = document.getElementById("scan-popup-title");
-  const contentEl = document.getElementById("scan-popup-content");
-  const hintEl = document.getElementById("scan-popup-hint");
-  const closeBtn = document.getElementById("scan-popup-close");
-  if (!popup) return;
-
-  const icons = {
-    success: "✅",
-    url: "🌐",
-    text: "📋",
-    "no-qr": "❓",
-    error: "❌",
-  };
-
-  popup.setAttribute("data-type", type || "success");
-  iconEl.textContent = icons[type] || icons.success;
-  titleEl.textContent = title || "Kuiqr";
-  contentEl.textContent = content || "";
-  if (hint) {
-    hintEl.textContent = hint;
-    hintEl.classList.remove("hidden");
-  } else {
-    hintEl.classList.add("hidden");
+  if (window.qrAPI && window.qrAPI.showScreenToast) {
+    window.qrAPI.showScreenToast(type, title, content, hint);
   }
-
-  popup.classList.remove("hidden");
-  popup.classList.add("visible");
-
-  if (scanPopupTimer) clearTimeout(scanPopupTimer);
-  scanPopupTimer = setTimeout(() => hideScanPopup(), 4500);
-
-  const closeHandler = () => {
-    hideScanPopup();
-    closeBtn.removeEventListener("click", closeHandler);
-  };
-  // Re-bind safely: remove any previous listener then add once.
-  closeBtn.replaceWith(closeBtn.cloneNode(true));
-  document.getElementById("scan-popup-close").addEventListener("click", closeHandler);
 }
 
-function hideScanPopup() {
-  const popup = document.getElementById("scan-popup");
-  if (!popup) return;
-  popup.classList.remove("visible");
-  popup.classList.add("hidden");
-  if (scanPopupTimer) {
-    clearTimeout(scanPopupTimer);
-    scanPopupTimer = null;
-  }
+// ── In-app right-click context menu ──
+// Gives the desktop app a real "right-click to scan" feature (the browser
+// extension already has right-click-on-image scanning; now the app does too).
+function setupContextMenu() {
+  const menu = document.getElementById("app-context-menu");
+  if (!menu) return;
+
+  const hide = () => menu.classList.add("hidden");
+  const showAt = (x, y) => {
+    // Keep the menu on-screen.
+    const mw = menu.offsetWidth || 200;
+    const mh = menu.offsetHeight || 160;
+    const px = Math.min(x, window.innerWidth - mw - 8);
+    const py = Math.min(y, window.innerHeight - mh - 8);
+    menu.style.left = Math.max(8, px) + "px";
+    menu.style.top = Math.max(8, py) + "px";
+    menu.classList.remove("hidden");
+  };
+
+  document.addEventListener("contextmenu", (e) => {
+    const t = e.target;
+    // Don't hijack right-click inside editable fields, links, or buttons.
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.closest("a, button"))) return;
+    e.preventDefault();
+    showAt(e.clientX, e.clientY);
+  });
+
+  document.addEventListener("click", (e) => { if (!menu.contains(e.target)) hide(); });
+  document.addEventListener("scroll", hide, true);
+  window.addEventListener("blur", hide);
+
+  menu.querySelectorAll("[data-action]").forEach((item) => {
+    item.addEventListener("click", () => {
+      hide();
+      const action = item.getAttribute("data-action");
+      if (action === "scan") {
+        if (window.qrAPI && window.qrAPI.triggerScan) window.qrAPI.triggerScan();
+      } else if (action === "paste") {
+        if (typeof readClipboardImage === "function") readClipboardImage();
+      } else if (action === "settings") {
+        if (window.qrAPI && window.qrAPI.openTab) window.qrAPI.openTab("settings");
+      } else if (action === "quit") {
+        if (window.qrAPI && window.qrAPI.quitApp) window.qrAPI.quitApp();
+      }
+    });
+  });
 }
 
 

@@ -48,13 +48,23 @@ contextBridge.exposeInMainWorld("qrAPI", {
   // the in-app overlay below).
   showNotification: (title, body) => ipcRenderer.invoke("show-notification", title, body),
 
-  // In-app scan feedback overlay (replaces native system notifications for scans)
+  // In-app scan feedback overlay (legacy; main now uses a real on-screen window)
   onShowScanToast: (callback) => ipcRenderer.on("show-scan-toast", (e, type, title, content, hint) => callback(type, title, content, hint)),
+
+  // ── On-screen scan notification window (a real always-on-top overlay) ──
+  // Lets the renderer raise the same on-screen layer as the main process.
+  showScreenToast: (type, title, content, hint) => ipcRenderer.send("show-screen-toast", type, title, content, hint),
+
+  // Show the main window and switch to a tab (in-app right-click menu).
+  openTab: (tab) => ipcRenderer.invoke("open-tab", tab),
+
+  // Fully quit the app (in-app right-click menu).
+  quitApp: () => ipcRenderer.invoke("quit-app"),
 
   // Copy a generated QR code image (data URL) to the system clipboard
   copyQrImage: (dataUrl) => ipcRenderer.invoke("copy-qr-image", dataUrl),
 
-  // Real app build version (4-part, e.g. "2.4.1.10"), for the About section
+  // Real app build version (4-part, e.g. "2.4.2.0"), for the About section
   getAppVersion: () => ipcRenderer.invoke("get-app-version"),
 
   // First-launch browser-extension download prompt
