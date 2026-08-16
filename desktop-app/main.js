@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Electron Main Process (v2.4.1.9)
+// Kuiqr — Electron Main Process (v2.4.1.10)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -920,8 +920,14 @@ ipcMain.handle("copy-clipboard", (event, text) => {
 ipcMain.handle("copy-qr-image", (event, dataUrl) => {
   try {
     const base64 = String(dataUrl).split(",")[1] || "";
+    if (!base64) return { ok: false, reason: "Empty image data" };
     const buffer = Buffer.from(base64, "base64");
     const img = nativeImage.createFromBuffer(buffer);
+    if (img.isEmpty()) {
+      // Most likely a GIF (nativeImage can't decode GIF) — the renderer should have
+      // already re-encoded to PNG; surface a clear error instead of a silent no-op.
+      return { ok: false, reason: "Unsupported image format (expected PNG/JPEG)" };
+    }
     clipboard.writeImage(img);
     return { ok: true };
   } catch (err) {
@@ -937,6 +943,10 @@ ipcMain.handle("decoded", (event, data) => applyDecodedResult(data));
 // Sends an in-app scan-feedback overlay to the renderer.
 function sendScanToast(type, title, content, hint) {
   if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+    // Reveal the window (it is hidden while the app lives in the menu bar) so the
+    // in-app notification overlay is actually visible to the user. Without this the
+    // overlay is drawn in an invisible window and looks like "nothing happened".
+    showMainWindow();
     mainWindow.webContents.send("show-scan-toast", type, title, content, hint || "");
   }
 }
@@ -1076,7 +1086,7 @@ ipcMain.handle("show-notification", (event, title, body) => {
   showNotification(title, body);
 });
 
-// Renderer requests: the real app build version (4-part, e.g. "2.4.1.9")
+// Renderer requests: the real app build version (4-part, e.g. "2.4.1.10")
 ipcMain.handle("get-app-version", () => RELEASE_VERSION);
 
 // ============================================================

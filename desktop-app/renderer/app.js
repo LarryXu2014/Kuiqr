@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Desktop App Renderer Logic (v2.4.1.9)
+// Kuiqr — Desktop App Renderer Logic (v2.4.1.10)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -1238,7 +1238,16 @@ function setupGenerate() {
     copyQrBtn.addEventListener("click", async () => {
       if (!lastDataUrl) return;
       try {
-        await window.qrAPI.copyQrImage(lastDataUrl);
+        // qrcode-generator emits a GIF data URL, but Electron's nativeImage can only
+        // read PNG/JPEG — so copying the raw GIF yields an empty clipboard image.
+        // Re-encode the rendered QR to PNG on a canvas first.
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth || img.width || 200;
+        c.height = img.naturalHeight || img.height || 200;
+        c.getContext("2d").drawImage(img, 0, 0);
+        const pngDataUrl = c.toDataURL("image/png");
+        const res = await window.qrAPI.copyQrImage(pngDataUrl);
+        if (res && res.ok === false) throw new Error(res.reason || "Copy failed");
         copyQrBtn.textContent = "Copied QR!";
         setTimeout(() => { copyQrBtn.textContent = "Copy QR Code"; }, 1500);
         showScanPopup("success", "QR Code Copied", "The QR code image has been copied to your clipboard.");
