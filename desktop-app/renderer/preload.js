@@ -47,13 +47,17 @@ contextBridge.exposeInMainWorld("qrAPI", {
   // Show a system notification (respects the "show notifications" setting)
   showNotification: (title, body) => ipcRenderer.invoke("show-notification", title, body),
 
-  // Real app build version (4-part, e.g. "2.4.1.6"), for the About section
+  // Real app build version (4-part, e.g. "2.4.1.7"), for the About section
   getAppVersion: () => ipcRenderer.invoke("get-app-version"),
 
   // First-launch browser-extension download prompt
   shouldShowExtensionPrompt: () => ipcRenderer.invoke("should-show-extension-prompt"),
   markExtensionPromptShown: () => ipcRenderer.invoke("mark-extension-prompt-shown"),
   downloadExtension: (browserType) => ipcRenderer.invoke("download-extension", browserType),
+
+  // First-launch guided tour
+  shouldShowTutorial: () => ipcRenderer.invoke("should-show-tutorial"),
+  markTutorialShown: () => ipcRenderer.invoke("mark-tutorial-shown"),
 });
 
 // Overlay API — used when overlay.html is loaded into the same mainWindow

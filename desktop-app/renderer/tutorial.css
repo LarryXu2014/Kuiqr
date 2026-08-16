@@ -1,0 +1,182 @@
+/* ============================================================
+   Kuiqr — First-launch Guided Tour
+   Spotlight + coach-mark styling. Matches the app's indigo
+   design system (see styles.css :root tokens).
+   ============================================================ */
+
+@keyframes tut-card-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes tut-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes tut-bob {
+  0%, 100% { transform: translateY(0) rotate(45deg); }
+  50%      { transform: translateY(-5px) rotate(45deg); }
+}
+
+@keyframes tut-ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(99,102,241,0.95), 0 0 0 8px rgba(99,102,241,0.18), 0 0 0 9999px rgba(15,23,42,0.60); }
+  50%      { box-shadow: 0 0 0 3px rgba(99,102,241,0.95), 0 0 0 14px rgba(99,102,241,0.10), 0 0 0 9999px rgba(15,23,42,0.60); }
+}
+
+.tut-root {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+/* Full-screen dim used for centered (no-target) steps */
+.tut-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  pointer-events: auto;
+  animation: tut-fade-in 0.3s ease-out;
+}
+
+/* The "hole" — a transparent box whose box-shadow paints the dim everywhere
+   else, producing the spotlight cut-out around the target element. */
+.tut-spotlight {
+  position: absolute;
+  border-radius: 14px;
+  pointer-events: auto;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.95),
+              0 0 0 10px rgba(99, 102, 241, 0.14),
+              0 0 0 9999px rgba(15, 23, 42, 0.60);
+  transition: top 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: tut-ring-pulse 2.2s ease-in-out infinite;
+}
+
+/* Coach-mark card */
+.tut-card {
+  position: fixed;
+  z-index: 9002;
+  width: 332px;
+  max-width: calc(100vw - 28px);
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.38),
+              0 6px 16px rgba(15, 23, 42, 0.18);
+  pointer-events: auto;
+  overflow: hidden;
+  outline: none;
+  -webkit-app-region: no-drag;
+  user-select: none;
+  animation: tut-card-in 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Thin progress bar across the top of the card */
+.tut-progress {
+  height: 4px;
+  width: 100%;
+  background: #e2e8f0;
+}
+.tut-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #4f46e5, #6366f1);
+  border-radius: 0 4px 4px 0;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tut-card-body {
+  padding: 18px 18px 14px;
+}
+.tut-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: -0.01em;
+  margin: 0 0 7px;
+}
+.tut-text {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #475569;
+  margin: 0;
+}
+
+/* Directional arrow (a rotated square = speech-bubble tail) */
+.tut-arrow {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  transform: rotate(45deg);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+  z-index: 9001;
+  pointer-events: none;
+  animation: tut-bob 1.7s ease-in-out infinite;
+}
+/* Card placed BELOW target → arrow sits on card's top edge, pointing up */
+.tut-arrow.up   { top: -7px;    left: 50%; margin-left: -7px; }
+/* Card placed ABOVE target → arrow sits on card's bottom edge, pointing down */
+.tut-arrow.down { bottom: -7px; left: 50%; margin-left: -7px; }
+
+.tut-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px 16px;
+}
+.tut-step {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-right: auto;
+}
+
+.tut-btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s, color 0.15s;
+}
+.tut-btn:active { transform: scale(0.97); }
+
+.tut-btn.tut-skip {
+  background: none;
+  color: #94a3b8;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+.tut-btn.tut-skip:hover { color: #64748b; }
+
+.tut-btn.tut-back {
+  background: #f1f5f9;
+  color: #475569;
+}
+.tut-btn.tut-back:hover { background: #e2e8f0; }
+
+.tut-btn.tut-next {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.28);
+}
+.tut-btn.tut-next:hover {
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.38);
+  transform: translateY(-1px);
+}
+
+.tut-btn[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tut-spotlight,
+  .tut-arrow,
+  .tut-card,
+  .tut-dim,
+  .tut-progress-fill { animation: none !important; transition: none !important; }
+}

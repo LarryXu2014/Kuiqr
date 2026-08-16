@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Electron Main Process (v2.4.1.6)
+// Kuiqr — Electron Main Process (v2.4.1.7)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -76,6 +76,7 @@ const DEFAULT_SETTINGS = {
   browserExtensionPriority: false, // when true and a browser is the foreground app, let the browser extension handle the shortcut
   extensionPromptShown: false,     // whether the first-launch browser-extension download prompt has been shown
   extensionDownloaded: false,        // whether the user has downloaded the extension zip through the app
+  tutorialShown: false,             // whether the first-launch guided tour has been shown
   showScanPopup: true,              // show a native OS notification after decoding a QR code
 };
 
@@ -152,13 +153,13 @@ if (!gotSingleInstanceLock) {
     createTray();
     registerShortcut();
 
-    // First launch: surface the browser-extension download prompt. This is a
-    // menu-bar (background) app and the main window starts hidden, so without
-    // this the first-launch prompt would never be seen. Show the window only
-    // while the prompt hasn't been acknowledged yet.
+    // First launch: surface the browser-extension download prompt and/or the
+    // guided tour. This is a menu-bar (background) app and the main window
+    // starts hidden, so without this neither would ever be seen. Show the window
+    // while either the tour or the extension prompt hasn't been acknowledged yet.
     try {
       const launchSettings = loadSettings();
-      if (launchSettings.extensionPromptShown !== true && mainWindow && !mainWindow.isDestroyed()) {
+      if ((launchSettings.extensionPromptShown !== true || launchSettings.tutorialShown !== true) && mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.once("ready-to-show", () => {
           mainWindow.show();
           mainWindow.focus();
@@ -1010,7 +1011,7 @@ ipcMain.handle("show-notification", (event, title, body) => {
   showNotification(title, body);
 });
 
-// Renderer requests: the real app build version (4-part, e.g. "2.4.1.6")
+// Renderer requests: the real app build version (4-part, e.g. "2.4.1.7")
 ipcMain.handle("get-app-version", () => RELEASE_VERSION);
 
 // ============================================================
@@ -1025,6 +1026,22 @@ ipcMain.handle("should-show-extension-prompt", () => {
 ipcMain.handle("mark-extension-prompt-shown", () => {
   const settings = loadSettings();
   settings.extensionPromptShown = true;
+  saveSettings(settings);
+  return { ok: true };
+});
+
+// ============================================================
+// IPC: First-launch guided tour
+// ============================================================
+
+ipcMain.handle("should-show-tutorial", () => {
+  const settings = loadSettings();
+  return { show: settings.tutorialShown !== true };
+});
+
+ipcMain.handle("mark-tutorial-shown", () => {
+  const settings = loadSettings();
+  settings.tutorialShown = true;
   saveSettings(settings);
   return { ok: true };
 });

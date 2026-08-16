@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Kuiqr</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="tutorial.css" />
 </head>
 <body>
   <!-- Title bar drag region (macOS) -->
@@ -200,9 +201,10 @@
 
     <div class="about-section">
       <h3>About</h3>
-      <p id="about-version">Kuiqr v2.4.1.6</p>
+      <p id="about-version">Kuiqr v2.4.1.7</p>
       <p>All processing is local. No data is sent to any server.</p>
       <p class="platform-info" id="platform-info"></p>
+      <button id="tutorial-replay" class="btn-text tutorial-replay" type="button">Take a tour</button>
     </div>
   </div>
 
@@ -273,6 +275,7 @@
   <!-- jsQR library for in-app decoding; qrcode-generator for generating -->
   <script src="../jsQR.js"></script>
   <script src="qrcode.js"></script>
+  <script src="tutorial.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

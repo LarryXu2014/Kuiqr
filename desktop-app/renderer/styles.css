@@ -740,6 +740,20 @@ body {
   font-style: italic;
 }
 
+.tutorial-replay {
+  margin-top: 10px;
+  display: inline-block;
+  background: #eef2ff;
+  color: var(--primary);
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 10px;
+}
+
+.tutorial-replay:hover {
+  background: #e0e7ff;
+}
+
 .hidden {
   display: none !important;
 }

@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Desktop App Renderer Logic (v2.4.1.6)
+// Kuiqr — Desktop App Renderer Logic (v2.4.1.7)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -147,8 +147,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupSettingsDirtyTracking();
   setupUnsavedPrompt();
 
-  // ── First-launch browser extension download prompt ──
-  setupExtensionPrompt();
+  // ── First-launch guided tour (then the extension prompt) ──
+  maybeStartTutorial();
+
+  // ── Replay the tour from Settings → About ──
+  const replayBtn = document.getElementById("tutorial-replay");
+  if (replayBtn) {
+    replayBtn.addEventListener("click", () => {
+      if (window.KuiqrTutorial) window.KuiqrTutorial.start(() => {});
+    });
+  }
 
   // ── macOS Automation permission: show the row + wire the Settings button ──
   const autoRow = document.getElementById("automation-permission-row");
@@ -298,6 +306,35 @@ function setupUnsavedPrompt() {
 function showUnsavedPrompt() {
   const prompt = document.getElementById("unsaved-prompt");
   if (prompt) prompt.classList.remove("hidden");
+}
+
+// ============================================================
+// First-launch guided tour
+// ============================================================
+
+async function maybeStartTutorial() {
+  try {
+    const { show } = await window.qrAPI.shouldShowTutorial();
+    if (show && window.KuiqrTutorial) {
+      // Run the tour; once it finishes (or is skipped) mark it seen and then
+      // surface the first-launch browser-extension download prompt if needed.
+      window.KuiqrTutorial.start(onTutorialDone);
+    } else {
+      // Returning user who already saw the tour: show the extension prompt
+      // directly if it hasn't been acknowledged yet.
+      setupExtensionPrompt();
+    }
+  } catch (e) {
+    // Non-fatal: fall back to the extension prompt.
+    setupExtensionPrompt();
+  }
+}
+
+function onTutorialDone() {
+  try { window.qrAPI.markTutorialShown(); } catch (e) {}
+  // Show the first-launch extension download prompt after the tour (it checks
+  // its own flag, so it no-ops if the user already downloaded/declined it).
+  setupExtensionPrompt();
 }
 
 // ============================================================
