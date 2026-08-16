@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Desktop App Renderer Logic (v2.4.1.7)
+// Kuiqr — Desktop App Renderer Logic (v2.4.1.9)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)
@@ -14,6 +14,7 @@ let isRecordingShortcut = false; // true while the user is recording a new short
 let savedSettingsSnapshot = null; // snapshot of settings when the Settings tab was loaded
 let settingsDirty = false;        // true when form values differ from savedSettingsSnapshot
 let pendingTabTarget = null;      // tab the user is trying to switch to while dirty
+let scanPopupTimer = null;        // auto-hide timer for the in-app scan toast
 
 document.addEventListener("DOMContentLoaded", async () => {
   // Detect platform
@@ -49,14 +50,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const text = await decodeBufferToText(buffer);
       await window.qrAPI.onDecoded(text || null);
-      // Success/no-QR feedback is delivered as a NATIVE OS notification by the
-      // main process (applyDecodedResult) — not an in-app popup.
+      // Success/no-QR feedback is delivered as an IN-APP overlay by the main
+      // process (applyDecodedResult).
       await loadHistory(); // refresh history silently if the window is open
     } catch (err) {
       console.error("Hidden decode failed:", err);
       await window.qrAPI.onDecoded(null);
-      // Surface the failure as a native system notification.
-      window.qrAPI.showNotification("Kuiqr — Scan Failed", "The captured image could not be processed.");
+      // Surface the failure as an in-app overlay notification.
+      showScanPopup("error", "Scan Failed", "The captured image could not be processed.");
     }
   });
 
@@ -65,9 +66,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   // side effects (open URL / copy text / history), and sends us the text so the
   // UI can show the popup and refresh history.
   window.qrAPI.onNativeDecoded(async (text) => {
-    // The main process already delivered the scan result as a native OS
-    // notification; we just refresh the history list.
+    // The main process sends a separate "show-scan-toast" event for the in-app
+    // notification overlay; we just refresh the history list here.
     await loadHistory();
+  });
+
+  // ── In-app scan feedback overlay (replaces native system notifications) ──
+  window.qrAPI.onShowScanToast((type, title, content, hint) => {
+    showScanPopup(type, title, content, hint);
   });
 
   // ── In-App Scan: Paste from Clipboard ──
@@ -147,16 +153,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupSettingsDirtyTracking();
   setupUnsavedPrompt();
 
-  // ── First-launch guided tour (then the extension prompt) ──
-  maybeStartTutorial();
+  // ── First-launch onboarding: extension prompt → tutorial ask → tutorial → menu bar ──
+  maybeRunOnboarding();
 
-  // ── Replay the tour from Settings → About ──
-  const replayBtn = document.getElementById("tutorial-replay");
-  if (replayBtn) {
-    replayBtn.addEventListener("click", () => {
-      if (window.KuiqrTutorial) window.KuiqrTutorial.start(() => {});
-    });
-  }
+  // ── Replay the guided tour from Settings → Tutorial ──
+  wireTutorialReplay();
 
   // ── macOS Automation permission: show the row + wire the Settings button ──
   const autoRow = document.getElementById("automation-permission-row");
@@ -309,75 +310,136 @@ function showUnsavedPrompt() {
 }
 
 // ============================================================
-// First-launch guided tour
+// First-launch onboarding
+//   1. Browser-extension download prompt (first)
+//   2. Ask whether to take the guided tour ("Enter Tutorial" / "Maybe later")
+//   3. Run the tour if requested
+//   4. Enter menu-bar (background) mode — shows the menu bar icon
+// The tour itself is first-launch only; it can always be replayed from
+// Settings → Tutorial → "Take a guided tour".
 // ============================================================
 
-async function maybeStartTutorial() {
+async function maybeRunOnboarding() {
+  let extNeeded = false;
+  let tutNeeded = false;
   try {
-    const { show } = await window.qrAPI.shouldShowTutorial();
-    if (show && window.KuiqrTutorial) {
-      // Run the tour; once it finishes (or is skipped) mark it seen and then
-      // surface the first-launch browser-extension download prompt if needed.
-      window.KuiqrTutorial.start(onTutorialDone);
-    } else {
-      // Returning user who already saw the tour: show the extension prompt
-      // directly if it hasn't been acknowledged yet.
-      setupExtensionPrompt();
-    }
+    extNeeded = (await window.qrAPI.shouldShowExtensionPrompt()).show;
+    tutNeeded = (await window.qrAPI.shouldShowTutorial()).show;
   } catch (e) {
-    // Non-fatal: fall back to the extension prompt.
-    setupExtensionPrompt();
+    // If we can't reach the main process, don't block startup — just bail.
+    return;
+  }
+
+  // Returning user (everything already seen): nothing to do. The main process is
+  // already in menu-bar mode and keeps the window hidden.
+  if (!extNeeded && !tutNeeded) return;
+
+  try {
+    // Step 1 — browser-extension download prompt comes first.
+    if (extNeeded) await showExtensionPrompt();
+
+    // Step 2 — ask whether to take the guided tour.
+    if (tutNeeded) {
+      const wantsTour = await askTutorial();
+      if (wantsTour && window.KuiqrTutorial) {
+        await new Promise((resolve) => {
+          window.KuiqrTutorial.start(() => resolve());
+        });
+      }
+      // Mark the tour as handled (first-launch only) whether or not they took it.
+      try { await window.qrAPI.markTutorialShown(); } catch (e) {}
+    }
+
+    // Step 3 — onboarding finished: become a menu-bar app (shows the menu bar icon).
+    try { await window.qrAPI.enterMenuBarMode(); } catch (e) {}
+  } catch (e) {
+    // If anything goes wrong mid-onboarding, still finish into menu-bar mode.
+    try { await window.qrAPI.enterMenuBarMode(); } catch (_) {}
   }
 }
 
-function onTutorialDone() {
-  try { window.qrAPI.markTutorialShown(); } catch (e) {}
-  // Show the first-launch extension download prompt after the tour (it checks
-  // its own flag, so it no-ops if the user already downloaded/declined it).
-  setupExtensionPrompt();
-}
-
-// ============================================================
-// First-launch browser extension download prompt
-// ============================================================
-
-async function setupExtensionPrompt() {
-  try {
-    const { show } = await window.qrAPI.shouldShowExtensionPrompt();
-    if (!show) return;
-
+// Shows the browser-extension download prompt and resolves once the user
+// dismisses it (download or "Not now"). Marks the prompt as shown.
+function showExtensionPrompt() {
+  return new Promise((resolve) => {
     const prompt = document.getElementById("extension-prompt");
     const chromeBtn = document.getElementById("ext-download-chrome");
     const firefoxBtn = document.getElementById("ext-download-firefox");
     const laterBtn = document.getElementById("ext-prompt-later");
     const status = document.getElementById("ext-download-status");
-    if (!prompt) return;
+    if (!prompt) { resolve(); return; }
 
     prompt.classList.remove("hidden");
 
+    let done = false;
     const closePrompt = () => {
+      if (done) return;
+      done = true;
       prompt.classList.add("hidden");
-      window.qrAPI.markExtensionPromptShown();
+      try { window.qrAPI.markExtensionPromptShown(); } catch (e) {}
+      // Detach listeners so they don't linger / double-fire on a later replay.
+      [chromeBtn, firefoxBtn, laterBtn].forEach((b) => {
+        if (b && b.parentNode) b.parentNode.replaceChild(b.cloneNode(true), b);
+      });
+      resolve();
     };
 
     const doDownload = async (type) => {
       status.textContent = "Downloading…";
       status.classList.remove("hidden");
-      const res = await window.qrAPI.downloadExtension(type);
-      if (res.ok) {
-        status.innerHTML = `<b>Downloaded:</b> ${escapeHtml(res.filename)}<br><span style="color:var(--text-muted)">Install steps: unzip the file, then load the folder as an unpacked extension.</span>`;
-      } else {
-        status.textContent = "Download failed: " + (res.reason || "unknown error");
+      try {
+        const res = await window.qrAPI.downloadExtension(type);
+        if (res.ok) {
+          status.innerHTML = `<b>Downloaded:</b> ${escapeHtml(res.filename)}<br><span style="color:var(--text-muted)">Install steps: unzip the file, then load the folder as an unpacked extension.</span>`;
+        } else {
+          status.textContent = "Download failed: " + (res.reason || "unknown error");
+        }
+      } catch (err) {
+        status.textContent = "Download failed: " + ((err && err.message) || "unknown error");
       }
-      // Keep prompt open so the user can read the instructions
+      // Keep the prompt open so the user can read the instructions; "Not now" finishes it.
     };
 
     if (chromeBtn) chromeBtn.addEventListener("click", () => doDownload("chrome"));
     if (firefoxBtn) firefoxBtn.addEventListener("click", () => doDownload("firefox"));
     if (laterBtn) laterBtn.addEventListener("click", closePrompt);
-  } catch (err) {
-    console.error("Extension prompt setup failed:", err);
-  }
+  });
+}
+
+// Shows the "want a guided tour?" dialog and resolves with
+// true ("Enter Tutorial") or false ("Maybe later").
+function askTutorial() {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("tutorial-ask");
+    const enterBtn = document.getElementById("tut-ask-enter");
+    const laterBtn = document.getElementById("tut-ask-later");
+    if (!modal) { resolve(false); return; }
+
+    modal.classList.remove("hidden");
+
+    let done = false;
+    const finish = (val) => {
+      if (done) return;
+      done = true;
+      modal.classList.add("hidden");
+      [enterBtn, laterBtn].forEach((b) => {
+        if (b && b.parentNode) b.parentNode.replaceChild(b.cloneNode(true), b);
+      });
+      resolve(val);
+    };
+
+    if (enterBtn) enterBtn.addEventListener("click", () => finish(true));
+    if (laterBtn) laterBtn.addEventListener("click", () => finish(false));
+  });
+}
+
+// Wires every "Take a guided tour" replay button (Settings → Tutorial section).
+function wireTutorialReplay() {
+  document.querySelectorAll(".tutorial-replay").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (window.KuiqrTutorial) window.KuiqrTutorial.start(() => {});
+    });
+  });
 }
 
 // ============================================================
@@ -461,8 +523,8 @@ function showPreviewAndDecode(dataUrl) {
     } catch (err) {
       console.error("Decode error:", err);
       showResult("error", "Failed to decode image", err.message);
-      // Surface the failure as a native system notification.
-      window.qrAPI.showNotification("Kuiqr — Scan Failed", err.message || "The file could not be processed.");
+      // Surface the failure as an in-app overlay notification.
+      showScanPopup("error", "Scan Failed", err.message || "The file could not be processed.");
     }
   };
   img.onerror = () => {
@@ -725,8 +787,8 @@ async function handleDecodedResult(qrResult) {
     showResult("text", text, null, false);
   }
 
-  // Scan success feedback is delivered as a NATIVE OS notification by the main
-  // process (applyDecodedResult) — not an in-app popup.
+  // Scan success feedback is delivered as an IN-APP overlay by the main process
+  // (applyDecodedResult), controlled by the "Show scan notifications" setting.
 
   // Apply side effects via main process
   const response = await window.qrAPI.onDecoded(text);
@@ -785,6 +847,64 @@ function showResult(type, data, sub, isUrl) {
 
 function hideResult() {
   document.getElementById("scan-result").classList.add("hidden");
+}
+
+// ============================================================
+// In-app scan notification overlay (replaces native system notifications)
+// ============================================================
+
+function showScanPopup(type, title, content, hint) {
+  const popup = document.getElementById("scan-popup");
+  const iconEl = document.getElementById("scan-popup-icon");
+  const titleEl = document.getElementById("scan-popup-title");
+  const contentEl = document.getElementById("scan-popup-content");
+  const hintEl = document.getElementById("scan-popup-hint");
+  const closeBtn = document.getElementById("scan-popup-close");
+  if (!popup) return;
+
+  const icons = {
+    success: "✅",
+    url: "🌐",
+    text: "📋",
+    "no-qr": "❓",
+    error: "❌",
+  };
+
+  popup.setAttribute("data-type", type || "success");
+  iconEl.textContent = icons[type] || icons.success;
+  titleEl.textContent = title || "Kuiqr";
+  contentEl.textContent = content || "";
+  if (hint) {
+    hintEl.textContent = hint;
+    hintEl.classList.remove("hidden");
+  } else {
+    hintEl.classList.add("hidden");
+  }
+
+  popup.classList.remove("hidden");
+  popup.classList.add("visible");
+
+  if (scanPopupTimer) clearTimeout(scanPopupTimer);
+  scanPopupTimer = setTimeout(() => hideScanPopup(), 4500);
+
+  const closeHandler = () => {
+    hideScanPopup();
+    closeBtn.removeEventListener("click", closeHandler);
+  };
+  // Re-bind safely: remove any previous listener then add once.
+  closeBtn.replaceWith(closeBtn.cloneNode(true));
+  document.getElementById("scan-popup-close").addEventListener("click", closeHandler);
+}
+
+function hideScanPopup() {
+  const popup = document.getElementById("scan-popup");
+  if (!popup) return;
+  popup.classList.remove("visible");
+  popup.classList.add("hidden");
+  if (scanPopupTimer) {
+    clearTimeout(scanPopupTimer);
+    scanPopupTimer = null;
+  }
 }
 
 
@@ -1065,6 +1185,7 @@ function setupGenerate() {
   const img = document.getElementById("gen-img");
   const errorEl = document.getElementById("gen-error");
   const downloadBtn = document.getElementById("gen-download");
+  const copyQrBtn = document.getElementById("gen-copy-qr");
   const copyBtn = document.getElementById("gen-copy");
 
   let lastDataUrl = "";
@@ -1109,7 +1230,21 @@ function setupGenerate() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.qrAPI.showNotification("QR Code Downloaded", "Saved as qrcode.png");
+      showScanPopup("success", "QR Code Downloaded", "Saved as qrcode.png.");
+    });
+  }
+
+  if (copyQrBtn) {
+    copyQrBtn.addEventListener("click", async () => {
+      if (!lastDataUrl) return;
+      try {
+        await window.qrAPI.copyQrImage(lastDataUrl);
+        copyQrBtn.textContent = "Copied QR!";
+        setTimeout(() => { copyQrBtn.textContent = "Copy QR Code"; }, 1500);
+        showScanPopup("success", "QR Code Copied", "The QR code image has been copied to your clipboard.");
+      } catch (err) {
+        showScanPopup("error", "Copy Failed", err.message || "Could not copy the QR code image.");
+      }
     });
   }
 
@@ -1119,7 +1254,7 @@ function setupGenerate() {
       window.qrAPI.copyClipboard(input.value);
       copyBtn.textContent = "Copied!";
       setTimeout(() => { copyBtn.textContent = "Copy Text"; }, 1500);
-      window.qrAPI.showNotification("Text Copied", "The QR content has been copied to your clipboard.");
+      showScanPopup("success", "Text Copied", "The QR content has been copied to your clipboard.");
     });
   }
 }

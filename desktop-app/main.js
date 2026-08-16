@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Electron Main Process (v2.4.1.7)
+// Kuiqr — Electron Main Process (v2.4.1.9)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -29,6 +29,8 @@ let isInOverlayMode = false;   // true while mainWindow is showing the scan over
 let savedWindowState = null;    // saved bounds/state to restore after overlay (Windows)
 let rendererReady = false;      // set when the renderer signals it's listening for decode jobs
 let pendingDecodeBuffer = null; // captured PNG waiting for the renderer to be ready
+let menuBarMode = false;        // true once the app has tucked itself into the menu bar (tray + hidden window)
+let onboardingActive = false;   // true during first-launch onboarding (window shown, no tray yet)
 let lastOverlayScreenshotPath = null; // temp screenshot for the Windows/Linux overlay (cleaned up after)
 
 const isMac = process.platform === "darwin";
@@ -141,25 +143,28 @@ if (!gotSingleInstanceLock) {
     showMainWindow();
   });
 
-  app.whenReady().then(() => {
-    // On macOS, run as a pure menu-bar (background) app: no Dock icon, so there is
-    // no Dock window/quit interplay that can terminate the app when the window is
-    // hidden via rapid tray clicks. The tray icon remains fully functional.
-    if (isMac && app.dock && typeof app.dock.hide === "function") {
-      try { app.dock.hide(); } catch { /* ignore */ }
+  app.whenReady().then(async () => {
+    createMainWindow();
+
+    // ── Decide the launch mode ──
+    // First launch (the browser-extension prompt and/or the guided tour have not
+    // been seen yet): keep the app as a NORMAL foreground app — Dock icon visible,
+    // window shown, no menu-bar/tray yet. The renderer drives the onboarding
+    // (extension prompt → tutorial ask → tutorial) and then calls
+    // "enter-menu-bar-mode" when it's done, at which point we hide the Dock,
+    // create the tray, and tuck the window into the menu bar.
+    // Returning user: go straight to menu-bar (background) mode.
+    let needsOnboarding = false;
+    try {
+      const s = loadSettings();
+      needsOnboarding = s.extensionPromptShown !== true || s.tutorialShown !== true;
+    } catch {
+      needsOnboarding = true; // default to first-launch behavior on any error
     }
 
-    createMainWindow(); // shows itself on launch
-    createTray();
-    registerShortcut();
-
-    // First launch: surface the browser-extension download prompt and/or the
-    // guided tour. This is a menu-bar (background) app and the main window
-    // starts hidden, so without this neither would ever be seen. Show the window
-    // while either the tour or the extension prompt hasn't been acknowledged yet.
-    try {
-      const launchSettings = loadSettings();
-      if ((launchSettings.extensionPromptShown !== true || launchSettings.tutorialShown !== true) && mainWindow && !mainWindow.isDestroyed()) {
+    if (needsOnboarding) {
+      onboardingActive = true;
+      if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.once("ready-to-show", () => {
           mainWindow.show();
           mainWindow.focus();
@@ -172,7 +177,12 @@ if (!gotSingleInstanceLock) {
           }
         }, 500);
       }
-    } catch (e) { /* non-fatal */ }
+    } else {
+      // Returning user → menu-bar mode immediately (Dock hidden, tray, window hidden).
+      enterMenuBarMode();
+    }
+
+    await registerShortcut();
 
     // On macOS, proactively trigger the native "Automation" permission prompt the
     // first time the app opens. macOS only shows its own system alert (we draw no
@@ -235,13 +245,22 @@ function createMainWindow() {
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
 
   mainWindow.on("close", (e) => {
-    // Normally hide to the tray instead of quitting, so the app + global shortcut
-    // keep working after the window is closed. But when we're genuinely quitting
-    // (isQuiting === true), let the window actually close so the app can exit.
-    if (!isQuiting) {
-      e.preventDefault();
-      mainWindow.hide();
+    // When we're genuinely quitting (isQuiting === true), let the window actually
+    // close so the app can exit.
+    if (isQuiting) return;
+
+    e.preventDefault();
+    if (onboardingActive) {
+      // During first-launch onboarding there is no tray yet — keep the window alive
+      // so the user can finish the flow (re-show it if they closed it).
+      if (mainWindow && !mainWindow.isVisible()) {
+        try { mainWindow.show(); mainWindow.focus(); } catch { /* ignore */ }
+      }
+      return;
     }
+    // Normally hide to the tray instead of quitting, so the app + global shortcut
+    // keep working after the window is closed.
+    mainWindow.hide();
   });
 }
 
@@ -327,6 +346,32 @@ function createTray() {
 }
 
 // ============================================================
+// Menu-bar (background) mode
+// ============================================================
+
+// Tucks the app into the menu bar: hide the Dock icon (macOS), create the tray
+// icon, and hide the window. Called by the renderer once first-launch onboarding
+// (extension prompt → tutorial) is complete, and at startup for returning users.
+function enterMenuBarMode() {
+  if (menuBarMode) return;
+  menuBarMode = true;
+  onboardingActive = false;
+
+  // macOS: become a pure menu-bar (background) app — no Dock icon, so rapid tray
+  // clicks can never terminate the app via Dock window/quit interplay.
+  if (isMac && app.dock && typeof app.dock.hide === "function") {
+    try { app.dock.hide(); } catch { /* ignore */ }
+  }
+
+  createTray();
+
+  // Tuck the window into the menu bar (it can be brought back via tray / shortcut).
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+    mainWindow.hide();
+  }
+}
+
+// ============================================================
 // Global Shortcut
 // ============================================================
 
@@ -345,9 +390,9 @@ function suspendShortcut() {
   appShortcutActive = false;
 }
 
-function resumeShortcut() {
+async function resumeShortcut() {
   shortcutSuspended = false;
-  registerShortcut();
+  await registerShortcut();
 }
 
 // Registers the actual OS-level global shortcut (one of the candidates). Exposed
@@ -386,7 +431,7 @@ function registerAppShortcut() {
   return false;
 }
 
-function registerShortcut() {
+async function registerShortcut() {
   // Don't actually register while the user is recording a new shortcut.
   if (shortcutSuspended) return;
 
@@ -402,7 +447,8 @@ function registerShortcut() {
   // app: we release it (so the extension gets the key) and hold it only when the
   // user is in a non-browser app. A monitor toggles this as the user switches apps.
   if (priority && isMac) {
-    if (isForegroundAppBrowser()) {
+    const browser = await isForegroundAppBrowser();
+    if (browser) {
       // Browser is foreground right now → release so the extension receives it.
       globalShortcut.unregisterAll();
       appShortcutActive = false;
@@ -433,7 +479,7 @@ function registerShortcut() {
 // not expose a reliable foreground-app-change event without native code.
 function startForegroundMonitor() {
   if (fgMonitorTimer) return;
-  fgMonitorTimer = setInterval(syncShortcutToForegroundApp, 300);
+  fgMonitorTimer = setInterval(syncShortcutToForegroundApp, 500);
   syncShortcutToForegroundApp();
 }
 
@@ -444,7 +490,7 @@ function stopForegroundMonitor() {
   }
 }
 
-function syncShortcutToForegroundApp() {
+async function syncShortcutToForegroundApp() {
   if (shortcutSuspended) return; // recording a new shortcut — leave unregistered
   // Always honour the LIVE setting. When browser-extension priority is OFF the app
   // must keep the global shortcut at all times — even while a browser is the
@@ -456,7 +502,7 @@ function syncShortcutToForegroundApp() {
     if (!appShortcutActive) registerAppShortcut();
     return;
   }
-  const browser = isForegroundAppBrowser();
+  const browser = await isForegroundAppBrowser();
   if (browser) {
     // Release so the browser extension can receive the keystroke.
     if (appShortcutActive) {
@@ -469,49 +515,52 @@ function syncShortcutToForegroundApp() {
   }
 }
 
-function reregisterShortcut() {
-  registerShortcut();
+async function reregisterShortcut() {
+  await registerShortcut();
 }
 
 // ============================================================
 // Screen Capture + Overlay
 // ============================================================
 
-// Returns true if the currently focused application is a known web browser.
-// Used so the browser extension can take priority over this app's global shortcut.
-// Best-effort: fully implemented on macOS; on other platforms returns false
-// (the app always scans) until a platform-specific check is added.
+// Returns a Promise resolving to true if the currently focused application is a
+// known web browser. Used so the browser extension can take priority over this
+// app's global shortcut. Best-effort: fully implemented on macOS; on other
+// platforms resolves to false (the app always scans).
+// Uses async exec instead of execSync so the main thread never blocks.
 function isForegroundAppBrowser() {
-  if (!isMac) return false;
-  try {
-    const bid = execSync(
+  return new Promise((resolve) => {
+    if (!isMac) return resolve(false);
+    exec(
       'osascript -e \'tell application "System Events" to get bundle identifier of (first process whose frontmost is true)\'',
-      { timeout: 2000 }
-    ).toString().trim();
-    const BROWSERS = [
-      "com.google.Chrome",
-      "com.google.Chrome.canary",
-      "com.microsoft.edgemac",
-      "com.microsoft.edgemac.Canary",
-      "org.mozilla.firefox",
-      "com.brave.Browser",
-      "com.operasoftware.Opera",
-      "com.operasoftware.OperaNext",
-      "com.vivaldi.Vivaldi",
-      "company.thebrowser.Browser", // Arc
-      "com.yandex.desktop.yandex",
-      "com.qwant.engine.macos",
-      "com.ecosia.mac",
-      "com.centbrowser.Chrome",
-      "com.duckduckgo.mobile.ios",
-      "com.tencent.webtab", // QQ Browser
-      "com.ucweb.uc", // UC Browser
-      "com.baidu.Baidu", // Baidu Browser
-    ];
-    return BROWSERS.includes(bid);
-  } catch {
-    return false;
-  }
+      { timeout: 2000 },
+      (err, stdout) => {
+        if (err) return resolve(false);
+        const bid = String(stdout).trim();
+        const BROWSERS = [
+          "com.google.Chrome",
+          "com.google.Chrome.canary",
+          "com.microsoft.edgemac",
+          "com.microsoft.edgemac.Canary",
+          "org.mozilla.firefox",
+          "com.brave.Browser",
+          "com.operasoftware.Opera",
+          "com.operasoftware.OperaNext",
+          "com.vivaldi.Vivaldi",
+          "company.thebrowser.Browser", // Arc
+          "com.yandex.desktop.yandex",
+          "com.qwant.engine.macos",
+          "com.ecosia.mac",
+          "com.centbrowser.Chrome",
+          "com.duckduckgo.mobile.ios",
+          "com.tencent.webtab", // QQ Browser
+          "com.ucweb.uc", // UC Browser
+          "com.baidu.Baidu", // Baidu Browser
+        ];
+        resolve(BROWSERS.includes(bid));
+      }
+    );
+  });
 }
 
 // ============================================================
@@ -526,13 +575,9 @@ function isForegroundAppBrowser() {
 // won't reappear; the user can still grant it later via the in-app settings button.)
 function requestAutomationPermissionIfNeeded() {
   if (!isMac) return;
-  try {
-    // Running this fires an osascript that requires Automation access, which makes
-    // macOS present its native permission prompt on first run. We ignore the result.
-    isForegroundAppBrowser();
-  } catch {
-    // The OS prompt may be shown while osascript is waiting; ignore any error here.
-  }
+  // Running this fires an osascript that requires Automation access, which makes
+  // macOS present its native permission prompt on first run. We ignore the result.
+  isForegroundAppBrowser().catch(() => {});
 }
 
 // Opens System Settings → Privacy & Security → Automation so the user can grant or
@@ -556,10 +601,10 @@ ipcMain.handle("open-automation-settings", () => {
 // The renderer calls this on the Settings tab to decide whether to show or hide
 // the "macOS Automation permission" row — once granted it stays granted, so
 // there's no point showing a button the user no longer needs.
-ipcMain.handle("check-automation-permission", () => {
+ipcMain.handle("check-automation-permission", async () => {
   if (!isMac) return { granted: true }; // non-mac: irrelevant, hide the row
   try {
-    isForegroundAppBrowser(); // will throw if permission was denied
+    await isForegroundAppBrowser(); // resolves false if permission was denied
     return { granted: true };
   } catch {
     return { granted: false };
@@ -871,16 +916,36 @@ ipcMain.handle("copy-clipboard", (event, text) => {
   clipboard.writeText(text);
 });
 
+// Renderer requests: copy a generated QR code image (data URL) to the clipboard
+ipcMain.handle("copy-qr-image", (event, dataUrl) => {
+  try {
+    const base64 = String(dataUrl).split(",")[1] || "";
+    const buffer = Buffer.from(base64, "base64");
+    const img = nativeImage.createFromBuffer(buffer);
+    clipboard.writeImage(img);
+    return { ok: true };
+  } catch (err) {
+    console.error("Kuiqr: copy-qr-image failed:", err);
+    return { ok: false, reason: err.message || String(err) };
+  }
+});
+
 // Overlay / renderer decodes the QR locally and sends the decoded string (or null).
 // The main process applies the side effects: open URL / copy text / history / notification.
 ipcMain.handle("decoded", (event, data) => applyDecodedResult(data));
 
+// Sends an in-app scan-feedback overlay to the renderer.
+function sendScanToast(type, title, content, hint) {
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+    mainWindow.webContents.send("show-scan-toast", type, title, content, hint || "");
+  }
+}
+
 // Single source of truth for what happens after a QR code is decoded (or not):
 // open the URL / copy the text / record history / notify. Used by BOTH the
 // in-app scan path and the native macOS scan path.
-// Feedback: success results are delivered as NATIVE OS notifications (top-right on
-// macOS, Action Center on Windows, libnotify on Linux) — the user asked for
-// system pop-ups, not in-app popups. Controlled by the "Show scan notifications"
+// Feedback: success results are delivered as an IN-APP overlay notification
+// (not a native OS notification). Controlled by the "Show scan notifications"
 // setting (showScanPopup). For "no QR found" we stay silent to avoid spam.
 function applyDecodedResult(data) {
   const settings = loadSettings();
@@ -898,10 +963,10 @@ function applyDecodedResult(data) {
     const targetUrl = text.startsWith("http") ? text : `https://${text}`;
     shell.openExternal(targetUrl);
     addToHistory(text, "url");
-    // Deliver as a native OS notification (user wants system pop-ups, not in-app).
+    // Deliver as an in-app overlay (user wants in-app notifications, not native).
     // Controlled by the "Show scan notifications" setting.
     if (usePopup) {
-      showNotification("QR Found — Opening URL", text.slice(0, 100));
+      sendScanToast("url", "QR Found — Opening URL", text.slice(0, 100));
     }
     return { result: "url", data: text };
   }
@@ -910,9 +975,9 @@ function applyDecodedResult(data) {
     clipboard.writeText(text);
   }
   addToHistory(text, "text");
-  // Native OS notification (see note above).
+  // In-app overlay notification.
   if (usePopup) {
-    showNotification("QR Found — Copied to Clipboard", text.slice(0, 100));
+    sendScanToast("text", "QR Found — Copied to Clipboard", text.slice(0, 100));
   }
   return { result: "text", data: text };
 }
@@ -1001,8 +1066,8 @@ ipcMain.handle("suspend-shortcut", () => {
   return true;
 });
 
-ipcMain.handle("resume-shortcut", () => {
-  resumeShortcut();
+ipcMain.handle("resume-shortcut", async () => {
+  await resumeShortcut();
   return true;
 });
 
@@ -1011,7 +1076,7 @@ ipcMain.handle("show-notification", (event, title, body) => {
   showNotification(title, body);
 });
 
-// Renderer requests: the real app build version (4-part, e.g. "2.4.1.7")
+// Renderer requests: the real app build version (4-part, e.g. "2.4.1.9")
 ipcMain.handle("get-app-version", () => RELEASE_VERSION);
 
 // ============================================================
@@ -1046,26 +1111,74 @@ ipcMain.handle("mark-tutorial-shown", () => {
   return { ok: true };
 });
 
+// Renderer calls this when first-launch onboarding is finished: tuck the app into
+// the menu bar (hide Dock, create tray, hide window).
+ipcMain.handle("enter-menu-bar-mode", () => {
+  enterMenuBarMode();
+  return { ok: true };
+});
+
 // Downloads the appropriate extension zip to the user's Downloads folder.
 // browserType is "chrome" or "firefox". Returns { ok, path? }.
+// Tries the release matching this app version first; if that isn't published
+// yet (e.g. pre-release testing), falls back to the latest published release.
+// Downloads the appropriate extension zip to the user's Downloads folder.
+// browserType is "chrome" or "firefox" (chrome covers Chrome/Edge/Brave).
+// Returns { ok, path? }.
+//
+// Strategy:
+//   1. Try the release that matches this exact app version (works as soon as
+//      this version is published — the asset is named kuiqr-extension-<ver>.zip).
+//   2. If that 404s (this build isn't released yet, or an older app version),
+//      resolve the REAL asset URL from the latest GitHub release via the API
+//      and download that. The published asset is versioned, so a bare
+//      "kuiqr-extension.zip" would 404 — we must read the actual name.
 ipcMain.handle("download-extension", async (event, browserType) => {
   const settings = loadSettings();
   try {
     const version = RELEASE_VERSION;
-    const filename = browserType === "firefox"
-      ? `kuiqr-firefox-${version}.zip`
-      : `kuiqr-extension-${version}.zip`;
-    const url = `https://github.com/LarryXu2014/Kuiqr/releases/download/v${version}/${filename}`;
+    const baseName = browserType === "firefox" ? "kuiqr-firefox" : "kuiqr-extension";
+    const filename = `${baseName}-${version}.zip`;
+    const versionedUrl = `https://github.com/LarryXu2014/Kuiqr/releases/download/v${version}/${filename}`;
     const destPath = path.join(app.getPath("downloads"), filename);
 
-    // Download via Electron's net module (Chromium networking stack), which
-    // respects the system proxy settings. Falls back to Node's native fetch.
-    let response;
-    try {
-      response = await net.fetch(url);
-    } catch (netErr) {
-      console.warn("Kuiqr: net.fetch failed, falling back to native fetch:", netErr.message || netErr);
-      response = await fetch(url);
+    async function tryFetch(url, acceptJson = false) {
+      const headers = acceptJson ? { Accept: "application/vnd.github+json" } : {};
+      try {
+        return await net.fetch(url, { headers });
+      } catch (netErr) {
+        console.warn("Kuiqr: net.fetch failed, falling back to native fetch:", netErr.message || netErr);
+        return acceptJson ? fetch(url, { headers }) : fetch(url);
+      }
+    }
+
+    // Resolve the real download URL from the latest published release.
+    async function resolveLatestUrl() {
+      try {
+        const meta = await tryFetch("https://api.github.com/repos/LarryXu2014/Kuiqr/releases/latest", true);
+        if (!meta.ok) return null;
+        const rel = await meta.json();
+        const assets = rel.assets || [];
+        // Prefer an asset whose name starts with our baseName (handles versioned
+        // names like kuiqr-extension-2.4.1.7.zip) and fall back to a plain name.
+        const asset =
+          assets.find((a) => a.name.startsWith(baseName) && a.name.endsWith(".zip")) ||
+          assets.find((a) => a.name === `${baseName}.zip`);
+        return asset ? asset.browser_download_url : null;
+      } catch (apiErr) {
+        console.warn("Kuiqr: latest-release lookup failed:", apiErr.message || apiErr);
+        return null;
+      }
+    }
+
+    let response = await tryFetch(versionedUrl);
+
+    // Fallback: this exact version isn't published yet (or version skew) —
+    // grab the matching asset from the latest release instead.
+    if (!response.ok && (response.status === 404 || response.status === 403)) {
+      console.log("Kuiqr: versioned extension zip not found, resolving from latest release");
+      const latestUrl = await resolveLatestUrl();
+      if (latestUrl) response = await tryFetch(latestUrl);
     }
 
     if (!response.ok) {

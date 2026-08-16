@@ -44,10 +44,17 @@ contextBridge.exposeInMainWorld("qrAPI", {
   // Tell the main process this renderer is ready to receive decode jobs.
   markRendererReady: () => ipcRenderer.send("renderer-ready"),
 
-  // Show a system notification (respects the "show notifications" setting)
+  // Show a system notification (kept for non-scan feedback; scan results use
+  // the in-app overlay below).
   showNotification: (title, body) => ipcRenderer.invoke("show-notification", title, body),
 
-  // Real app build version (4-part, e.g. "2.4.1.7"), for the About section
+  // In-app scan feedback overlay (replaces native system notifications for scans)
+  onShowScanToast: (callback) => ipcRenderer.on("show-scan-toast", (e, type, title, content, hint) => callback(type, title, content, hint)),
+
+  // Copy a generated QR code image (data URL) to the system clipboard
+  copyQrImage: (dataUrl) => ipcRenderer.invoke("copy-qr-image", dataUrl),
+
+  // Real app build version (4-part, e.g. "2.4.1.9"), for the About section
   getAppVersion: () => ipcRenderer.invoke("get-app-version"),
 
   // First-launch browser-extension download prompt
@@ -58,6 +65,10 @@ contextBridge.exposeInMainWorld("qrAPI", {
   // First-launch guided tour
   shouldShowTutorial: () => ipcRenderer.invoke("should-show-tutorial"),
   markTutorialShown: () => ipcRenderer.invoke("mark-tutorial-shown"),
+
+  // Called by the renderer once first-launch onboarding is done, to tuck the app
+  // into the menu bar (hide Dock, create tray, hide window).
+  enterMenuBarMode: () => ipcRenderer.invoke("enter-menu-bar-mode"),
 });
 
 // Overlay API — used when overlay.html is loaded into the same mainWindow

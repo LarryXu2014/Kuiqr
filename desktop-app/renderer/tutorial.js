@@ -1,7 +1,14 @@
 // ============================================================
 // Kuiqr — First-launch Guided Tour
-// A spotlight + coach-mark tour that runs on first launch.
+// A fast spotlight + coach-mark tour that runs on first launch.
 // Exposes window.KuiqrTutorial.start(onComplete).
+//
+// Performance notes:
+//   - No huge box-shadows or continuous keyframe animations (those made the
+//     whole app lag on every frame).
+//   - The dim is built from four static panels around the target.
+//   - Step transitions are instant: no setTimeout delays, no card re-entrance
+//     animation between steps.
 // ============================================================
 
 (function () {
@@ -41,7 +48,7 @@
       placement: "bottom",
     },
     {
-      selector: '.tab[data-tab="history"]',
+      selector: ".tabs",
       title: "Four simple tabs",
       text:
         "Switch anytime between Scan, History, Settings, and Generate from here.",
@@ -73,6 +80,10 @@
   let root = null;
   let dimEl = null;
   let spotEl = null;
+  let topPanel = null;
+  let bottomPanel = null;
+  let leftPanel = null;
+  let rightPanel = null;
   let cardEl = null;
   let arrowEl = null;
   let fillEl = null;
@@ -84,22 +95,28 @@
   let onDone = null;
   let rafId = 0;
 
+  function makeEl(cls) {
+    const el = document.createElement("div");
+    el.className = cls;
+    return el;
+  }
+
   function buildDom() {
-    root = document.createElement("div");
-    root.className = "tut-root";
+    root = makeEl("tut-root");
     root.setAttribute("role", "dialog");
     root.setAttribute("aria-label", "Kuiqr tour");
 
-    dimEl = document.createElement("div");
-    dimEl.className = "tut-dim";
-    dimEl.style.display = "none";
+    dimEl = makeEl("tut-dim");
 
-    spotEl = document.createElement("div");
-    spotEl.className = "tut-spotlight";
+    // Four dim panels form a frame around the spotlight target.
+    topPanel = makeEl("tut-panel tut-panel-top");
+    bottomPanel = makeEl("tut-panel tut-panel-bottom");
+    leftPanel = makeEl("tut-panel tut-panel-left");
+    rightPanel = makeEl("tut-panel tut-panel-right");
 
-    cardEl = document.createElement("div");
-    cardEl.className = "tut-card";
+    spotEl = makeEl("tut-spotlight");
 
+    cardEl = makeEl("tut-card");
     cardEl.innerHTML = `
       <div class="tut-progress"><div class="tut-progress-fill"></div></div>
       <div class="tut-card-body">
@@ -113,11 +130,14 @@
         <button class="tut-btn tut-next" type="button">Next</button>
       </div>`;
 
-    arrowEl = document.createElement("div");
-    arrowEl.className = "tut-arrow";
+    arrowEl = makeEl("tut-arrow");
 
     document.body.appendChild(root);
     root.appendChild(dimEl);
+    root.appendChild(topPanel);
+    root.appendChild(bottomPanel);
+    root.appendChild(leftPanel);
+    root.appendChild(rightPanel);
     root.appendChild(spotEl);
     root.appendChild(cardEl);
     root.appendChild(arrowEl);
@@ -167,7 +187,44 @@
     }
   }
 
-  async function render(animate) {
+  function setPanelsVisible(visible) {
+    const disp = visible ? "block" : "none";
+    topPanel.style.display = disp;
+    bottomPanel.style.display = disp;
+    leftPanel.style.display = disp;
+    rightPanel.style.display = disp;
+  }
+
+  function positionPanels(rect, pad) {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const sx = clamp(rect.left - pad, 0, W);
+    const sy = clamp(rect.top - pad, 0, H);
+    const sw = clamp(rect.width + pad * 2, 0, W);
+    const sh = clamp(rect.height + pad * 2, 0, H);
+
+    topPanel.style.left = "0px";
+    topPanel.style.top = "0px";
+    topPanel.style.width = W + "px";
+    topPanel.style.height = sy + "px";
+
+    bottomPanel.style.left = "0px";
+    bottomPanel.style.top = (sy + sh) + "px";
+    bottomPanel.style.width = W + "px";
+    bottomPanel.style.height = clamp(H - (sy + sh), 0, H) + "px";
+
+    leftPanel.style.left = "0px";
+    leftPanel.style.top = sy + "px";
+    leftPanel.style.width = sx + "px";
+    leftPanel.style.height = sh + "px";
+
+    rightPanel.style.left = (sx + sw) + "px";
+    rightPanel.style.top = sy + "px";
+    rightPanel.style.width = clamp(W - (sx + sw), 0, W) + "px";
+    rightPanel.style.height = sh + "px";
+  }
+
+  function render(animate) {
     const step = STEPS[current];
     const total = STEPS.length;
 
@@ -179,10 +236,16 @@
     backBtn.hidden = current === 0;
     nextBtn.textContent = current === total - 1 ? "Done" : "Next";
 
+    // Card entrance animation only on the very first render.
+    if (animate && current === 0) {
+      cardEl.classList.add("tut-card-enter");
+    } else {
+      cardEl.classList.remove("tut-card-enter");
+    }
+
     // Tab switch (before measuring target)
     if (step.tab) {
       switchToTab(step.tab);
-      await new Promise((r) => setTimeout(r, 80)); // let layout settle
     }
 
     const hasTarget = !!step.selector;
@@ -191,6 +254,7 @@
     if (!hasTarget || !target) {
       // Centered card, no spotlight
       spotEl.style.display = "none";
+      setPanelsVisible(false);
       dimEl.style.display = "block";
       arrowEl.style.display = "none";
 
@@ -204,6 +268,7 @@
     // Spotlight a real element
     dimEl.style.display = "none";
     spotEl.style.display = "block";
+    setPanelsVisible(true);
 
     if (target.scrollIntoView) {
       try { target.scrollIntoView({ block: "center", behavior: "auto" }); } catch (e) {}
@@ -220,6 +285,8 @@
     spotEl.style.top = sy + "px";
     spotEl.style.width = sw + "px";
     spotEl.style.height = sh + "px";
+
+    positionPanels(rect, pad);
 
     // Decide card placement
     let placement = step.placement || "auto";
@@ -271,7 +338,7 @@
   function go(index) {
     if (index < 0 || index >= STEPS.length) return;
     current = index;
-    render(true);
+    render(false);
   }
 
   function finish() {
@@ -285,17 +352,11 @@
 
     const cleanup = () => {
       if (root && root.parentNode) root.parentNode.removeChild(root);
-      root = dimEl = spotEl = cardEl = arrowEl = fillEl = stepLabelEl = backBtn = nextBtn = null;
+      root = dimEl = spotEl = topPanel = bottomPanel = leftPanel = rightPanel = cardEl = arrowEl = fillEl = stepLabelEl = backBtn = nextBtn = null;
       if (typeof done === "function") done();
     };
 
-    if (root) {
-      root.style.transition = "opacity 0.25s ease-out";
-      root.style.opacity = "0";
-      setTimeout(cleanup, 260);
-    } else {
-      cleanup();
-    }
+    cleanup();
   }
 
   function start(onComplete) {
@@ -303,10 +364,18 @@
     if (typeof onComplete === "function") onDone = onComplete;
     active = true;
     current = 0;
+
+    // Always start the tour from the home (Scan) tab so the early steps make sense.
+    switchToTab("scan");
+
     buildDom();
-    // Focus the card so keyboard (Esc / arrows) works immediately
-    setTimeout(() => { render(true); cardEl && cardEl.focus && cardEl.setAttribute("tabindex", "-1"); }, 30);
-    setTimeout(() => { if (cardEl) cardEl.focus(); }, 60);
+    render(true);
+
+    // Focus the card so keyboard (Esc / arrows) works immediately.
+    if (cardEl) {
+      cardEl.setAttribute("tabindex", "-1");
+      cardEl.focus();
+    }
   }
 
   window.KuiqrTutorial = { start: start, STEPS: STEPS };
