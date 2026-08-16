@@ -64,7 +64,7 @@ contextBridge.exposeInMainWorld("qrAPI", {
   // Copy a generated QR code image (data URL) to the system clipboard
   copyQrImage: (dataUrl) => ipcRenderer.invoke("copy-qr-image", dataUrl),
 
-  // Real app build version (4-part, e.g. "2.4.2.0"), for the About section
+  // Real app build version (4-part, e.g. "2.4.2.1"), for the About section
   getAppVersion: () => ipcRenderer.invoke("get-app-version"),
 
   // First-launch browser-extension download prompt

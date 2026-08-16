@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Desktop App Renderer Logic (v2.4.2.0)
+// Kuiqr — Desktop App Renderer Logic (v2.4.2.1)
 // Features:
 //   - In-app scan: paste from clipboard or drag-drop image
 //   - Screen capture via overlay (shortcut / button)

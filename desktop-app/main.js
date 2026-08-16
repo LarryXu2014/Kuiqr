@@ -1,5 +1,5 @@
 // ============================================================
-// Kuiqr — Electron Main Process (v2.4.2.0)
+// Kuiqr — Electron Main Process (v2.4.2.1)
 // Features:
 //   1. Global hotkey → scan
 //   2. macOS: uses the NATIVE screen-selection UI (screencapture -i) — the
@@ -1199,7 +1199,7 @@ ipcMain.handle("show-notification", (event, title, body) => {
   showNotification(title, body);
 });
 
-// Renderer requests: the real app build version (4-part, e.g. "2.4.2.0")
+// Renderer requests: the real app build version (4-part, e.g. "2.4.2.1")
 ipcMain.handle("get-app-version", () => RELEASE_VERSION);
 
 // ============================================================
