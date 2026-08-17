@@ -1,3 +1,4 @@
+<!-- Copyright 2026 LarryXu. Licensed under GPL-3.0. -->
 # Kuiqr — Project Summary
 
 > **Purpose:** This file captures the full state of the project so it can be continued in a new chat.

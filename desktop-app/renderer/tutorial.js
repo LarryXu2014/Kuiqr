@@ -1,3 +1,4 @@
+// Copyright 2026 LarryXu. Licensed under GPL-3.0.
 // ============================================================
 // Kuiqr — First-launch Guided Tour
 // A fast spotlight + coach-mark tour that runs on first launch.

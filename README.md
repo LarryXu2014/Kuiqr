@@ -1,8 +1,9 @@
+<!-- Copyright 2026 LarryXu. Licensed under GPL-3.0. -->
 # Kuiqr
 
 > Scan QR codes instantly — right-click any image, press a keyboard shortcut, or paste a screenshot. Works on your desktop, in your browser, and on the web.
 
-![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)
 ![Version](https://img.shields.io/badge/Version-2.4.2.1-green.svg)
 
 All QR decoding happens **locally on your device**. On macOS the desktop app uses the native **Apple Vision** framework for instant detection, with a fast bounded jsQR fallback for hard or artistic QR codes. No images, URLs, or scan data are ever sent to any server.
@@ -430,4 +431,8 @@ cd /tmp/ff-build && zip -r /path/to/kuiqr-firefox-2.4.2.1.zip . -x "*.DS_Store"
 
 ## License
 
-MIT — free to use, modify, and distribute.
+**GPL-3.0** — Copyright © 2026 LarryXu. Free to use, modify, and distribute under the terms of the GNU General Public License v3.0.
+
+The full license text is in [`LICENSE`](./LICENSE).
+
+> Note: the bundled third-party libraries **jsQR** and **qrcode-generator** retain their original **MIT** licenses and are redistributed under the GPL-3.0, which is compatible with MIT.

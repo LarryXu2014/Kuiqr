@@ -1,3 +1,4 @@
+// Copyright 2026 LarryXu. Licensed under GPL-3.0.
 // ============================================================
 // Kuiqr — Content Script (v2.4.2.1)
 // Runs in the page context on every allowed site.

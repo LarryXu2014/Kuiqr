@@ -1,3 +1,4 @@
+// Copyright 2026 LarryXu. Licensed under GPL-3.0.
 // ============================================================
 // Kuiqr - Popup Script (v2.4.1.3)
 //   - Shows/sets the customizable shortcut (Record)

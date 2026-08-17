@@ -1,3 +1,4 @@
+// Copyright 2026 LarryXu. Licensed under GPL-3.0.
 // Kuiqr — Toast Window Preload (v2.4.2.1)
 // Bridges the toast BrowserWindow (a real on-screen overlay, not an in-app DOM
 // element) with the main process.

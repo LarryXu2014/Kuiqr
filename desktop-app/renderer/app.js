@@ -1,3 +1,4 @@
+// Copyright 2026 LarryXu. Licensed under GPL-3.0.
 // ============================================================
 // Kuiqr — Desktop App Renderer Logic (v2.4.2.1)
 // Features:

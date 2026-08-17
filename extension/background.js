@@ -1,3 +1,4 @@
+// Copyright 2026 LarryXu. Licensed under GPL-3.0.
 // ============================================================
 // Kuiqr — Background Service Worker (v2.4.2.1)
 // Features:
