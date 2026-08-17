@@ -259,8 +259,15 @@ function createMainWindow() {
       }
       return;
     }
-    // Normally hide to the tray instead of quitting, so the app + global shortcut
-    // keep working after the window is closed.
+
+    // The FIRST time the user closes the main window, tuck the app into the menu
+    // bar (hide Dock, create tray icon). After that, closing just hides the window.
+    if (!menuBarMode) {
+      enterMenuBarMode();
+    }
+
+    // Hide to the tray instead of quitting, so the app + global shortcut keep
+    // working after the window is closed.
     mainWindow.hide();
   });
 }
@@ -285,15 +292,29 @@ function showMainWindow() {
 function createTray() {
   if (tray) return; // guard against double creation
 
-  const iconPath = path.join(__dirname, "icons", isMac ? "icon16.png" : "icon32.png");
-  const trayIcon = nativeImage.createFromPath(iconPath);
-  // If the icon file is missing, createFromPath returns an empty NativeImage.
-  // Use a tiny fallback so the tray still works (and we can see it).
-  if (trayIcon.isEmpty()) {
-    console.warn("Kuiqr: tray icon not found at", iconPath);
+  // Try several icon candidates so the tray icon is visible in both dev and the
+  // packaged app. macOS menu-bar icons should be a template image and retina-safe
+  // (we use the 32 px source and resize to 16 px logical, which gives crisp 2x).
+  const candidates = isMac
+    ? [path.join(__dirname, "icons", "icon32.png"), path.join(__dirname, "icons", "icon16.png")]
+    : [path.join(__dirname, "icons", "icon32.png")];
+  let trayIcon = null;
+  for (const p of candidates) {
+    const ni = nativeImage.createFromPath(p);
+    if (!ni.isEmpty()) {
+      trayIcon = ni;
+      break;
+    }
+  }
+  if (!trayIcon || trayIcon.isEmpty()) {
+    console.warn("Kuiqr: tray icon not found; tried", candidates);
+    trayIcon = nativeImage.createEmpty();
+  } else if (isMac) {
+    trayIcon = trayIcon.resize({ width: 16, height: 16 });
+    trayIcon.setTemplateImage(true);
   }
 
-  tray = new Tray(trayIcon.isEmpty() ? nativeImage.createEmpty() : trayIcon);
+  tray = new Tray(trayIcon);
   tray.setToolTip("Kuiqr");
 
   const contextMenu = Menu.buildFromTemplate([
@@ -1005,10 +1026,10 @@ function showScanToastWindow(type, title, content, hint) {
     hint: hint || "",
   };
 
-  // Top-right of the primary display.
+  // Top-center of the primary display.
   const { width: screenW } = screen.getPrimaryDisplay().workAreaSize;
   const w = 360;
-  scanToastWindow.setBounds({ x: screenW - w - 20, y: 20, width: w, height: 80 });
+  scanToastWindow.setBounds({ x: Math.round((screenW - w) / 2), y: 20, width: w, height: 80 });
 
   // If the window is still loading its first paint, queue the payload and let the
   // did-finish-load handler replay it once the listener is live.
@@ -1232,6 +1253,15 @@ ipcMain.handle("mark-tutorial-shown", () => {
   const settings = loadSettings();
   settings.tutorialShown = true;
   saveSettings(settings);
+  return { ok: true };
+});
+
+// Renderer calls this once first-launch onboarding (extension prompt → tutorial)
+// is finished and the app should remain a normal foreground app. This clears the
+// onboarding guard so the FIRST window-close handler below will tuck the app into
+// the menu bar, instead of re-showing the window.
+ipcMain.handle("mark-onboarding-complete", () => {
+  onboardingActive = false;
   return { ok: true };
 });
 

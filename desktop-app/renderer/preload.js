@@ -77,6 +77,10 @@ contextBridge.exposeInMainWorld("qrAPI", {
   shouldShowTutorial: () => ipcRenderer.invoke("should-show-tutorial"),
   markTutorialShown: () => ipcRenderer.invoke("mark-tutorial-shown"),
 
+  // Called by the renderer once first-launch onboarding is finished, so the first
+  // window close will tuck the app into the menu bar (instead of re-showing it).
+  markOnboardingComplete: () => ipcRenderer.invoke("mark-onboarding-complete"),
+
   // Called by the renderer once first-launch onboarding is done, to tuck the app
   // into the menu bar (hide Dock, create tray, hide window).
   enterMenuBarMode: () => ipcRenderer.invoke("enter-menu-bar-mode"),

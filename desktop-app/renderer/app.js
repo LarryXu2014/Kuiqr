@@ -318,7 +318,8 @@ function showUnsavedPrompt() {
 //   1. Browser-extension download prompt (first)
 //   2. Ask whether to take the guided tour ("Enter Tutorial" / "Maybe later")
 //   3. Run the tour if requested
-//   4. Enter menu-bar (background) mode — shows the menu bar icon
+// The app stays a normal foreground app after onboarding. It only enters
+// menu-bar (background) mode the first time the user closes the main window.
 // The tour itself is first-launch only; it can always be replayed from
 // Settings → Tutorial → "Take a guided tour".
 // ============================================================
@@ -354,11 +355,15 @@ async function maybeRunOnboarding() {
       try { await window.qrAPI.markTutorialShown(); } catch (e) {}
     }
 
-    // Step 3 — onboarding finished: become a menu-bar app (shows the menu bar icon).
-    try { await window.qrAPI.enterMenuBarMode(); } catch (e) {}
+    // Step 3 — onboarding finished. Stay as a normal foreground app so the user
+    // can keep using the window. The app will tuck itself into the menu bar the
+    // FIRST time the user closes the window (Dock icon is removed then).
+    try { await window.qrAPI.markOnboardingComplete(); } catch (e) {}
   } catch (e) {
-    // If anything goes wrong mid-onboarding, still finish into menu-bar mode.
-    try { await window.qrAPI.enterMenuBarMode(); } catch (_) {}
+    // If anything goes wrong mid-onboarding, just leave the window open as a
+    // normal app rather than hiding it. Still clear the onboarding guard so the
+    // first window-close tucks the app into the menu bar instead of re-showing it.
+    try { await window.qrAPI.markOnboardingComplete(); } catch (e2) {}
   }
 }
 

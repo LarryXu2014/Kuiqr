@@ -67,6 +67,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       await saveToHistory(null, srcUrl, "no-qr", "No QR code detected");
       return;
     }
+    // Explicit success toast for right-click scans so the user always sees feedback.
+    const display = data.length > 100 ? data.slice(0, 100) + "\u2026" : data;
+    const isUrl = /^(https?:\/\/|www\.)/i.test(data);
+    notify(
+      isUrl ? "QR Found - Opening URL" : "QR Found - Copied to Clipboard",
+      display
+    );
     await actOnQRData(data, srcUrl);
   } catch (err) {
     log("QR scan error:", err);
@@ -306,6 +313,7 @@ async function injectOverlay(tabId, screenshotUrl) {
 
       // ── Drag logic ──
       let dragging = false;
+      let isDecoding = false;
       let sx = 0, sy = 0, ex = 0, ey = 0;
 
       function updateDimAreas() {
@@ -330,7 +338,7 @@ async function injectOverlay(tabId, screenshotUrl) {
       }
 
       root.addEventListener("mousedown", (e) => {
-        if (e.button !== 0) return;
+        if (isDecoding || e.button !== 0) return;
         dragging = true;
         sx = ex = e.clientX;
         sy = ey = e.clientY;
@@ -341,7 +349,7 @@ async function injectOverlay(tabId, screenshotUrl) {
       });
 
       root.addEventListener("mousemove", (e) => {
-        if (!dragging) return;
+        if (isDecoding || !dragging) return;
         ex = e.clientX;
         ey = e.clientY;
         const left = Math.min(sx, ex);
@@ -356,7 +364,7 @@ async function injectOverlay(tabId, screenshotUrl) {
       });
 
       root.addEventListener("mouseup", async (e) => {
-        if (!dragging) return;
+        if (isDecoding || !dragging) return;
         dragging = false;
 
         const left = Math.min(sx, ex);
@@ -364,12 +372,21 @@ async function injectOverlay(tabId, screenshotUrl) {
         const w = Math.abs(ex - sx);
         const h = Math.abs(ey - sy);
 
+        // A bare click / tiny accidental press should NOT close the overlay.
+        // Only an intentional selection (>= 10 px) starts the scan. Otherwise
+        // we just reset the selection and keep the overlay open so the user can
+        // try again without re-pressing the shortcut.
         if (w < 10 || h < 10) {
-          closeOverlay();
+          sel.style.display = "none";
+          hint.style.display = "block";
+          cancelBtn.style.display = "flex";
+          sx = ex = sy = ey = 0;
+          updateDimAreas();
           return;
         }
 
-        // Show scanning state
+        // Show scanning state and ignore further mouse input until decoding is done.
+        isDecoding = true;
         sel.style.borderColor = "#4f46e5";
         hint.style.display = "block";
         hint.textContent = "Scanning...";
@@ -487,119 +504,198 @@ function createCanvas(w, h) {
 }
 
 // ── Robust QR decoding with multiple preprocessing strategies ──
-// Handles: artistic/decorative QR codes, low contrast, color backgrounds,
-// small QR codes, inverted codes, and noisy images.
+// Mirrors the desktop app's decoder so the browser extension can scan the same
+// hard / artistic / decorative QR codes (e.g. Chrome dinosaur QR).
+// Handles: artistic QR, low contrast, color backgrounds, small QR codes,
+// inverted codes, and noisy images. Kept bounded so a bad selection never hangs.
+const DECODER_BUDGET_FAST = 80;
+const DECODER_BUDGET_MEDIUM = 220;
+const DECODER_BUDGET_DEEP = 550;
+const DECODER_BUDGET_ABSOLUTE = 800;
+
+function looksEmptyOrUniform(imageData) {
+  const d = imageData.data;
+  const w = imageData.width;
+  const h = imageData.height;
+  const sampleStep = Math.max(8, Math.floor(Math.min(w, h) / 16));
+  let samples = 0;
+  let rSum = 0, gSum = 0, bSum = 0;
+  let minL = 255, maxL = 0;
+
+  for (let y = 0; y < h; y += sampleStep) {
+    for (let x = 0; x < w; x += sampleStep) {
+      const i = (y * w + x) * 4;
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      rSum += r; gSum += g; bSum += b;
+      if (lum < minL) minL = lum;
+      if (lum > maxL) maxL = lum;
+      samples++;
+    }
+  }
+
+  if (samples === 0) return true;
+  if (maxL - minL < 18) return true;
+
+  const rAvg = rSum / samples;
+  const gAvg = gSum / samples;
+  const bAvg = bSum / samples;
+  let varianceSum = 0;
+  for (let y = 0; y < h; y += sampleStep) {
+    for (let x = 0; x < w; x += sampleStep) {
+      const i = (y * w + x) * 4;
+      varianceSum += Math.abs(d[i] - rAvg) + Math.abs(d[i + 1] - gAvg) + Math.abs(d[i + 2] - bAvg);
+    }
+  }
+  return varianceSum / samples < 12;
+}
+
+function scaleImageData(ctx, w, h, sw, sh) {
+  const sc = createCanvas(sw, sh);
+  const sctx = sc.getContext("2d");
+  sctx.imageSmoothingEnabled = true;
+  sctx.imageSmoothingQuality = "high";
+  sctx.drawImage(ctx.canvas, 0, 0, sw, sh);
+  return sctx.getImageData(0, 0, sw, sh);
+}
+
+function tryScaleDecode(ctx, w, h, s, decode) {
+  const sw = Math.round(w * s);
+  const sh = Math.round(h * s);
+  if (sw < 10 || sh < 10) return null;
+  const sd = scaleImageData(ctx, w, h, sw, sh);
+  return decode(sd);
+}
+
+function grayscale(imageData) {
+  const d = imageData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const v = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  return imageData;
+}
+
+function stretchContrast(imageData) {
+  const d = imageData.data;
+  let min = 255, max = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i] < min) min = d[i];
+    if (d[i] > max) max = d[i];
+  }
+  if (max > min) {
+    const range = max - min;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = ((d[i] - min) / range) * 255;
+      d[i] = d[i + 1] = d[i + 2] = v;
+    }
+  }
+  return imageData;
+}
+
+function binaryThreshold(imageData, thresh) {
+  const out = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+  const d = out.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const v = d[i] >= thresh ? 255 : 0;
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  return out;
+}
+
+function invertBin(imageData) {
+  const out = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+  const d = out.data;
+  for (let i = 0; i < d.length; i += 4) {
+    d[i] = 255 - d[i]; d[i + 1] = 255 - d[i + 1]; d[i + 2] = 255 - d[i + 2];
+  }
+  return out;
+}
+
+function decodeImageRobust(ctx, w, h) {
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const start = performance.now();
+
+  if (w < 50 || h < 50) return null;
+  if (looksEmptyOrUniform(imageData)) return null;
+
+  // FAST PATH
+  let result = jsQR(imageData.data, w, h, { inversionAttempts: "attemptBoth" });
+  if (result) return result;
+
+  for (const s of [1.5, 2]) {
+    if (performance.now() - start > DECODER_BUDGET_FAST) break;
+    result = tryScaleDecode(ctx, w, h, s, (sd) =>
+      jsQR(sd.data, sd.width, sd.height, { inversionAttempts: "attemptBoth" })
+    );
+    if (result) return result;
+  }
+
+  if (w > 600 || h > 600) {
+    if (performance.now() - start <= DECODER_BUDGET_FAST) {
+      result = tryScaleDecode(ctx, w, h, 0.5, (sd) =>
+        jsQR(sd.data, sd.width, sd.height, { inversionAttempts: "attemptBoth" })
+      );
+      if (result) return result;
+    }
+  }
+
+  // MEDIUM PATH
+  if (performance.now() - start <= DECODER_BUDGET_MEDIUM) {
+    let gray = grayscale(ctx.getImageData(0, 0, w, h));
+    gray = stretchContrast(gray);
+
+    result = jsQR(gray.data, w, h, { inversionAttempts: "attemptBoth" });
+    if (result) return result;
+
+    for (const thresh of [100, 128, 160]) {
+      if (performance.now() - start > DECODER_BUDGET_MEDIUM) break;
+      const bin = binaryThreshold(gray, thresh);
+      result = jsQR(bin.data, w, h, { inversionAttempts: "attemptBoth" });
+      if (result) return result;
+    }
+  }
+
+  // DEEP PATH
+  const deepScales = [0.75, 1.25, 1.5];
+  for (const s of deepScales) {
+    if (performance.now() - start > DECODER_BUDGET_DEEP) break;
+
+    const sw = Math.round(w * s);
+    const sh = Math.round(h * s);
+    if (sw < 80 || sh < 80) continue;
+
+    const sd = scaleImageData(ctx, w, h, sw, sh);
+    let gray = grayscale(sd);
+    gray = stretchContrast(gray);
+
+    result = jsQR(gray.data, sw, sh, { inversionAttempts: "attemptBoth" });
+    if (result) return result;
+
+    for (const thresh of [80, 110, 140, 170]) {
+      if (performance.now() - start > DECODER_BUDGET_DEEP) break;
+      const bin = binaryThreshold(gray, thresh);
+      result = jsQR(bin.data, sw, sh, { inversionAttempts: "attemptBoth" });
+      if (result) return result;
+
+      const invBin = invertBin(bin);
+      result = jsQR(invBin.data, sw, sh, { inversionAttempts: "attemptBoth" });
+      if (result) return result;
+    }
+  }
+
+  return null;
+}
+
 async function decodeDataUrl(dataUrl) {
   const blob = await (await fetch(dataUrl)).blob();
   const bitmap = await createImageBitmap(blob);
-  const origW = bitmap.width;
-  const origH = bitmap.height;
-
-  // Try a matrix of: [scale, threshold, invert]
-  // scale = multiplier for minSize (try multiple sizes)
-  // threshold = 0 means no thresholding (grayscale only), >0 = binary threshold
-  // invert = try inverted colors too
-  const strategies = [];
-
-  // Base sizes to try (in pixels, targeting QR module size)
-  const baseSizes = [200, 400, 600, 800, 1000, 1200];
-  const minDim = Math.min(origW, origH);
-
-  for (const targetSize of baseSizes) {
-    if (targetSize < minDim) continue; // skip if already bigger than original
-    const scale = Math.ceil(targetSize / minDim);
-    strategies.push({ scale, threshold: 0, invert: false });
-    strategies.push({ scale, threshold: 0, invert: true });
-    // Binary thresholds
-    for (const thresh of [80, 100, 120, 140, 160]) {
-      strategies.push({ scale, threshold: thresh, invert: false });
-      strategies.push({ scale, threshold: thresh, invert: true });
-    }
-  }
-
-  // Also try exact original size
-  strategies.push({ scale: 1, threshold: 0, invert: false });
-  strategies.push({ scale: 1, threshold: 0, invert: true });
-
-  log(`decodeDataUrl: original=${origW}x${origH}, trying ${strategies.length} strategies`);
-
-  for (const { scale, threshold, invert } of strategies) {
-    let w = origW * scale;
-    let h = origH * scale;
-
-    // Cap at reasonable max to avoid OOM
-    if (w > 2000 || h > 2000) {
-      const ratio = Math.min(2000 / w, 2000 / h);
-      w = Math.round(w * ratio);
-      h = Math.round(h * ratio);
-    }
-
-    const canvas = createCanvas(w, h);
-    const ctx = canvas.getContext("2d");
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(bitmap, 0, 0, w, h);
-
-    let imageData = ctx.getImageData(0, 0, w, h);
-    const data = imageData.data;
-
-    // Step 1: Convert to grayscale
-    for (let i = 0; i < data.length; i += 4) {
-      // Luminance formula (perceptual)
-      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      data[i] = gray;
-      data[i + 1] = gray;
-      data[i + 2] = gray;
-    }
-
-    // Step 2: Contrast enhancement (histogram stretching)
-    let minG = 255, maxG = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] < minG) minG = data[i];
-      if (data[i] > maxG) maxG = data[i];
-    }
-    if (maxG > minG) {
-      const range = maxG - minG;
-      for (let i = 0; i < data.length; i += 4) {
-        const v = ((data[i] - minG) / range) * 255;
-        data[i] = v;
-        data[i + 1] = v;
-        data[i + 2] = v;
-      }
-    }
-
-    // Step 3: Invert if requested
-    if (invert) {
-      for (let i = 0; i < data.length; i += 4) {
-        data[i] = 255 - data[i];
-        data[i + 1] = 255 - data[i + 1];
-        data[i + 2] = 255 - data[i + 2];
-      }
-    }
-
-    // Step 4: Binary thresholding if requested
-    if (threshold > 0) {
-      for (let i = 0; i < data.length; i += 4) {
-        const v = data[i] >= threshold ? 255 : 0;
-        data[i] = v;
-        data[i + 1] = v;
-        data[i + 2] = v;
-      }
-    }
-
-    const code = jsQR(imageData.data, w, h, {
-      inversionAttempts: "dontInvert", // we handle inversion ourselves
-    });
-
-    if (code && code.data) {
-      log(`QR FOUND! strategy=scale:${scale} thresh:${threshold} invert:${invert} data=${code.data.slice(0, 60)}`);
-      bitmap.close();
-      return code.data;
-    }
-  }
-
+  const canvas = createCanvas(bitmap.width, bitmap.height);
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(bitmap, 0, 0);
+  const result = decodeImageRobust(ctx, bitmap.width, bitmap.height);
   bitmap.close();
-  return null;
+  return result ? result.data : null;
 }
 
 async function decodeQRFromUrl(url, tabId) {
@@ -666,17 +762,17 @@ async function actOnQRData(rawData, source) {
 
   if (isUrl) {
     const targetUrl = data.startsWith("http") ? data : `https://${data}`;
+    notify("QR Found \u2014 Opening URL", targetUrl);
     chrome.tabs.create({ url: targetUrl });
-    notify("Opening QR Code", targetUrl);
   } else {
     // Copy from the page (content script) — the service worker itself
     // cannot write to the clipboard, so copyToClipboard() here silently
     // failed before. copyTextToActiveTab() asks the active tab to copy.
-    await copyTextToActiveTab(data);
     notify(
-      "QR Code Scanned \u2014 Copied to Clipboard",
+      "QR Found \u2014 Copied to Clipboard",
       data.length > 100 ? data.slice(0, 100) + "\u2026" : data
     );
+    await copyTextToActiveTab(data);
   }
 
   await saveToHistory(data, source, isUrl ? "url" : "text", null);
