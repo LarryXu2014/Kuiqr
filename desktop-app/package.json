@@ -46,8 +46,8 @@
         "filter": ["**/*"]
       }
     ],
-    "artifactName": "Kuiqr-${buildVersion}-mac-${arch}.${ext}",
     "mac": {
+      "artifactName": "Kuiqr-${buildVersion}-mac-${arch}.${ext}",
       "identity": null,
       "category": "public.app-category.utilities",
       "target": [
@@ -57,18 +57,11 @@
       "icon": "icons/icon512.png"
     },
     "win": {
-      "artifactName": "Kuiqr-${buildVersion}-windows-x64.${ext}",
       "target": [
-        "portable",
-        "nsis",
-        "zip"
+        { "target": "portable", "arch": ["x64"] },
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "zip", "arch": ["x64"] }
       ],
-      "portable": {
-        "artifactName": "Kuiqr-${buildVersion}-windows-x64-portable.${ext}"
-      },
-      "nsis": {
-        "artifactName": "Kuiqr-${buildVersion}-windows-x64-setup.${ext}"
-      },
       "icon": "icons/icon512.png"
     },
     "linux": {

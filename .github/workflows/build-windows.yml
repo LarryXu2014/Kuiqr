@@ -30,6 +30,22 @@ jobs:
         working-directory: desktop-app
         run: npm run build:win
 
+      # electron-builder emits platform-default names (e.g. "Kuiqr Setup 2.4.2.3.exe").
+      # Rename them to the canonical names the in-app updater (pickUpdateAsset) and the
+      # README download links expect, so the upload step below can find them.
+      - name: Rename artifacts to canonical names
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./desktop-app/package.json').build.buildVersion")
+          cd desktop-app/dist
+          setup=$(ls Kuiqr*Setup*.exe 2>/dev/null | head -1)
+          [ -n "$setup" ] && mv "$setup" "Kuiqr-${VERSION}-windows-x64-setup.exe"
+          [ -f "Kuiqr ${VERSION}.exe" ] && mv "Kuiqr ${VERSION}.exe" "Kuiqr-${VERSION}-windows-x64-portable.exe"
+          zip=$(ls Kuiqr-*-win.zip 2>/dev/null | head -1)
+          [ -n "$zip" ] && mv "$zip" "Kuiqr-${VERSION}-windows-x64.zip"
+          echo "dist contents:"; ls -la
+          cd ../..
+
       - name: Ensure release exists and upload
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
