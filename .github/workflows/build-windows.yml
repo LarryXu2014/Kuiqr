@@ -38,9 +38,12 @@ jobs:
         run: |
           VERSION=$(node -p "require('./desktop-app/package.json').build.buildVersion")
           cd desktop-app/dist
+          # electron-builder's default Windows names embed package.json "version"
+          # (2.4.1), not buildVersion, so glob by shape rather than the version string.
           setup=$(ls Kuiqr*Setup*.exe 2>/dev/null | head -1)
           [ -n "$setup" ] && mv "$setup" "Kuiqr-${VERSION}-windows-x64-setup.exe"
-          [ -f "Kuiqr ${VERSION}.exe" ] && mv "Kuiqr ${VERSION}.exe" "Kuiqr-${VERSION}-windows-x64-portable.exe"
+          portable=$(ls Kuiqr\ *.exe 2>/dev/null | grep -vi Setup | head -1)
+          [ -n "$portable" ] && mv "$portable" "Kuiqr-${VERSION}-windows-x64-portable.exe"
           zip=$(ls Kuiqr-*-win.zip 2>/dev/null | head -1)
           [ -n "$zip" ] && mv "$zip" "Kuiqr-${VERSION}-windows-x64.zip"
           echo "dist contents:"; ls -la
