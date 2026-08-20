@@ -81,6 +81,8 @@ const DEFAULT_SETTINGS = {
   extensionDownloaded: false,        // whether the user has downloaded the extension zip through the app
   tutorialShown: false,             // whether the first-launch guided tour has been shown
   showScanPopup: true,              // show a native OS notification after decoding a QR code
+  language: "en",                   // UI language code (en, zh-CN, zh-TW, ja, ko, es, fr, de)
+  lastUpdateNagVersion: "",         // last version we already nagged the user about updating to
 };
 
 function loadSettings() {
@@ -1347,6 +1349,137 @@ ipcMain.handle("download-extension", async (event, browserType) => {
     return { ok: true, path: destPath, filename };
   } catch (err) {
     console.error("Kuiqr: extension download failed:", err);
+    return { ok: false, reason: err.message || String(err) };
+  }
+});
+
+// ============================================================
+// IPC: In-app update check + download
+// ============================================================
+
+// Compare dotted versions (e.g. "2.4.2.1"). Returns >0 if a is newer than b.
+function compareVersions(a, b) {
+  const pa = String(a || "").split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = String(b || "").split(".").map((n) => parseInt(n, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const x = pa[i] || 0;
+    const y = pb[i] || 0;
+    if (x > y) return 1;
+    if (x < y) return -1;
+  }
+  return 0;
+}
+
+// Pick the release asset name that matches THIS platform/arch.
+// Asset names follow electron-builder artifactName patterns in package.json:
+//   macOS : Kuiqr-<ver>-mac-<arch>.{dmg,zip}   (arch: x64 | arm64)
+//   Win   : Kuiqr-<ver>-windows-x64.exe
+//   Linux : Kuiqr-<ver>-linux-x86_64.AppImage / .deb  (x64 → x86_64 / amd64)
+//           Kuiqr-<ver>-linux-arm64.AppImage  / .deb  (arm64)
+function pickUpdateAsset(version, assets) {
+  const platform = process.platform;
+  const arch = process.arch; // "x64" | "arm64"
+  const candidates = [];
+
+  if (platform === "darwin") {
+    const a = arch === "arm64" ? "arm64" : "x64";
+    candidates.push(`Kuiqr-${version}-mac-${a}.dmg`, `Kuiqr-${version}-mac-${a}.zip`);
+  } else if (platform === "win32") {
+    candidates.push(`Kuiqr-${version}-windows-x64.exe`);
+  } else if (platform === "linux") {
+    if (arch === "arm64") {
+      candidates.push(`Kuiqr-${version}-linux-arm64.AppImage`, `Kuiqr-${version}-linux-arm64.deb`);
+    } else {
+      candidates.push(
+        `Kuiqr-${version}-linux-x86_64.AppImage`,
+        `Kuiqr-${version}-linux-amd64.deb`
+      );
+    }
+  }
+
+  for (const name of candidates) {
+    const asset = assets.find((a) => a.name === name);
+    if (asset) return asset;
+  }
+  return null;
+}
+
+// Fetches the latest GitHub release and reports whether a newer version exists.
+// Returns { ok, updateAvailable, currentVersion, latestVersion, releaseUrl,
+//           assetUrl, assetName, notes }.
+ipcMain.handle("check-for-updates", async () => {
+  const currentVersion = RELEASE_VERSION;
+  try {
+    const headers = { Accept: "application/vnd.github+json" };
+    let meta;
+    try {
+      meta = await net.fetch("https://api.github.com/repos/LarryXu2014/Kuiqr/releases/latest", { headers });
+    } catch (netErr) {
+      console.warn("Kuiqr: net.fetch failed, falling back to native fetch:", netErr.message || netErr);
+      meta = await fetch("https://api.github.com/repos/LarryXu2014/Kuiqr/releases/latest", { headers });
+    }
+    if (!meta.ok) {
+      return { ok: false, reason: `GitHub API returned HTTP ${meta.status}`, currentVersion };
+    }
+    const rel = await meta.json();
+    const latestVersion = String(rel.tag_name || "").replace(/^v/i, "");
+    if (!latestVersion) {
+      return { ok: false, reason: "No version tag in latest release", currentVersion };
+    }
+
+    const updateAvailable = compareVersions(latestVersion, currentVersion) > 0;
+    const assets = rel.assets || [];
+    const asset = updateAvailable ? pickUpdateAsset(latestVersion, assets) : null;
+    const assetUrl = asset ? asset.browser_download_url : null;
+
+    return {
+      ok: true,
+      updateAvailable,
+      currentVersion,
+      latestVersion,
+      releaseUrl: rel.html_url || `https://github.com/LarryXu2014/Kuiqr/releases/tag/v${latestVersion}`,
+      assetUrl,
+      assetName: asset ? asset.name : null,
+      notes: rel.body || "",
+    };
+  } catch (err) {
+    console.error("Kuiqr: update check failed:", err);
+    return { ok: false, reason: err.message || String(err), currentVersion };
+  }
+});
+
+// Downloads the chosen update asset into the user's Downloads folder and opens
+// it (mounts a .dmg on macOS, runs the .exe on Windows, opens the AppImage on
+// Linux). Returns { ok, path? }.
+ipcMain.handle("download-update", async (event, url) => {
+  if (!url || typeof url !== "string") {
+    return { ok: false, reason: "No download URL provided" };
+  }
+  try {
+    const filename = decodeURIComponent(url.split("?")[0].split("/").pop()) || "Kuiqr-update";
+    const destPath = path.join(app.getPath("downloads"), filename);
+
+    let response;
+    try {
+      response = await net.fetch(url);
+    } catch (netErr) {
+      console.warn("Kuiqr: net.fetch failed, falling back to native fetch:", netErr.message || netErr);
+      response = await fetch(url);
+    }
+    if (!response.ok) {
+      throw new Error(`Download failed: HTTP ${response.status}`);
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(destPath, buffer);
+
+    // Open the downloaded installer so the user can finish the update.
+    shell.openPath(destPath).catch(() => {});
+
+    return { ok: true, path: destPath };
+  } catch (err) {
+    console.error("Kuiqr: update download failed:", err);
     return { ok: false, reason: err.message || String(err) };
   }
 });

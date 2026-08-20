@@ -73,6 +73,10 @@ contextBridge.exposeInMainWorld("qrAPI", {
   markExtensionPromptShown: () => ipcRenderer.invoke("mark-extension-prompt-shown"),
   downloadExtension: (browserType) => ipcRenderer.invoke("download-extension", browserType),
 
+  // In-app update check + download
+  checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
+  downloadUpdate: (url) => ipcRenderer.invoke("download-update", url),
+
   // First-launch guided tour
   shouldShowTutorial: () => ipcRenderer.invoke("should-show-tutorial"),
   markTutorialShown: () => ipcRenderer.invoke("mark-tutorial-shown"),

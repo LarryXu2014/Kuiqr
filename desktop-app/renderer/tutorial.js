@@ -16,67 +16,50 @@
   "use strict";
 
   // ---- Tour content -------------------------------------------------------
-  // Each step: { selector, title, text, tab?, placement? }
+  // DOM anchors (which element to spotlight + which tab to open first) are
+  // language-INDEPENDENT, so they live here and never get translated. The
+  // localized title/text for each step is pulled from window.getSteps()
+  // (i18n.js) by index, with FALLBACK_TEXT used if i18n isn't ready.
   //   selector : CSS selector of the element to spotlight (omit for a centered
   //              welcome / finale card with no target).
   //   tab      : optional tab to switch to before showing the step.
-  //   placement: "auto" (default) | "top" | "bottom" — which side the card sits.
-  const STEPS = [
-    {
-      title: "Welcome to Kuiqr",
-      text:
-        "Kuiqr scans QR codes from anywhere on your screen with a single shortcut — and everything stays on your device. Let's take a quick tour.",
-    },
-    {
-      selector: ".scan-hero",
-      title: "This is your scanner",
-      text:
-        "Everything lives in this little window. Keep it open while you work, or tuck it into your menu bar.",
-      placement: "bottom",
-    },
-    {
-      selector: "#drop-zone",
-      title: "Scan from an image",
-      text:
-        "Paste an image from your clipboard (⌘V) or drag & drop one here. Kuiqr decodes it instantly in this window.",
-      placement: "bottom",
-    },
-    {
-      selector: "#scan-btn",
-      title: "Or capture your screen",
-      text:
-        "Click this (or press the shortcut) to draw a box around any QR code on screen. Links open automatically; other text is copied for you.",
-      placement: "bottom",
-    },
-    {
-      selector: ".tabs",
-      title: "Four simple tabs",
-      text:
-        "Switch anytime between Scan, History, Settings, and Generate from here.",
-      placement: "bottom",
-    },
-    {
-      tab: "settings",
-      selector: "#shortcut-record-btn",
-      title: "Make it yours",
-      text:
-        "Record your own shortcut and choose what happens after a scan — notifications, auto-open links, and more.",
-      placement: "bottom",
-    },
-    {
-      tab: "generate",
-      selector: "#gen-input",
-      title: "Need a QR instead?",
-      text:
-        "The Generate tab turns any link or text into a QR code you can download or copy.",
-      placement: "bottom",
-    },
-    {
-      title: "You're all set",
-      text:
-        "Press the shortcut or drop in an image to scan your first code. Welcome aboard!",
-    },
+  const STEP_ANCHORS = [
+    { selector: null, tab: null },                          // welcome
+    { selector: ".scan-hero", tab: null },                  // scanner
+    { selector: "#drop-zone", tab: null },                  // scan from image
+    { selector: "#scan-btn", tab: null },                   // capture screen
+    { selector: ".tabs", tab: null },                       // four tabs
+    { selector: "#setting-shortcut-row", tab: "settings" }, // make it yours
+    { selector: "#gen-input", tab: "generate" },            // need a QR?
+    { selector: null, tab: null },                          // all set
   ];
+
+  const FALLBACK_TEXT = [
+    { title: "Welcome to Kuiqr", text: "Kuiqr scans QR codes from anywhere on your screen with a single shortcut — and everything stays on your device. Let's take a quick tour." },
+    { title: "This is your scanner", text: "Everything lives in this little window. Keep it open while you work, or tuck it into your menu bar." },
+    { title: "Scan from an image", text: "Paste an image from your clipboard (⌘V) or drag & drop one here. Kuiqr decodes it instantly in this window." },
+    { title: "Or capture your screen", text: "Click this (or press the shortcut) to draw a box around any QR code on screen. Links open automatically; other text is copied for you." },
+    { title: "Four simple tabs", text: "Switch anytime between Scan, History, Settings, and Generate from here." },
+    { title: "Make it yours", text: "Record your own shortcut and choose what happens after a scan — notifications, auto-open links, and more." },
+    { title: "Need a QR instead?", text: "The Generate tab turns any link or text into a QR code you can download or copy." },
+    { title: "You're all set", text: "Press the shortcut or drop in an image to scan your first code. Welcome aboard!" },
+  ];
+
+  function getLocalizedSteps() {
+    const localized = (window.getSteps && window.getSteps().tutorialSteps) || [];
+    return STEP_ANCHORS.map((anchor, i) => {
+      const l = localized[i] || {};
+      const fb = FALLBACK_TEXT[i] || {};
+      return {
+        selector: anchor.selector,
+        tab: anchor.tab,
+        title: l.title || fb.title || "",
+        text: l.text || fb.text || "",
+      };
+    });
+  }
+
+  let STEPS = getLocalizedSteps();
 
   let root = null;
   let dimEl = null;
@@ -149,6 +132,7 @@
     nextBtn = cardEl.querySelector(".tut-next");
 
     cardEl.querySelector(".tut-skip").addEventListener("click", finish);
+    cardEl.querySelector(".tut-skip").textContent = t("tut.skip");
     backBtn.addEventListener("click", () => go(current - 1));
     nextBtn.addEventListener("click", () => {
       if (current === STEPS.length - 1) finish();
@@ -232,10 +216,10 @@
     // Header / text
     cardEl.querySelector(".tut-title").textContent = step.title;
     cardEl.querySelector(".tut-text").textContent = step.text;
-    stepLabelEl.textContent = "Step " + (current + 1) + " of " + total;
+    stepLabelEl.textContent = t("tut.stepLabel", { n: current + 1, m: total });
     fillEl.style.width = ((current + 1) / total) * 100 + "%";
     backBtn.hidden = current === 0;
-    nextBtn.textContent = current === total - 1 ? "Done" : "Next";
+    nextBtn.textContent = current === total - 1 ? t("tut.done") : t("tut.next");
 
     // Card entrance animation only on the very first render.
     if (animate && current === 0) {

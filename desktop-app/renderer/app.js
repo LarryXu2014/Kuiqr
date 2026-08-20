@@ -16,11 +16,20 @@ let savedSettingsSnapshot = null; // snapshot of settings when the Settings tab 
 let settingsDirty = false;        // true when form values differ from savedSettingsSnapshot
 let pendingTabTarget = null;      // tab the user is trying to switch to while dirty
 let scanPopupTimer = null;        // auto-hide timer for the in-app scan toast
+let lastHistory = [];             // last loaded history (for re-render on language change)
+let latestUpdateAssetUrl = null;  // asset URL of the latest update (set by checkForUpdates)
 
 document.addEventListener("DOMContentLoaded", async () => {
   // Detect platform
   currentPlatform = await window.qrAPI.getPlatform();
   updatePlatformUI();
+
+  // i18n: detect language, build the picker, apply static translations.
+  window.initI18n();
+  setupLanguagePicker();
+  setupUpdates();
+  // Re-render JS-built (dynamic) strings whenever the language changes.
+  window.addEventListener("kuiqr:localize", () => localize());
 
   // Show the real app build version in the About section (fixes a bug where it
   // was hardcoded to an old version).
@@ -58,7 +67,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       console.error("Hidden decode failed:", err);
       // Surface the failure as an on-screen notification. We don't post a null
       // result here (the no-QR case is handled separately in applyDecodedResult).
-      showScanPopup("error", "Scan Failed", "The captured image could not be processed.");
+      showScanPopup("error", t("scanFailed"), t("scanFailedMsg"));
     }
   });
 
@@ -131,11 +140,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   scanBtn.addEventListener("click", async () => {
     if (isRecordingShortcut) return; // never scan while recording a shortcut
     scanBtn.disabled = true;
-    scanBtn.innerHTML = '<span>Starting capture…</span>';
+    scanBtn.querySelector(".btn-label").textContent = t("starting");
     await window.qrAPI.triggerScan();
     setTimeout(() => {
       scanBtn.disabled = false;
-      scanBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10 7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><span>Select Screen Area</span><kbd id="shortcut-display" class="btn-kbd">' + formatShortcutForDisplay(currentShortcut) + '</kbd>';
+      setScanButtonLabel();
     }, 2000);
   });
 
@@ -260,7 +269,7 @@ function updateSettingsDirtyState() {
   settingsDirty = dirty;
   const saveBtn = document.getElementById("save-settings-btn");
   if (saveBtn) {
-    saveBtn.textContent = dirty ? "Save Settings*" : "Save Settings";
+    saveBtn.textContent = dirty ? t("btn.save") + " *" : t("btn.save");
   }
 }
 
@@ -268,7 +277,7 @@ function markSettingsClean() {
   settingsDirty = false;
   savedSettingsSnapshot = getSettingsFormValues();
   const saveBtn = document.getElementById("save-settings-btn");
-  if (saveBtn) saveBtn.textContent = "Save Settings";
+  if (saveBtn) saveBtn.textContent = t("btn.save");
 }
 
 function setupSettingsDirtyTracking() {
@@ -394,17 +403,17 @@ function showExtensionPrompt() {
     };
 
     const doDownload = async (type) => {
-      status.textContent = "Downloading…";
+      status.textContent = t("ext.instr.loading");
       status.classList.remove("hidden");
       try {
         const res = await window.qrAPI.downloadExtension(type);
         if (res.ok) {
           showExtensionInstructions(type, res.filename);
         } else {
-          status.textContent = "Download failed: " + (res.reason || "unknown error");
+          status.textContent = t("ext.instr.failed", { reason: (res.reason || "unknown error") });
         }
       } catch (err) {
-        status.textContent = "Download failed: " + ((err && err.message) || "unknown error");
+        status.textContent = t("ext.instr.failed", { reason: ((err && err.message) || "unknown error") });
       }
       // Keep the prompt open so the user can read the instructions; "Not now" finishes it.
     };
@@ -415,25 +424,14 @@ function showExtensionPrompt() {
       const instr = document.getElementById("ext-instructions");
       const hint = prompt.querySelector(".modal-hint");
       if (!instr) {
-        status.innerHTML = `<b>Downloaded:</b> ${escapeHtml(filename)}`;
+        status.innerHTML = `<b>${t("ext.instr.downloaded", { filename: escapeHtml(filename) })}</b>`;
         return;
       }
       const isChrome = type !== "firefox";
-      const steps = isChrome
-        ? [
-            `Unzip the downloaded file (<b>${escapeHtml(filename)}</b>).`,
-            "Open <b>chrome://extensions</b> (or edge://extensions, brave://extensions).",
-            "Turn on <b>Developer mode</b> (top-right corner).",
-            "Click <b>Load unpacked</b> and select the unzipped folder.",
-            "Right-click any QR image → <b>Scan QR Code</b>.",
-          ]
-        : [
-            `Unzip the downloaded file (<b>${escapeHtml(filename)}</b>).`,
-            "Open <b>about:debugging#/runtime/this-firefox</b>.",
-            "Click <b>Load Temporary Add-on</b>.",
-            "Select <b>manifest.json</b> inside the unzipped folder.",
-            "Right-click any QR image → <b>Scan QR Code</b>.",
-          ];
+      const stepsSrc = isChrome
+        ? window.getSteps().extChromeSteps
+        : window.getSteps().extFirefoxSteps;
+      const steps = stepsSrc.map((s) => s.replace(/\{file\}/g, escapeHtml(filename)));
 
       instr.querySelector(".ext-instr-steps").innerHTML = steps.map((s) => `<li>${s}</li>`).join("");
 
@@ -448,13 +446,13 @@ function showExtensionPrompt() {
       // Countdown "Tab closing in 3, 2, 1" then close the prompt (resolves onboarding).
       const countdownEl = instr.querySelector(".ext-instr-countdown");
       let n = 3;
-      const renderCount = () => { if (countdownEl) countdownEl.textContent = `Tab closing in ${n}…`; };
+      const renderCount = () => { if (countdownEl) countdownEl.textContent = t("ext.instr.tabClosing", { n }); };
       renderCount();
       const iv = setInterval(() => {
         n -= 1;
         if (n <= 0) {
           clearInterval(iv);
-          if (countdownEl) countdownEl.textContent = "Tab closing…";
+          if (countdownEl) countdownEl.textContent = t("ext.instr.tabClosingDone");
           closePrompt();
         } else {
           renderCount();
@@ -517,7 +515,7 @@ function updatePlatformUI() {
 
   const platformInfo = document.getElementById("platform-info");
   if (platformInfo && currentPlatform) {
-    platformInfo.textContent = `Running on: ${currentPlatform.platform}`;
+    platformInfo.textContent = t("platform.running", { platform: currentPlatform.platform });
   }
 }
 
@@ -532,11 +530,11 @@ async function readClipboardImage() {
     if (imageDataUrl) {
       showPreviewAndDecode(imageDataUrl);
     } else {
-      showResult("no-qr", "No image found in clipboard.", "Copy an image first, then paste (⌘V).");
+      showResult("no-qr", t("clip.noImage"), t("clip.hint"));
     }
   } catch (err) {
     console.error("Clipboard read error:", err);
-    showResult("error", "Could not read clipboard.", err.message);
+    showResult("error", t("clip.err"), err.message);
   }
 }
 
@@ -580,17 +578,17 @@ function showPreviewAndDecode(dataUrl) {
       if (result) {
         await handleDecodedResult(result);
       } else {
-        showResult("no-qr", "No QR code detected", "Try a clearer image or use screen-area selection instead.");
+        showResult("no-qr", t("noQr"), t("noQr.sub"));
       }
     } catch (err) {
       console.error("Decode error:", err);
-      showResult("error", "Failed to decode image", err.message);
+      showResult("error", t("decode.err"), err.message);
       // Surface the failure as an in-app overlay notification.
-      showScanPopup("error", "Scan Failed", err.message || "The file could not be processed.");
+      showScanPopup("error", t("scanFailed"), err.message || t("scanFailedMsg"));
     }
   };
   img.onerror = () => {
-    showResult("error", "Failed to load image", "The file may be corrupted or unsupported.");
+    showResult("error", t("load.err"), t("load.err.sub"));
   };
   img.src = dataUrl;
 }
@@ -872,10 +870,10 @@ function showResult(type, data, sub, isUrl) {
   el.classList.remove("hidden");
 
   const typeConfig = {
-    url: { label: "URL", cls: "url" },
-    text: { label: "Text", cls: "text" },
-    "no-qr": { label: "No QR", cls: "no-qr" },
-    error: { label: "Error", cls: "no-qr" },
+    url: { label: t("hist.type.url"), cls: "url" },
+    text: { label: t("hist.type.text"), cls: "text" },
+    "no-qr": { label: t("hist.type.noqr"), cls: "no-qr" },
+    error: { label: t("hist.type.noqr"), cls: "no-qr" },
   };
 
   const cfg = typeConfig[type] || typeConfig["text"];
@@ -886,16 +884,16 @@ function showResult(type, data, sub, isUrl) {
 
   actionsEl.innerHTML = "";
   if (isUrl && type === "url") {
-    actionsEl.innerHTML = `<button class="btn-result" id="result-open-btn">Open in Browser</button>`;
+    actionsEl.innerHTML = `<button class="btn-result" id="result-open-btn">${t("result.open")}</button>`;
     document.getElementById("result-open-btn").addEventListener("click", () => {
       window.qrAPI.openUrl(data.startsWith("http") ? data : `https://${data}`);
     });
   } else if (type === "text") {
-    actionsEl.innerHTML = `<button class="btn-result" id="result-copy-btn">Copy to Clipboard</button>`;
+    actionsEl.innerHTML = `<button class="btn-result" id="result-copy-btn">${t("result.copy")}</button>`;
     document.getElementById("result-copy-btn").addEventListener("click", () => {
       window.qrAPI.copyClipboard(data);
-      document.getElementById("result-copy-btn").textContent = "Copied!";
-      setTimeout(() => { document.getElementById("result-copy-btn").textContent = "Copy to Clipboard"; }, 1500);
+      document.getElementById("result-copy-btn").textContent = t("result.copied");
+      setTimeout(() => { document.getElementById("result-copy-btn").textContent = t("result.copy"); }, 1500);
     });
   }
 
@@ -978,25 +976,27 @@ function setupContextMenu() {
 
 async function loadHistory() {
   const history = await window.qrAPI.getHistory();
-  renderHistory(history);
+  lastHistory = history || [];
+  renderHistory(lastHistory);
 }
 
 function renderHistory(history) {
   const list = document.getElementById("history-list");
+  if (!history) history = [];
 
-  if (!history || !history.length) {
-    list.innerHTML = '<p class="empty-state">No scans yet. Paste an image or press the shortcut to scan.</p>';
+  if (!history.length) {
+    list.innerHTML = `<p class="empty-state" data-i18n="history.empty">${t("history.empty")}</p>`;
     return;
   }
 
   list.innerHTML = history
     .map((item) => {
-      const typeLabel = { url: "URL", text: "Text", "no-qr": "No QR" }[item.type] || "Unknown";
+      const typeLabel = { url: t("hist.type.url"), text: t("hist.type.text"), "no-qr": t("hist.type.noqr") }[item.type] || t("hist.type.unknown");
       const display = item.data
         ? item.data.length > 100
           ? item.data.slice(0, 100) + "\u2026"
           : item.data
-        : "No QR code detected";
+        : t("hist.noqr");
       const time = formatTime(item.timestamp);
 
       return `
@@ -1048,14 +1048,14 @@ async function loadSettingsForm() {
   // "Press keys to record…" forever.
   const recordLabel = document.getElementById("shortcut-record-label");
   if (recordLabel) {
-    recordLabel.textContent = `Current: ${formatShortcutForDisplay(currentShortcut)} — click to change`;
+    recordLabel.textContent = t("shortcut.recordLabel", { shortcut: formatShortcutForDisplay(currentShortcut) });
   }
 
   // Snapshot form values so we can detect unsaved changes.
   savedSettingsSnapshot = getSettingsFormValues();
   settingsDirty = false;
   const saveBtn = document.getElementById("save-settings-btn");
-  if (saveBtn) saveBtn.textContent = "Save Settings";
+  if (saveBtn) saveBtn.textContent = t("btn.save");
 }
 
 // Update both the "Current:" label and the scan button's kbd to match a shortcut
@@ -1115,7 +1115,7 @@ function setupShortcutRecorder() {
     window.qrAPI.suspendShortcut();
     isRecordingShortcut = true;
     btn.classList.add("recording");
-    label.textContent = "Press a key combination now…  (Esc to cancel)";
+    label.textContent = t("shortcut.press");
   });
 
   const stopRecording = (newShortcut) => {
@@ -1130,9 +1130,9 @@ function setupShortcutRecorder() {
     if (newShortcut) {
       btn.dataset.shortcut = newShortcut;
       updateShortcutDisplay(newShortcut);
-      label.textContent = "Saved! Press Record to change it again.";
+      label.textContent = t("shortcut.saved");
     } else {
-      label.textContent = "Cancelled. Press Record to set a shortcut.";
+      label.textContent = t("shortcut.cancelled");
     }
   };
 
@@ -1171,18 +1171,18 @@ function setupShortcutRecorder() {
 
     // Lock so a second combo / auto-repeat can't re-trigger while we validate
     finalizing = true;
-    label.textContent = "Checking…";
+    label.textContent = t("shortcut.checking");
 
     window.qrAPI.testShortcut(accelerator).then((ok) => {
       if (ok) {
         // Record = save: persist immediately and make it the active shortcut
         persistShortcut(accelerator).then(() => stopRecording(accelerator));
       } else {
-        label.textContent = "That combination can't be used. Try another.";
+        label.textContent = t("shortcut.cantUse");
         finalizing = false;
         pressedKeys = {};
         setTimeout(() => {
-          if (recording && !finalizing) label.textContent = "Press a key combination now…  (Esc to cancel)";
+          if (recording && !finalizing) label.textContent = t("shortcut.press");
         }, 1800);
       }
     });
@@ -1214,7 +1214,7 @@ async function persistShortcut(accelerator) {
   // Update the recorder button so it reflects the new shortcut.
   const recordLabel = document.getElementById("shortcut-record-label");
   if (recordLabel) {
-    recordLabel.textContent = `Current: ${formatShortcutForDisplay(currentShortcut)} — click to change`;
+    recordLabel.textContent = t("shortcut.recordLabel", { shortcut: formatShortcutForDisplay(currentShortcut) });
   }
 }
 
@@ -1275,7 +1275,7 @@ function setupGenerate() {
     } catch (e) {
       img.style.display = "none";
       lastDataUrl = "";
-      errorEl.textContent = "Could not generate: " + (e.message || "text may be too long for a QR code");
+      errorEl.textContent = t("gen.error", { msg: (e.message || "text may be too long for a QR code") });
       errorEl.classList.remove("hidden");
     }
   }
@@ -1294,7 +1294,7 @@ function setupGenerate() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      showScanPopup("success", "QR Code Downloaded", "Saved as qrcode.png.");
+      showScanPopup("success", t("genDown"), t("genDownSub"));
     });
   }
 
@@ -1312,11 +1312,11 @@ function setupGenerate() {
         const pngDataUrl = c.toDataURL("image/png");
         const res = await window.qrAPI.copyQrImage(pngDataUrl);
         if (res && res.ok === false) throw new Error(res.reason || "Copy failed");
-        copyQrBtn.textContent = "Copied QR!";
-        setTimeout(() => { copyQrBtn.textContent = "Copy QR Code"; }, 1500);
-        showScanPopup("success", "QR Code Copied", "The QR code image has been copied to your clipboard.");
+        copyQrBtn.textContent = t("result.copied");
+        setTimeout(() => { copyQrBtn.textContent = t("gen.copyqr"); }, 1500);
+        showScanPopup("success", t("qrCopied"), t("qrCopiedSub"));
       } catch (err) {
-        showScanPopup("error", "Copy Failed", err.message || "Could not copy the QR code image.");
+        showScanPopup("error", t("copyFail"), err.message || t("scanFailedMsg"));
       }
     });
   }
@@ -1325,10 +1325,127 @@ function setupGenerate() {
     copyBtn.addEventListener("click", () => {
       if (!input.value) return;
       window.qrAPI.copyClipboard(input.value);
-      copyBtn.textContent = "Copied!";
-      setTimeout(() => { copyBtn.textContent = "Copy Text"; }, 1500);
-      showScanPopup("success", "Text Copied", "The QR content has been copied to your clipboard.");
+      copyBtn.textContent = t("result.copied");
+      setTimeout(() => { copyBtn.textContent = t("gen.copytext"); }, 1500);
+      showScanPopup("success", t("textCopied"), t("textCopiedSub"));
     });
+  }
+}
+
+// ============================================================
+// Language picker + i18n refresh
+// ============================================================
+
+function setupLanguagePicker() {
+  const sel = document.getElementById("setting-language");
+  if (!sel) return;
+  sel.addEventListener("change", async () => {
+    const lang = sel.value;
+    window.setLang(lang); // applies translations + dispatches kuiqr:localize -> localize()
+    // Persist the choice so it survives restarts.
+    try {
+      const settings = await window.qrAPI.getSettings();
+      settings.language = lang;
+      await window.qrAPI.saveSettings(settings);
+    } catch (e) { /* non-fatal */ }
+  });
+}
+
+// Re-render JS-built (dynamic) strings after a language switch. Static DOM is
+// already handled by i18n.applyI18n(); here we refresh what app.js generates.
+function localize() {
+  renderHistory(lastHistory);
+  updateSettingsDirtyState();
+  updateShortcutDisplay(currentShortcut);
+  setScanButtonLabel();
+}
+
+// Keep the scan button's label + shortcut kbd in sync (used on init + re-localize).
+function setScanButtonLabel() {
+  const scanBtn = document.getElementById("scan-btn");
+  if (!scanBtn) return;
+  const label = scanBtn.querySelector(".btn-label");
+  const kbd = scanBtn.querySelector("#shortcut-display");
+  if (label) label.textContent = t("btn.scan");
+  if (kbd) kbd.textContent = formatShortcutForDisplay(currentShortcut);
+}
+
+// ============================================================
+// Updates — check for + download the latest GitHub release
+// ============================================================
+
+function setupUpdates() {
+  const checkBtn = document.getElementById("check-updates-btn");
+  const dlBtn = document.getElementById("update-download-btn");
+  const statusEl = document.getElementById("update-status");
+  const currentEl = document.getElementById("update-current");
+
+  window.qrAPI.getAppVersion().then((v) => {
+    if (currentEl) currentEl.textContent = t("updates.current", { ver: v || "?" });
+  });
+
+  if (checkBtn) checkBtn.addEventListener("click", () => checkForUpdates(false));
+  if (dlBtn) dlBtn.addEventListener("click", downloadUpdate);
+
+  // Silent background check on startup (only toasts once per new version).
+  checkForUpdates(true);
+}
+
+async function checkForUpdates(silent) {
+  const statusEl = document.getElementById("update-status");
+  const dlBtn = document.getElementById("update-download-btn");
+  if (statusEl) { statusEl.textContent = t("updates.status.checking"); statusEl.className = "update-status"; }
+  if (dlBtn) dlBtn.classList.add("hidden");
+
+  try {
+    const res = await window.qrAPI.checkForUpdates();
+    if (!res || !res.ok) throw new Error("no data");
+    latestUpdateAssetUrl = res.assetUrl || null;
+
+    if (res.updateAvailable) {
+      if (statusEl) { statusEl.textContent = t("updates.status.available", { latest: res.latest }); statusEl.className = "update-status success"; }
+      if (dlBtn) { dlBtn.classList.remove("hidden"); if (res.assetUrl) dlBtn.dataset.url = res.assetUrl; }
+
+      // Only surface the toast once per new version.
+      const settings = await window.qrAPI.getSettings();
+      if (settings.lastUpdateNagVersion !== res.latest) {
+        if (window.qrAPI.showScreenToast) {
+          window.qrAPI.showScreenToast("info", t("update.toast.title"), t("update.toast.content", { latest: res.latest }), "");
+        }
+        try {
+          settings.lastUpdateNagVersion = res.latest;
+          await window.qrAPI.saveSettings(settings);
+        } catch (e) { /* non-fatal */ }
+      }
+    } else {
+      if (statusEl) {
+        statusEl.textContent = silent ? "" : t("updates.status.uptodate", { cur: res.current });
+        statusEl.className = "update-status" + (silent ? "" : " success");
+      }
+    }
+  } catch (e) {
+    if (statusEl) {
+      statusEl.textContent = silent ? "" : t("updates.status.error");
+      statusEl.className = "update-status" + (silent ? "" : " error");
+    }
+  }
+}
+
+async function downloadUpdate() {
+  const dlBtn = document.getElementById("update-download-btn");
+  const statusEl = document.getElementById("update-status");
+  const url = (dlBtn && dlBtn.dataset.url) || latestUpdateAssetUrl;
+  if (!url) return;
+  if (statusEl) { statusEl.textContent = t("updates.status.downloading"); statusEl.className = "update-status"; }
+  try {
+    const res = await window.qrAPI.downloadUpdate(url);
+    if (res && res.ok) {
+      if (statusEl) { statusEl.textContent = t("updates.status.done"); statusEl.className = "update-status success"; }
+    } else {
+      if (statusEl) { statusEl.textContent = (res && res.reason) || t("updates.status.error"); statusEl.className = "update-status error"; }
+    }
+  } catch (e) {
+    if (statusEl) { statusEl.textContent = e.message || t("updates.status.error"); statusEl.className = "update-status error"; }
   }
 }
 
@@ -1339,9 +1456,9 @@ function setupGenerate() {
 function formatTime(ts) {
   const date = new Date(ts);
   const diff = Date.now() - ts;
-  if (diff < 60000) return "Just now";
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  if (diff < 60000) return t("time.justnow");
+  if (diff < 3600000) return t("time.mago", { n: Math.floor(diff / 60000) });
+  if (diff < 86400000) return t("time.hago", { n: Math.floor(diff / 3600000) });
   return date.toLocaleDateString();
 }
 
