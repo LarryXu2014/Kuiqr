@@ -30,9 +30,11 @@ jobs:
         working-directory: desktop-app
         run: npm run build:win
 
-      # electron-builder emits platform-default names (e.g. "Kuiqr Setup 2.4.2.3.exe").
-      # Rename them to the canonical names the in-app updater (pickUpdateAsset) and the
-      # README download links expect, so the upload step below can find them.
+      # electron-builder emits platform-default names like `Kuiqr Setup <version>.exe`,
+      # `Kuiqr <version>.exe`, and `Kuiqr-<version>-win.zip`. Rename them to the canonical
+      # names that pickUpdateAsset and the README download links expect. The Windows filenames
+      # embed `package.json` "version" (currently 2.4.1), not `buildVersion`, so glob by
+      # shape rather than the version string — this stays correct across any release.
       - name: Rename artifacts to canonical names
         shell: bash
         run: |
