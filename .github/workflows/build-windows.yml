@@ -26,7 +26,7 @@ jobs:
         working-directory: desktop-app
         run: npm install
 
-      - name: Build Windows portable
+      - name: Build Windows (portable + NSIS setup + zip)
         working-directory: desktop-app
         run: npm run build:win
 
@@ -41,4 +41,9 @@ jobs:
           if ! gh release view "v${VERSION}" >/dev/null 2>&1; then
             gh release create "v${VERSION}" --draft --title "v${VERSION}" --notes "Kuiqr v${VERSION}" || true
           fi
-          gh release upload "v${VERSION}" "desktop-app/dist/Kuiqr-${VERSION}-windows-x64.exe" --clobber
+          # Upload every Windows artifact we produced (setup installer, portable exe, zip).
+          for f in desktop-app/dist/Kuiqr-${VERSION}-windows-x64-setup.exe \
+                   desktop-app/dist/Kuiqr-${VERSION}-windows-x64-portable.exe \
+                   desktop-app/dist/Kuiqr-${VERSION}-windows-x64.zip; do
+            [ -e "$f" ] && gh release upload "v${VERSION}" "$f" --clobber
+          done

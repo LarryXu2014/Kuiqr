@@ -267,37 +267,66 @@
     </div>
   </div>
 
-  <!-- First-launch browser-extension download prompt -->
-  <div id="extension-prompt" class="modal hidden">
+  <!-- First-launch setup wizard: language → extension → guide → done -->
+  <div id="setup-wizard" class="modal hidden">
     <div class="modal-backdrop"></div>
-    <div class="modal-card">
-      <h3 data-i18n="ext.title">Get the browser extension</h3>
-      <p data-i18n="ext.desc">Kuiqr works best with its browser extension. Would you like to download it now?</p>
-      <p class="modal-hint" data-i18n="ext.hint">You can install it later from the README if you change your mind.</p>
-      <div class="modal-actions">
-        <button id="ext-download-chrome" class="btn-save" data-i18n="ext.chrome">Download for Chrome / Edge / Brave</button>
-        <button id="ext-download-firefox" class="btn-save btn-secondary" data-i18n="ext.firefox">Download for Firefox</button>
-        <button id="ext-prompt-later" class="btn-text" data-i18n="ext.later">Not now</button>
+    <div class="modal-card setup-card">
+      <div class="setup-progress">
+        <span class="setup-dot active"></span>
+        <span class="setup-dot"></span>
+        <span class="setup-dot"></span>
+        <span class="setup-dot"></span>
+        <span class="setup-dot"></span>
       </div>
-      <div id="ext-download-status" class="modal-status hidden"></div>
-      <div id="ext-instructions" class="ext-instructions hidden">
-        <h4 data-i18n="ext.instr.title">Load it into your browser</h4>
-        <ol class="ext-instr-steps"></ol>
-        <p class="ext-instr-countdown"></p>
-      </div>
-    </div>
-  </div>
 
-  <!-- First-launch: ask whether to take the guided tour -->
-  <div id="tutorial-ask" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-card">
-      <h3 data-i18n="tut.title">Take a quick tour?</h3>
-      <p data-i18n="tut.desc">Would you like a guided tour to show you how Kuiqr works? It only takes a minute.</p>
-      <p class="modal-hint" data-i18n="tut.hint">You can always replay it later from Settings → Tutorial.</p>
-      <div class="modal-actions">
-        <button id="tut-ask-enter" class="btn-save" data-i18n="tut.enter">Enter Tutorial</button>
-        <button id="tut-ask-later" class="btn-text" data-i18n="tut.later">Maybe later</button>
+      <!-- Step 0: Welcome -->
+      <div class="setup-step" data-step="0">
+        <h3 data-i18n="setup.welcome.title">Welcome to Kuiqr</h3>
+        <p data-i18n="setup.welcome.desc">Kuiqr scans QR codes from anywhere on your screen with a single shortcut. Let's get you set up in a few quick steps.</p>
+      </div>
+
+      <!-- Step 1: Language -->
+      <div class="setup-step hidden" data-step="1">
+        <h3 data-i18n="setup.language.title">Choose your language</h3>
+        <p data-i18n="setup.language.desc">You can change this anytime in Settings.</p>
+        <select id="setup-language" class="setting-input setting-select"></select>
+      </div>
+
+      <!-- Step 2: Browser extension -->
+      <div class="setup-step hidden" data-step="2">
+        <h3 data-i18n="setup.ext.title">Install the browser extension</h3>
+        <p data-i18n="setup.ext.desc">Lets you scan QR codes directly from web pages with a right-click. Optional, but handy.</p>
+        <div class="setup-ext-btns modal-actions">
+          <button id="setup-ext-chrome" class="btn-save" data-i18n="ext.chrome">Download for Chrome / Edge / Brave</button>
+          <button id="setup-ext-firefox" class="btn-save btn-secondary" data-i18n="ext.firefox">Download for Firefox</button>
+        </div>
+        <div id="setup-ext-status" class="modal-status hidden"></div>
+        <div id="setup-ext-instr" class="ext-instructions hidden">
+          <h4 data-i18n="ext.instr.title">Load it into your browser</h4>
+          <ol class="setup-ext-steps"></ol>
+        </div>
+        <p class="modal-hint" data-i18n="ext.hint">You can install it later from the README if you change your mind.</p>
+      </div>
+
+      <!-- Step 3: Guided tour -->
+      <div class="setup-step hidden" data-step="3">
+        <h3 data-i18n="setup.guide.title">Take a quick tour?</h3>
+        <p data-i18n="setup.guide.desc">We'll show you how scanning, history, and generating work. It only takes a minute.</p>
+      </div>
+
+      <!-- Step 4: Done -->
+      <div class="setup-step hidden" data-step="4">
+        <h3 data-i18n="setup.done.title">You're all set</h3>
+        <p data-i18n="setup.done.desc">Press the shortcut or drop in an image to scan your first code. Welcome aboard!</p>
+      </div>
+
+      <!-- Footer controls -->
+      <div class="setup-footer modal-actions">
+        <button id="setup-skip" class="btn-text" data-i18n="setup.skip">Skip setup</button>
+        <span class="setup-spacer"></span>
+        <button id="setup-back" class="btn-text hidden" data-i18n="setup.back">Back</button>
+        <button id="setup-skip-tour" class="btn-text hidden" data-i18n="setup.guide.skipTour">Skip tour</button>
+        <button id="setup-next" class="btn-save" data-i18n="setup.getStarted">Get started</button>
       </div>
     </div>
   </div>

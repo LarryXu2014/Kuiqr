@@ -81,6 +81,9 @@ contextBridge.exposeInMainWorld("qrAPI", {
   shouldShowTutorial: () => ipcRenderer.invoke("should-show-tutorial"),
   markTutorialShown: () => ipcRenderer.invoke("mark-tutorial-shown"),
 
+  // First-launch setup wizard: the renderer marks it complete (or skipped) here.
+  markSetupComplete: () => ipcRenderer.invoke("mark-setup-complete"),
+
   // Called by the renderer once first-launch onboarding is finished, so the first
   // window close will tuck the app into the menu bar (instead of re-showing it).
   markOnboardingComplete: () => ipcRenderer.invoke("mark-onboarding-complete"),

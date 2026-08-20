@@ -1010,3 +1010,18 @@ body {
 .update-status { font-size: 13px; color: var(--text-light); min-height: 18px; margin: 6px 0 2px; }
 .update-status.error { color: var(--error); }
 .update-status.success { color: var(--success); }
+
+/* ── First-launch setup wizard ── */
+.setup-card { max-width: 420px; }
+.setup-progress { display: flex; gap: 6px; justify-content: center; margin-bottom: 14px; }
+.setup-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border, #d0d5dd); transition: background 0.2s; }
+.setup-dot.active { background: var(--accent, #2563eb); }
+.setup-step { text-align: left; }
+.setup-step h3 { margin: 0 0 8px; font-size: 17px; }
+.setup-step p { margin: 0 0 12px; font-size: 14px; color: var(--text-light); line-height: 1.5; }
+.setup-step .setting-select { margin-top: 4px; }
+.setup-ext-btns { margin: 4px 0 10px; }
+.setup-ext-steps { margin: 8px 0 0; padding-left: 20px; }
+.setup-ext-steps li { font-size: 13px; color: var(--text-light); margin-bottom: 4px; line-height: 1.4; }
+.setup-footer { display: flex; align-items: center; gap: 10px; margin-top: 18px; }
+.setup-spacer { flex: 1; }

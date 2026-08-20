@@ -333,6 +333,12 @@ function showUnsavedPrompt() {
 // Settings → Tutorial → "Take a guided tour".
 // ============================================================
 
+// ============================================================
+// First-launch setup wizard (language → extension → guide → done)
+// ============================================================
+
+// Decide whether to run the wizard. The main process only reports first-launch
+// onboarding as needed, so already-onboarded users won't be re-prompted.
 async function maybeRunOnboarding() {
   let extNeeded = false;
   let tutNeeded = false;
@@ -343,154 +349,123 @@ async function maybeRunOnboarding() {
     // If we can't reach the main process, don't block startup — just bail.
     return;
   }
-
-  // Returning user (everything already seen): nothing to do. The main process is
-  // already in menu-bar mode and keeps the window hidden.
   if (!extNeeded && !tutNeeded) return;
+  runSetupWizard();
+}
 
+// Shared by the wizard's extension step: downloads the chosen browser extension
+// and renders the "load into your browser" instructions inline in the wizard.
+async function setupDownloadExtension(type, statusEl, instrEl, wizardEl) {
+  if (statusEl) { statusEl.textContent = t("ext.instr.loading"); statusEl.classList.remove("hidden"); }
   try {
-    // Step 1 — browser-extension download prompt comes first.
-    if (extNeeded) await showExtensionPrompt();
-
-    // Step 2 — ask whether to take the guided tour.
-    if (tutNeeded) {
-      const wantsTour = await askTutorial();
-      if (wantsTour && window.KuiqrTutorial) {
-        await new Promise((resolve) => {
-          window.KuiqrTutorial.start(() => resolve());
-        });
+    const res = await window.qrAPI.downloadExtension(type);
+    if (res.ok) {
+      const stepsSrc = type === "firefox"
+        ? window.getSteps().extFirefoxSteps
+        : window.getSteps().extChromeSteps;
+      const steps = stepsSrc.map((s) => s.replace(/\{file\}/g, escapeHtml(res.filename)));
+      if (instrEl) {
+        const list = instrEl.querySelector(".setup-ext-steps");
+        if (list) list.innerHTML = steps.map((s) => `<li>${s}</li>`).join("");
+        instrEl.classList.remove("hidden");
       }
-      // Mark the tour as handled (first-launch only) whether or not they took it.
-      try { await window.qrAPI.markTutorialShown(); } catch (e) {}
+      // Hide the download buttons + hint so only the instructions remain.
+      if (wizardEl) wizardEl.querySelectorAll(".setup-ext-btns").forEach((b) => b.classList.add("hidden"));
+      if (statusEl) statusEl.classList.add("hidden");
+    } else {
+      if (statusEl) statusEl.textContent = t("ext.instr.failed", { reason: (res.reason || "unknown error") });
     }
-
-    // Step 3 — onboarding finished. Stay as a normal foreground app so the user
-    // can keep using the window. The app will tuck itself into the menu bar the
-    // FIRST time the user closes the window (Dock icon is removed then).
-    try { await window.qrAPI.markOnboardingComplete(); } catch (e) {}
-  } catch (e) {
-    // If anything goes wrong mid-onboarding, just leave the window open as a
-    // normal app rather than hiding it. Still clear the onboarding guard so the
-    // first window-close tucks the app into the menu bar instead of re-showing it.
-    try { await window.qrAPI.markOnboardingComplete(); } catch (e2) {}
+  } catch (err) {
+    if (statusEl) statusEl.textContent = t("ext.instr.failed", { reason: ((err && err.message) || "unknown error") });
   }
 }
 
-// Shows the browser-extension download prompt and resolves once the user
-// dismisses it (download or "Not now"). Marks the prompt as shown.
-function showExtensionPrompt() {
-  return new Promise((resolve) => {
-    const prompt = document.getElementById("extension-prompt");
-    const chromeBtn = document.getElementById("ext-download-chrome");
-    const firefoxBtn = document.getElementById("ext-download-firefox");
-    const laterBtn = document.getElementById("ext-prompt-later");
-    const status = document.getElementById("ext-download-status");
-    if (!prompt) { resolve(); return; }
+// Drives the multi-step first-run setup wizard. Calls markSetupComplete() when
+// finished or skipped (the main process then clears the onboarding guard).
+function runSetupWizard() {
+  const wizard = document.getElementById("setup-wizard");
+  if (!wizard) return;
+  const steps = Array.from(wizard.querySelectorAll(".setup-step"));
+  const dots = Array.from(wizard.querySelectorAll(".setup-dot"));
+  const backBtn = wizard.querySelector("#setup-back");
+  const nextBtn = wizard.querySelector("#setup-next");
+  const skipBtn = wizard.querySelector("#setup-skip");
+  const skipTourBtn = wizard.querySelector("#setup-skip-tour");
+  const langSelect = wizard.querySelector("#setup-language");
+  const TOTAL = steps.length;
+  let current = 0;
 
-    prompt.classList.remove("hidden");
-
-    let done = false;
-    const closePrompt = () => {
-      if (done) return;
-      done = true;
-      prompt.classList.add("hidden");
-      try { window.qrAPI.markExtensionPromptShown(); } catch (e) {}
-      // Detach listeners so they don't linger / double-fire on a later replay.
-      [chromeBtn, firefoxBtn, laterBtn].forEach((b) => {
-        if (b && b.parentNode) b.parentNode.replaceChild(b.cloneNode(true), b);
-      });
-      resolve();
-    };
-
-    const doDownload = async (type) => {
-      status.textContent = t("ext.instr.loading");
-      status.classList.remove("hidden");
+  // Build the language picker and wire live language switching.
+  if (window.buildLanguagePicker) window.buildLanguagePicker(langSelect);
+  if (langSelect) {
+    langSelect.value = window.getLang();
+    langSelect.addEventListener("change", async () => {
+      const lang = langSelect.value;
+      window.setLang(lang); // live-applies translations + dispatches kuiqr:localize
+      render();             // keep the wizard's dynamic button labels in sync
       try {
-        const res = await window.qrAPI.downloadExtension(type);
-        if (res.ok) {
-          showExtensionInstructions(type, res.filename);
-        } else {
-          status.textContent = t("ext.instr.failed", { reason: (res.reason || "unknown error") });
-        }
-      } catch (err) {
-        status.textContent = t("ext.instr.failed", { reason: ((err && err.message) || "unknown error") });
+        const s = await window.qrAPI.getSettings();
+        s.language = lang;
+        await window.qrAPI.saveSettings(s);
+      } catch (e) { /* non-fatal */ }
+    });
+  }
+
+  // Extension step download buttons.
+  const extChrome = wizard.querySelector("#setup-ext-chrome");
+  const extFirefox = wizard.querySelector("#setup-ext-firefox");
+  const extStatus = wizard.querySelector("#setup-ext-status");
+  const extInstr = wizard.querySelector("#setup-ext-instr");
+  if (extChrome) extChrome.addEventListener("click", () => setupDownloadExtension("chrome", extStatus, extInstr, wizard));
+  if (extFirefox) extFirefox.addEventListener("click", () => setupDownloadExtension("firefox", extStatus, extInstr, wizard));
+
+  function render() {
+    steps.forEach((el, i) => el.classList.toggle("hidden", i !== current));
+    dots.forEach((d, i) => d.classList.toggle("active", i <= current));
+    // Footer button visibility.
+    backBtn.classList.toggle("hidden", current === 0);
+    skipTourBtn.classList.toggle("hidden", current !== 3); // guide step only
+    skipBtn.classList.toggle("hidden", current === TOTAL - 1); // hide on final step
+    // Primary button label.
+    if (current === 0) nextBtn.textContent = t("setup.getStarted");
+    else if (current === TOTAL - 1) nextBtn.textContent = t("setup.finish");
+    else if (current === 3) nextBtn.textContent = t("setup.guide.takeTour");
+    else nextBtn.textContent = t("setup.next");
+  }
+
+  function goTo(i) {
+    current = Math.max(0, Math.min(TOTAL - 1, i));
+    render();
+  }
+
+  function finishSetup() {
+    wizard.classList.add("hidden");
+    try { window.qrAPI.markSetupComplete(); } catch (e) {}
+  }
+
+  nextBtn.addEventListener("click", () => {
+    if (current === 0) return goTo(1);
+    if (current === 1) return goTo(2);
+    if (current === 2) return goTo(3); // proceed without installing the extension
+    if (current === 3) {
+      // Take the guided tour, then finish once it completes.
+      wizard.classList.add("hidden");
+      if (window.KuiqrTutorial) {
+        window.KuiqrTutorial.start(() => finishSetup());
+      } else {
+        finishSetup();
       }
-      // Keep the prompt open so the user can read the instructions; "Not now" finishes it.
-    };
-
-    // Shows the "how to load into Chrome/Firefox" steps, then auto-closes the
-    // prompt after a visible "Tab closing in 3, 2, 1" countdown.
-    const showExtensionInstructions = (type, filename) => {
-      const instr = document.getElementById("ext-instructions");
-      const hint = prompt.querySelector(".modal-hint");
-      if (!instr) {
-        status.innerHTML = `<b>${t("ext.instr.downloaded", { filename: escapeHtml(filename) })}</b>`;
-        return;
-      }
-      const isChrome = type !== "firefox";
-      const stepsSrc = isChrome
-        ? window.getSteps().extChromeSteps
-        : window.getSteps().extFirefoxSteps;
-      const steps = stepsSrc.map((s) => s.replace(/\{file\}/g, escapeHtml(filename)));
-
-      instr.querySelector(".ext-instr-steps").innerHTML = steps.map((s) => `<li>${s}</li>`).join("");
-
-      // Hide the download controls, show the instructions.
-      status.classList.add("hidden");
-      if (chromeBtn) chromeBtn.classList.add("hidden");
-      if (firefoxBtn) firefoxBtn.classList.add("hidden");
-      if (laterBtn) laterBtn.classList.add("hidden");
-      if (hint) hint.classList.add("hidden");
-      instr.classList.remove("hidden");
-
-      // Countdown "Tab closing in 3, 2, 1" then close the prompt (resolves onboarding).
-      const countdownEl = instr.querySelector(".ext-instr-countdown");
-      let n = 3;
-      const renderCount = () => { if (countdownEl) countdownEl.textContent = t("ext.instr.tabClosing", { n }); };
-      renderCount();
-      const iv = setInterval(() => {
-        n -= 1;
-        if (n <= 0) {
-          clearInterval(iv);
-          if (countdownEl) countdownEl.textContent = t("ext.instr.tabClosingDone");
-          closePrompt();
-        } else {
-          renderCount();
-        }
-      }, 1000);
-    };
-
-    if (chromeBtn) chromeBtn.addEventListener("click", () => doDownload("chrome"));
-    if (firefoxBtn) firefoxBtn.addEventListener("click", () => doDownload("firefox"));
-    if (laterBtn) laterBtn.addEventListener("click", closePrompt);
+      return;
+    }
+    if (current === TOTAL - 1) return finishSetup();
   });
-}
 
-// Shows the "want a guided tour?" dialog and resolves with
-// true ("Enter Tutorial") or false ("Maybe later").
-function askTutorial() {
-  return new Promise((resolve) => {
-    const modal = document.getElementById("tutorial-ask");
-    const enterBtn = document.getElementById("tut-ask-enter");
-    const laterBtn = document.getElementById("tut-ask-later");
-    if (!modal) { resolve(false); return; }
+  backBtn.addEventListener("click", () => goTo(current - 1));
+  skipTourBtn.addEventListener("click", () => goTo(TOTAL - 1));
+  skipBtn.addEventListener("click", finishSetup);
 
-    modal.classList.remove("hidden");
-
-    let done = false;
-    const finish = (val) => {
-      if (done) return;
-      done = true;
-      modal.classList.add("hidden");
-      [enterBtn, laterBtn].forEach((b) => {
-        if (b && b.parentNode) b.parentNode.replaceChild(b.cloneNode(true), b);
-      });
-      resolve(val);
-    };
-
-    if (enterBtn) enterBtn.addEventListener("click", () => finish(true));
-    if (laterBtn) laterBtn.addEventListener("click", () => finish(false));
-  });
+  wizard.classList.remove("hidden");
+  render();
 }
 
 // Wires every "Take a guided tour" replay button (Settings → Tutorial section).
@@ -1394,8 +1369,10 @@ function setupUpdates() {
 async function checkForUpdates(silent) {
   const statusEl = document.getElementById("update-status");
   const dlBtn = document.getElementById("update-download-btn");
-  if (statusEl) { statusEl.textContent = t("updates.status.checking"); statusEl.className = "update-status"; }
   if (dlBtn) dlBtn.classList.add("hidden");
+  // Only show the "Checking…" spinner on a manual press, not on the silent
+  // background startup check (which would otherwise flash text briefly).
+  if (!silent && statusEl) { statusEl.textContent = t("updates.status.checking"); statusEl.className = "update-status"; }
 
   try {
     const res = await window.qrAPI.checkForUpdates();

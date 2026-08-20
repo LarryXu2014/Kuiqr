@@ -32,23 +32,15 @@ xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
 ### macOS (Apple Silicon / M1, M2, M3, M4)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-arm64.dmg -o ~/Downloads/Kuiqr.dmg && open ~/Downloads/Kuiqr.dmg
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-arm64.zip -o ~/Downloads/Kuiqr.zip && unzip -o ~/Downloads/Kuiqr.zip -d /Applications && xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
 ```
 
-After dragging to Applications, **first launch only**: open Terminal and run:
-```bash
-xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
-```
+> **No Homebrew?** You can also download the `.zip`, unzip it, and open `Kuiqr.app` directly (optionally drag it to Applications). The `.dmg` is also provided if you prefer a disk image.
 
 ### macOS (Intel)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-x64.dmg -o ~/Downloads/Kuiqr.dmg && open ~/Downloads/Kuiqr.dmg
-```
-
-After dragging to Applications, **first launch only**:
-```bash
-xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-x64.zip -o ~/Downloads/Kuiqr.zip && unzip -o ~/Downloads/Kuiqr.zip -d /Applications && xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
 ```
 
 > **Not sure which Mac you have?** Click   → About This Mac. If the chip says "Apple M-series" use Apple Silicon; if it says "Intel" use Intel.
@@ -56,8 +48,10 @@ xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
 ### Windows (x64)
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-windows-x64.exe" -OutFile "$env:USERPROFILE\Downloads\Kuiqr.exe"; Start-Process "$env:USERPROFILE\Downloads\Kuiqr.exe"
+Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-windows-x64-setup.exe" -OutFile "$env:USERPROFILE\Downloads\Kuiqr-setup.exe"; Start-Process "$env:USERPROFILE\Downloads\Kuiqr-setup.exe"
 ```
+
+> A **portable** `.exe` and a `.zip` are also provided if you'd rather not run an installer.
 
 ### Linux (x64 / arm64) — AppImage
 
@@ -101,7 +95,7 @@ GitHub's release server (`objects.githubusercontent.com`) is throttled in some r
 
 ```bash
 # Replace any GitHub releases URL prefix with ghproxy.com
-curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-arm64.dmg" -o ~/Downloads/Kuiqr.dmg && open ~/Downloads/Kuiqr.dmg
+curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-arm64.zip" -o ~/Downloads/Kuiqr.zip && unzip -o ~/Downloads/Kuiqr.zip -d /Applications && open /Applications/Kuiqr.app
 ```
 If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 
@@ -113,17 +107,19 @@ If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
 | Chrome / Edge / Brave      | [kuiqr-extension-2.4.2.3.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension-2.4.2.3.zip)                           | 84 KB | Verified |
 | Firefox (109+)             | [kuiqr-firefox-2.4.2.3.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-firefox-2.4.2.3.zip)                               | 84 KB | Verified |
-| macOS (Apple Silicon)      | [Kuiqr-2.4.2.3-mac-arm64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-arm64.dmg)     | ~95 MB | Verified |
-| macOS (Apple Silicon, ZIP) | [Kuiqr-2.4.2.3-mac-arm64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-arm64.zip)     | ~92 MB | Verified |
-| macOS (Intel)              | [Kuiqr-2.4.2.3-mac-x64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-x64.dmg)         | ~100 MB | Verified |
-| macOS (Intel, ZIP)         | [Kuiqr-2.4.2.3-mac-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-x64.zip)         | ~97 MB | Verified |
-| Windows (x64)              | [Kuiqr-2.4.2.3-windows-x64.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-windows-x64.exe) | ~70 MB | Verified |
+| macOS (Apple Silicon)      | [Kuiqr-2.4.2.3-mac-arm64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-arm64.zip)     | ~92 MB | Verified |
+| macOS (Apple Silicon, .dmg)| [Kuiqr-2.4.2.3-mac-arm64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-arm64.dmg)     | ~95 MB | Verified |
+| macOS (Intel)              | [Kuiqr-2.4.2.3-mac-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-x64.zip)         | ~97 MB | Verified |
+| macOS (Intel, .dmg)        | [Kuiqr-2.4.2.3-mac-x64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-mac-x64.dmg)         | ~100 MB | Verified |
+| Windows (x64) — Setup      | [Kuiqr-2.4.2.3-windows-x64-setup.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-windows-x64-setup.exe) | ~70 MB | Verified |
+| Windows (x64) — Portable   | [Kuiqr-2.4.2.3-windows-x64-portable.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-windows-x64-portable.exe) | ~70 MB | Verified |
+| Windows (x64) — Zip       | [Kuiqr-2.4.2.3-windows-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-windows-x64.zip) | ~70 MB | Verified |
 | Linux (x64, AppImage)      | [Kuiqr-2.4.2.3-linux-x86_64.AppImage](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-linux-x86_64.AppImage) | ~90 MB | Verified |
 | Linux (arm64, AppImage)    | [Kuiqr-2.4.2.3-linux-arm64.AppImage](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-linux-arm64.AppImage) | ~90 MB | Verified |
 | Linux (x64, .deb)          | [Kuiqr-2.4.2.3-linux-amd64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-linux-amd64.deb) | ~90 MB | Verified |
 | Linux (arm64, .deb)        | [Kuiqr-2.4.2.3-linux-arm64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3-linux-arm64.deb) | ~90 MB | Verified |
 
-All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32, AppImage runs headless.
+All binaries verified: ZIPs no errors, EXE valid PE32, AppImage runs headless. (The macOS `.zip` is the recommended download — just unzip and open `Kuiqr.app`.)
 
 ---
 
@@ -186,12 +182,14 @@ All binaries verified: DMG checksum valid, ZIPs no errors, EXE valid PE32, AppIm
 ### Desktop App
 
 **macOS:**
-1. Download `.dmg`, open it
-2. Drag **Kuiqr** to Applications
+1. Download the **`.zip`** (recommended) and unzip it — you get `Kuiqr.app`
+2. Drag **Kuiqr.app** to Applications (or just open it from the unzipped folder)
 3. **First launch only** — open Terminal and run: `xattr -cr /Applications/Kuiqr.app`
 4. Double-click to open (or run `open /Applications/Kuiqr.app`)
 
-**Windows:** Run the `.exe` — no installer needed (portable). The app stays in the **system tray** after you close the window, so the global shortcut keeps working. To fully quit, right-click the tray icon → **Quit**.
+> A `.dmg` disk image is also provided if you prefer the drag-to-Applications installer flow.
+
+**Windows:** Two options — run the **`-setup.exe`** installer (recommended; adds a Start Menu entry and uninstaller), or the **portable** `.exe` / `.zip` (no install, runs from anywhere). The app stays in the **system tray** after you close the window, so the global shortcut keeps working. To fully quit, right-click the tray icon → **Quit**.
 
 > **Windows SmartScreen ("Windows protected your PC"):** The app is not code-signed (no paid certificate), so Windows may block the first launch. This is expected for unsigned apps — click **More info → Run anyway**. You only need to do this once.
 
@@ -229,7 +227,9 @@ All processing happens on your device. Zero server communication.
 
 ### v2.4.2.3
 - **Multilingual UI** — the entire desktop app interface is now translated. A new **Language** picker in Settings supports English, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, and Deutsch. Your choice is remembered across restarts.
-- **In-app updater** — a new **Updates** section in Settings checks GitHub for the latest release on startup (quietly) and on demand. When a newer version exists, a **Download Update** button fetches the right installer for your platform (macOS / Windows / Linux) and opens it automatically.
+- **In-app updater** — a new **Updates** section in Settings checks GitHub for the latest release on startup (quietly) and on demand. When a newer version exists, a **Download Update** button fetches the right installer for your platform (macOS / Windows / Linux) and opens it automatically. The check is fast (8-second timeout, cached result) so it never hangs.
+- **More download options** — **macOS** now ships as a simple **`.zip`** (just unzip and open `Kuiqr.app`) in addition to the `.dmg`. **Windows** now offers three ways: an **NSIS setup installer** (`-setup.exe`, recommended), a **portable** `.exe`, and a **`.zip`**. The in-app updater picks the setup installer on Windows.
+- **First-run setup wizard** — new installs now get a friendly Welcome → **Language** → **Browser extension** → **Guided tour** → Done flow on first launch, replacing the old separate prompts. Skippable at any step; returning users are not re-prompted.
 
 ### v2.4.2.2
 - **First-launch onboarding no longer quits the app** — after the guided tour the app stays as a normal foreground window. It only tucks into the menu bar (Dock icon removed, tray icon added) the **first time you close the main window**, so it keeps running in the background.

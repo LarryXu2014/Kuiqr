@@ -59,8 +59,16 @@
     "win": {
       "artifactName": "Kuiqr-${buildVersion}-windows-x64.${ext}",
       "target": [
-        { "target": "portable", "arch": ["x64"] }
+        "portable",
+        "nsis",
+        "zip"
       ],
+      "portable": {
+        "artifactName": "Kuiqr-${buildVersion}-windows-x64-portable.${ext}"
+      },
+      "nsis": {
+        "artifactName": "Kuiqr-${buildVersion}-windows-x64-setup.${ext}"
+      },
       "icon": "icons/icon512.png"
     },
     "linux": {

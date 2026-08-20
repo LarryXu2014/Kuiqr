@@ -189,6 +189,25 @@ const I18N = {
   "tut.next": { en: "Next", "zh-CN": "下一步", "zh-TW": "下一步", ja: "次へ", ko: "다음", es: "Siguiente", fr: "Suivant", de: "Weiter" },
   "tut.done": { en: "Done", "zh-CN": "完成", "zh-TW": "完成", ja: "完了", ko: "완료", es: "Listo", fr: "Terminer", de: "Fertig" },
   "tut.skip": { en: "Skip", "zh-CN": "跳过", "zh-TW": "跳過", ja: "スキップ", ko: "건너뛰기", es: "Omitir", fr: "Ignorer", de: "Überspringen" },
+
+  // First-launch setup wizard (language → extension → guide → done)
+  "setup.welcome.title": { en: "Welcome to Kuiqr", "zh-CN": "欢迎使用 Kuiqr", "zh-TW": "歡迎使用 Kuiqr", ja: "Kuiqr へようこそ", ko: "Kuiqr에 오신 것을 환영합니다", es: "Bienvenido a Kuiqr", fr: "Bienvenue dans Kuiqr", de: "Willkommen bei Kuiqr" },
+  "setup.welcome.desc": { en: "Kuiqr scans QR codes from anywhere on your screen with a single shortcut. Let's get you set up in a few quick steps.", "zh-CN": "Kuiqr 用一次快捷键就能扫描屏幕上任意位置的二维码。让我们用几个简单步骤完成设置。", "zh-TW": "Kuiqr 用一次快捷鍵就能掃描螢幕上任意位置的 QR Code。讓我們用幾個簡單步驟完成設定。", ja: "Kuiqr はショートカット一つで画面のどこにある QR コードでも読み取れます。いくつかの簡単なステップで設定を済ませましょう。", ko: "Kuiqr는 단축키 하나로 화면 어디에 있는 QR 코드든 스캔합니다. 몇 가지 간단한 단계로 설정을 마쳐 보세요.", es: "Kuiqr escanea códigos QR de cualquier parte de tu pantalla con un solo atajo. Configuremos la app en unos pasos rápidos.", fr: "Kuiqr lit les QR codes n'importe où sur ton écran avec un seul raccourci. Réglons tout en quelques étapes rapides.", de: "Kuiqr liest QR-Codes überall auf deinem Bildschirm mit einem einzigen Shortcut. Richten wir es in wenigen Schritten ein." },
+  "setup.language.title": { en: "Choose your language", "zh-CN": "选择你的语言", "zh-TW": "選擇你的語言", ja: "言語を選択", ko: "언어 선택", es: "Elige tu idioma", fr: "Choisis ta langue", de: "Wähle deine Sprache" },
+  "setup.language.desc": { en: "You can change this anytime in Settings.", "zh-CN": "你可以随时在“设置”中更改。", "zh-TW": "你可以隨時在「設定」中更改。", ja: "いつでも設定から変更できます。", ko: "언제든 설정에서 변경할 수 있습니다.", es: "Puedes cambiarlo cuando quieras en Ajustes.", fr: "Tu peux le changer à tout moment dans les Réglages.", de: "Du kannst es jederzeit in den Einstellungen ändern." },
+  "setup.ext.title": { en: "Install the browser extension", "zh-CN": "安装浏览器扩展", "zh-TW": "安裝瀏覽器擴充功能", ja: "ブラウザ拡張機能をインストール", ko: "브라우저 확장 프로그램 설치", es: "Instala la extensión del navegador", fr: "Installe l'extension de navigateur", de: "Installiere die Browser-Erweiterung" },
+  "setup.ext.desc": { en: "Lets you scan QR codes directly from web pages with a right-click. Optional, but handy.", "zh-CN": "让你在网页上右键即可扫描二维码。可选，但很实用。", "zh-TW": "讓你在網頁上右鍵即可掃描 QR Code。可選，但很實用。", ja: "ウェブページで右クリックするだけで QR コードを読み取れます。任意ですが便利です。", ko: "웹페이지에서 마우스 오른쪽 버튼으로 QR 코드를 바로 스캔할 수 있습니다. 선택 사항이지만 유용합니다.", es: "Te permite escanear códigos QR directamente desde páginas web con clic derecho. Opcional, pero útil.", fr: "Permet de scanner les QR codes des pages web d'un clic droit. Optionnel, mais pratique.", de: "Ermöglicht das Scannen von QR-Codes direkt aus Webseiten per Rechtsklick. Optional, aber nützlich." },
+  "setup.guide.title": { en: "Take a quick tour?", "zh-CN": "来一次快速导览？", "zh-TW": "來一次快速導覽？", ja: "簡単なツアーをしますか？", ko: "간단한 둘러보기를 할까요?", es: "¿Un tour rápido?", fr: "Faire une petite visite ?", de: "Kleine Tour mitmachen?" },
+  "setup.guide.desc": { en: "We'll show you how scanning, history, and generating work. It only takes a minute.", "zh-CN": "我们会演示扫描、历史记录和生成功能。只需一分钟。", "zh-TW": "我們會示範掃描、歷史記錄與產生功能。只需一分鐘。", ja: "スキャン・履歴・生成の使い方をお見せします。1 分で終わります。", ko: "스캔, 기록, 생성 기능을 보여드립니다. 1분이면 충분합니다.", es: "Te mostraremos cómo funcionan el escaneo, el historial y la generación. Solo toma un minuto.", fr: "On te montre comment marchent le scan, l'historique et la génération. Ça prend une minute.", de: "Wir zeigen dir, wie Scannen, Verlauf und Erstellen funktionieren. Dauert nur eine Minute." },
+  "setup.guide.takeTour": { en: "Take the tour", "zh-CN": "开始导览", "zh-TW": "開始導覽", ja: "ツアーを始める", ko: "둘러보기 시작", es: "Hacer el tour", fr: "Faire la visite", de: "Tour starten" },
+  "setup.guide.skipTour": { en: "Skip tour", "zh-CN": "跳过导览", "zh-TW": "跳過導覽", ja: "ツアーをスキップ", ko: "둘러보기 건너뛰기", es: "Omitir el tour", fr: "Ignorer la visite", de: "Tour überspringen" },
+  "setup.done.title": { en: "You're all set", "zh-CN": "一切就绪", "zh-TW": "一切就緒", ja: "準備完了", ko: "모두 준비되었습니다", es: "Todo listo", fr: "C'est prêt", de: "Alles bereit" },
+  "setup.done.desc": { en: "Press the shortcut or drop in an image to scan your first code. Welcome aboard!", "zh-CN": "按下快捷键或拖入图片即可扫描你的第一个二维码。欢迎使用！", "zh-TW": "按下快捷鍵或拖入圖片即可掃描你的第一個 QR Code。歡迎使用！", ja: "ショートカットを押すか画像をドロップして、最初の QR コードを読み取ってみましょう。ようこそ！", ko: "단축키를 누르거나 이미지를 넣어 첫 QR 코드를 스캔해 보세요. 환영합니다!", es: "Pulsa el atajo o suelta una imagen para escanear tu primer código. ¡Bienvenido!", fr: "Appuie sur le raccourci ou dépose une image pour scanner ton premier code. Bienvenue !", de: "Drücke den Shortcut oder zieh ein Bild ein, um deinen ersten Code zu scannen. Willkommen!" },
+  "setup.next": { en: "Next", "zh-CN": "下一步", "zh-TW": "下一步", ja: "次へ", ko: "다음", es: "Siguiente", fr: "Suivant", de: "Weiter" },
+  "setup.back": { en: "Back", "zh-CN": "返回", "zh-TW": "返回", ja: "戻る", ko: "이전", es: "Atrás", fr: "Retour", de: "Zurück" },
+  "setup.skip": { en: "Skip setup", "zh-CN": "跳过设置", "zh-TW": "跳過設定", ja: "セットアップをスキップ", ko: "설정 건너뛰기", es: "Omitir configuración", fr: "Ignorer la config", de: "Setup überspringen" },
+  "setup.getStarted": { en: "Get started", "zh-CN": "开始", "zh-TW": "開始", ja: "始める", ko: "시작하기", es: "Empezar", fr: "Commencer", de: "Loslegen" },
+  "setup.finish": { en: "Finish", "zh-CN": "完成", "zh-TW": "完成", ja: "完了", ko: "완료", es: "Finalizar", fr: "Terminer", de: "Fertig" },
 };
 
 // ── Localized step lists ──
@@ -501,3 +520,4 @@ window.getLang = getLang;
 window.setLang = setLang;
 window.getSteps = getSteps;
 window.initI18n = initI18n;
+window.buildLanguagePicker = buildLanguagePicker;

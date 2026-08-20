@@ -83,6 +83,7 @@ const DEFAULT_SETTINGS = {
   showScanPopup: true,              // show a native OS notification after decoding a QR code
   language: "en",                   // UI language code (en, zh-CN, zh-TW, ja, ko, es, fr, de)
   lastUpdateNagVersion: "",         // last version we already nagged the user about updating to
+  setupDone: false,                 // whether the first-launch setup wizard has been completed
 };
 
 function loadSettings() {
@@ -150,17 +151,18 @@ if (!gotSingleInstanceLock) {
     createMainWindow();
 
     // ── Decide the launch mode ──
-    // First launch (the browser-extension prompt and/or the guided tour have not
-    // been seen yet): keep the app as a NORMAL foreground app — Dock icon visible,
-    // window shown, no menu-bar/tray yet. The renderer drives the onboarding
-    // (extension prompt → tutorial ask → tutorial) and then calls
-    // "enter-menu-bar-mode" when it's done, at which point we hide the Dock,
-    // create the tray, and tuck the window into the menu bar.
-    // Returning user: go straight to menu-bar (background) mode.
+    // First launch (the setup wizard has not been completed): keep the app as a
+    // NORMAL foreground app — Dock icon visible, window shown, no menu-bar/tray
+    // yet. The renderer drives the setup wizard (language → extension → guide →
+    // done) and then calls "mark-setup-complete", at which point we clear the
+    // onboarding guard so the FIRST window-close tucks the app into the menu bar.
+    // Returning user (setupDone === true): go straight to menu-bar mode.
     let needsOnboarding = false;
     try {
       const s = loadSettings();
-      needsOnboarding = s.extensionPromptShown !== true || s.tutorialShown !== true;
+      // Run the wizard if it's never finished. The (extPrompt||tut) clause keeps
+      // already-onboarded users (who predate the wizard) from being re-prompted.
+      needsOnboarding = s.setupDone !== true && (s.extensionPromptShown !== true || s.tutorialShown !== true);
     } catch {
       needsOnboarding = true; // default to first-launch behavior on any error
     }
@@ -1267,6 +1269,19 @@ ipcMain.handle("mark-onboarding-complete", () => {
   return { ok: true };
 });
 
+// Renderer calls this when the first-launch setup wizard is finished (or skipped).
+// Marks everything as seen so the wizard never re-appears, and clears the
+// onboarding guard so the FIRST window-close tucks the app into the menu bar.
+ipcMain.handle("mark-setup-complete", () => {
+  const settings = loadSettings();
+  settings.setupDone = true;
+  settings.extensionPromptShown = true;
+  settings.tutorialShown = true;
+  saveSettings(settings);
+  onboardingActive = false;
+  return { ok: true };
+});
+
 // Renderer calls this when first-launch onboarding is finished: tuck the app into
 // the menu bar (hide Dock, create tray, hide window).
 ipcMain.handle("enter-menu-bar-mode", () => {
@@ -1374,7 +1389,7 @@ function compareVersions(a, b) {
 // Pick the release asset name that matches THIS platform/arch.
 // Asset names follow electron-builder artifactName patterns in package.json:
 //   macOS : Kuiqr-<ver>-mac-<arch>.{dmg,zip}   (arch: x64 | arm64)
-//   Win   : Kuiqr-<ver>-windows-x64.exe
+//   Win   : Kuiqr-<ver>-windows-x64-setup.exe / -portable.exe
 //   Linux : Kuiqr-<ver>-linux-x86_64.AppImage / .deb  (x64 → x86_64 / amd64)
 //           Kuiqr-<ver>-linux-arm64.AppImage  / .deb  (arm64)
 function pickUpdateAsset(version, assets) {
@@ -1386,7 +1401,11 @@ function pickUpdateAsset(version, assets) {
     const a = arch === "arm64" ? "arm64" : "x64";
     candidates.push(`Kuiqr-${version}-mac-${a}.dmg`, `Kuiqr-${version}-mac-${a}.zip`);
   } else if (platform === "win32") {
-    candidates.push(`Kuiqr-${version}-windows-x64.exe`);
+    // Prefer the NSIS setup installer, fall back to the portable exe.
+    candidates.push(
+      `Kuiqr-${version}-windows-x64-setup.exe`,
+      `Kuiqr-${version}-windows-x64-portable.exe`
+    );
   } else if (platform === "linux") {
     if (arch === "arm64") {
       candidates.push(`Kuiqr-${version}-linux-arm64.AppImage`, `Kuiqr-${version}-linux-arm64.deb`);
@@ -1405,48 +1424,92 @@ function pickUpdateAsset(version, assets) {
   return null;
 }
 
+// Shared fetch with a hard timeout. A slow/stalling GitHub connection (common
+// from some networks) would otherwise hang the in-app update check for minutes;
+// aborting after a few seconds lets the UI fail fast and stay responsive.
+async function netFetchWithTimeout(url, { headers = {}, method = "GET" } = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    try {
+      return await net.fetch(url, { method, headers, signal: controller.signal });
+    } catch (netErr) {
+      console.warn("Kuiqr: net.fetch failed, falling back to native fetch:", netErr.message || netErr);
+      return await fetch(url, { method, headers, signal: controller.signal });
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Avoid hitting the network on every check: cache the latest result for a short
+// window, and dedupe concurrent calls so the startup silent check + a manual
+// button press don't both spin up a request.
+const _updateCache = { ts: 0, data: null };
+const UPDATE_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+let _updateInFlight = null;
+
+async function performUpdateCheck() {
+  if (_updateInFlight) return _updateInFlight; // dedupe concurrent callers
+  _updateInFlight = (async () => {
+    const currentVersion = RELEASE_VERSION;
+    try {
+      const headers = { Accept: "application/vnd.github+json" };
+      const meta = await netFetchWithTimeout(
+        "https://api.github.com/repos/LarryXu2014/Kuiqr/releases/latest",
+        { headers },
+        8000
+      );
+      if (!meta.ok) {
+        return { ok: false, reason: `GitHub API returned HTTP ${meta.status}`, currentVersion };
+      }
+      const rel = await meta.json();
+      const latestVersion = String(rel.tag_name || "").replace(/^v/i, "");
+      if (!latestVersion) {
+        return { ok: false, reason: "No version tag in latest release", currentVersion };
+      }
+
+      const updateAvailable = compareVersions(latestVersion, currentVersion) > 0;
+      const assets = rel.assets || [];
+      const asset = updateAvailable ? pickUpdateAsset(latestVersion, assets) : null;
+      const assetUrl = asset ? asset.browser_download_url : null;
+
+      const result = {
+        ok: true,
+        updateAvailable,
+        currentVersion,
+        latestVersion,
+        releaseUrl: rel.html_url || `https://github.com/LarryXu2014/Kuiqr/releases/tag/v${latestVersion}`,
+        assetUrl,
+        assetName: asset ? asset.name : null,
+        notes: rel.body || "",
+      };
+      _updateCache = { ts: Date.now(), data: result };
+      return result;
+    } catch (err) {
+      console.error("Kuiqr: update check failed:", err);
+      const reason =
+        err && err.name === "AbortError"
+          ? "Update check timed out — check your connection"
+          : err.message || String(err);
+      return { ok: false, reason, currentVersion };
+    }
+  })();
+  try {
+    return await _updateInFlight;
+  } finally {
+    _updateInFlight = null;
+  }
+}
+
 // Fetches the latest GitHub release and reports whether a newer version exists.
 // Returns { ok, updateAvailable, currentVersion, latestVersion, releaseUrl,
 //           assetUrl, assetName, notes }.
-ipcMain.handle("check-for-updates", async () => {
-  const currentVersion = RELEASE_VERSION;
-  try {
-    const headers = { Accept: "application/vnd.github+json" };
-    let meta;
-    try {
-      meta = await net.fetch("https://api.github.com/repos/LarryXu2014/Kuiqr/releases/latest", { headers });
-    } catch (netErr) {
-      console.warn("Kuiqr: net.fetch failed, falling back to native fetch:", netErr.message || netErr);
-      meta = await fetch("https://api.github.com/repos/LarryXu2014/Kuiqr/releases/latest", { headers });
-    }
-    if (!meta.ok) {
-      return { ok: false, reason: `GitHub API returned HTTP ${meta.status}`, currentVersion };
-    }
-    const rel = await meta.json();
-    const latestVersion = String(rel.tag_name || "").replace(/^v/i, "");
-    if (!latestVersion) {
-      return { ok: false, reason: "No version tag in latest release", currentVersion };
-    }
-
-    const updateAvailable = compareVersions(latestVersion, currentVersion) > 0;
-    const assets = rel.assets || [];
-    const asset = updateAvailable ? pickUpdateAsset(latestVersion, assets) : null;
-    const assetUrl = asset ? asset.browser_download_url : null;
-
-    return {
-      ok: true,
-      updateAvailable,
-      currentVersion,
-      latestVersion,
-      releaseUrl: rel.html_url || `https://github.com/LarryXu2014/Kuiqr/releases/tag/v${latestVersion}`,
-      assetUrl,
-      assetName: asset ? asset.name : null,
-      notes: rel.body || "",
-    };
-  } catch (err) {
-    console.error("Kuiqr: update check failed:", err);
-    return { ok: false, reason: err.message || String(err), currentVersion };
+ipcMain.handle("check-for-updates", async (event, { force = false } = {}) => {
+  if (!force && _updateCache.data && Date.now() - _updateCache.ts < UPDATE_CACHE_TTL) {
+    return _updateCache.data; // serve instantly from cache
   }
+  return performUpdateCheck();
 });
 
 // Downloads the chosen update asset into the user's Downloads folder and opens
