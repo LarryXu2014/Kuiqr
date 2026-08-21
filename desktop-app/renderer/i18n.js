@@ -190,6 +190,8 @@ const I18N = {
   "tut.done": { en: "Done", "zh-CN": "完成", "zh-TW": "完成", ja: "完了", ko: "완료", es: "Listo", fr: "Terminer", de: "Fertig" },
   "tut.skip": { en: "Skip", "zh-CN": "跳过", "zh-TW": "跳過", ja: "スキップ", ko: "건너뛰기", es: "Omitir", fr: "Ignorer", de: "Überspringen" },
 
+  "tut.back": { en: "Back", "zh-CN": "返回", "zh-TW": "返回", ja: "戻る", ko: "이전", es: "Atrás", fr: "Retour", de: "Zurück" },
+
   // First-launch setup wizard (language → extension → guide → done)
   "setup.welcome.title": { en: "Welcome to Kuiqr", "zh-CN": "欢迎使用 Kuiqr", "zh-TW": "歡迎使用 Kuiqr", ja: "Kuiqr へようこそ", ko: "Kuiqr에 오신 것을 환영합니다", es: "Bienvenido a Kuiqr", fr: "Bienvenue dans Kuiqr", de: "Willkommen bei Kuiqr" },
   "setup.welcome.desc": { en: "Kuiqr scans QR codes from anywhere on your screen with a single shortcut. Let's get you set up in a few quick steps.", "zh-CN": "Kuiqr 用一次快捷键就能扫描屏幕上任意位置的二维码。让我们用几个简单步骤完成设置。", "zh-TW": "Kuiqr 用一次快捷鍵就能掃描螢幕上任意位置的 QR Code。讓我們用幾個簡單步驟完成設定。", ja: "Kuiqr はショートカット一つで画面のどこにある QR コードでも読み取れます。いくつかの簡単なステップで設定を済ませましょう。", ko: "Kuiqr는 단축키 하나로 화면 어디에 있는 QR 코드든 스캔합니다. 몇 가지 간단한 단계로 설정을 마쳐 보세요.", es: "Kuiqr escanea códigos QR de cualquier parte de tu pantalla con un solo atajo. Configuremos la app en unos pasos rápidos.", fr: "Kuiqr lit les QR codes n'importe où sur ton écran avec un seul raccourci. Réglons tout en quelques étapes rapides.", de: "Kuiqr liest QR-Codes überall auf deinem Bildschirm mit einem einzigen Shortcut. Richten wir es in wenigen Schritten ein." },

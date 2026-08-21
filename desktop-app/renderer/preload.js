@@ -77,6 +77,12 @@ contextBridge.exposeInMainWorld("qrAPI", {
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
   downloadUpdate: (url) => ipcRenderer.invoke("download-update", url),
 
+  // Internet connectivity probe
+  checkInternet: () => ipcRenderer.invoke("check-internet"),
+
+  // Restart the app
+  restartApp: () => ipcRenderer.invoke("restart-app"),
+
   // First-launch guided tour
   shouldShowTutorial: () => ipcRenderer.invoke("should-show-tutorial"),
   markTutorialShown: () => ipcRenderer.invoke("mark-tutorial-shown"),

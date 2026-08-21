@@ -342,14 +342,19 @@ function showUnsavedPrompt() {
 async function maybeRunOnboarding() {
   let extNeeded = false;
   let tutNeeded = false;
+  let setupDone = true;
   try {
-    extNeeded = (await window.qrAPI.shouldShowExtensionPrompt()).show;
-    tutNeeded = (await window.qrAPI.shouldShowTutorial()).show;
+    const settings = await window.qrAPI.getSettings();
+    extNeeded = settings.extensionPromptShown !== true;
+    tutNeeded = settings.tutorialShown !== true;
+    setupDone = settings.setupDone === true;
   } catch (e) {
     // If we can't reach the main process, don't block startup — just bail.
     return;
   }
-  if (!extNeeded && !tutNeeded) return;
+  // Run the full setup wizard if it was never completed, or if any legacy
+  // first-launch prompt/tour flag is still pending.
+  if (setupDone && !extNeeded && !tutNeeded) return;
   runSetupWizard();
 }
 
@@ -408,6 +413,8 @@ function runSetupWizard() {
         s.language = lang;
         await window.qrAPI.saveSettings(s);
       } catch (e) { /* non-fatal */ }
+      // Restart so the new language is applied everywhere (including the tour).
+      try { await window.qrAPI.restartApp(); } catch { /* ignore */ }
     });
   }
 
@@ -441,6 +448,9 @@ function runSetupWizard() {
   function finishSetup() {
     wizard.classList.add("hidden");
     try { window.qrAPI.markSetupComplete(); } catch (e) {}
+    // Move into menu-bar mode now so the app doesn't appear to quit when the
+    // user closes the main window after onboarding.
+    try { window.qrAPI.enterMenuBarMode(); } catch (e) {}
   }
 
   nextBtn.addEventListener("click", () => {
@@ -1323,6 +1333,8 @@ function setupLanguagePicker() {
       settings.language = lang;
       await window.qrAPI.saveSettings(settings);
     } catch (e) { /* non-fatal */ }
+    // Restart so the new language is fully applied everywhere.
+    try { await window.qrAPI.restartApp(); } catch { /* ignore */ }
   });
 }
 
@@ -1333,6 +1345,14 @@ function localize() {
   updateSettingsDirtyState();
   updateShortcutDisplay(currentShortcut);
   setScanButtonLabel();
+
+  // Refresh the shortcut-recorder button label so it doesn't stay in the old
+  // language after a switch.
+  const recordLabel = document.getElementById("shortcut-record-label");
+  const recordBtn = document.getElementById("shortcut-record-btn");
+  if (recordLabel && recordBtn && !recordBtn.classList.contains("recording")) {
+    recordLabel.textContent = t("shortcut.recordLabel", { shortcut: formatShortcutForDisplay(currentShortcut) });
+  }
 }
 
 // Keep the scan button's label + shortcut kbd in sync (used on init + re-localize).
@@ -1362,8 +1382,21 @@ function setupUpdates() {
   if (checkBtn) checkBtn.addEventListener("click", () => checkForUpdates(false));
   if (dlBtn) dlBtn.addEventListener("click", downloadUpdate);
 
-  // Silent background check on startup (only toasts once per new version).
-  checkForUpdates(true);
+  // Silent background check on startup — skip if the machine is offline so we
+  // don't flash a misleading "Could not check for updates" message.
+  probeInternet().then((online) => {
+    if (online) checkForUpdates(true);
+  });
+}
+
+async function probeInternet() {
+  try {
+    const res = await window.qrAPI.checkInternet();
+    return res && res.online;
+  } catch {
+    // If the probe itself fails, fall back to the browser's online hint.
+    return navigator.onLine;
+  }
 }
 
 async function checkForUpdates(silent) {

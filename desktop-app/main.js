@@ -296,17 +296,23 @@ function showMainWindow() {
 function createTray() {
   if (tray) return; // guard against double creation
 
-  // Try several icon candidates so the tray icon is visible in both dev and the
-  // packaged app. macOS menu-bar icons should be a template image and retina-safe
-  // (we use the 32 px source and resize to 16 px logical, which gives crisp 2x).
+  // Use a dedicated monochrome tray icon on macOS so it renders crisply as a
+  // menu-bar template image. Windows keeps the colored 32 px icon.
   const candidates = isMac
-    ? [path.join(__dirname, "icons", "icon32.png"), path.join(__dirname, "icons", "icon16.png")]
+    ? [
+        path.join(__dirname, "icons", "icon-tray@2x.png"),
+        path.join(__dirname, "icons", "icon-tray.png"),
+        path.join(__dirname, "icons", "icon32.png"),
+        path.join(__dirname, "icons", "icon16.png"),
+      ]
     : [path.join(__dirname, "icons", "icon32.png")];
   let trayIcon = null;
+  let usedPath = null;
   for (const p of candidates) {
     const ni = nativeImage.createFromPath(p);
     if (!ni.isEmpty()) {
       trayIcon = ni;
+      usedPath = p;
       break;
     }
   }
@@ -314,7 +320,10 @@ function createTray() {
     console.warn("Kuiqr: tray icon not found; tried", candidates);
     trayIcon = nativeImage.createEmpty();
   } else if (isMac) {
-    trayIcon = trayIcon.resize({ width: 16, height: 16 });
+    // Retina-aware sizing: @2x sources are already 32 px for a 16 px logical item.
+    if (!usedPath || !usedPath.includes("icon-tray@2x")) {
+      trayIcon = trayIcon.resize({ width: 16, height: 16 });
+    }
     trayIcon.setTemplateImage(true);
   }
 
@@ -1445,7 +1454,7 @@ async function netFetchWithTimeout(url, { headers = {}, method = "GET" } = {}, t
 // Avoid hitting the network on every check: cache the latest result for a short
 // window, and dedupe concurrent calls so the startup silent check + a manual
 // button press don't both spin up a request.
-const _updateCache = { ts: 0, data: null };
+let _updateCache = { ts: 0, data: null };
 const UPDATE_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 let _updateInFlight = null;
 
@@ -1510,6 +1519,34 @@ ipcMain.handle("check-for-updates", async (event, { force = false } = {}) => {
     return _updateCache.data; // serve instantly from cache
   }
   return performUpdateCheck();
+});
+
+// Quick online/offline probe: try to reach a reliable endpoint with a short
+// timeout. Used so the startup update check stays silent when there is no
+// internet instead of flashing an error.
+ipcMain.handle("check-internet", async () => {
+  const endpoints = [
+    "https://www.google.com/generate_204",
+    "https://www.apple.com/library/test/success.html",
+    "https://detectportal.firefox.com/canonical.html",
+  ];
+  for (const url of endpoints) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 2500);
+      const response = await net.fetch(url, { method: "HEAD", signal: controller.signal });
+      clearTimeout(timer);
+      if (response.ok || response.status === 204) return { online: true };
+    } catch { /* try next */ }
+  }
+  return { online: false };
+});
+
+// Restart the app (used after a language change so the new locale takes effect).
+ipcMain.handle("restart-app", () => {
+  app.relaunch();
+  app.quit();
+  return { ok: true };
 });
 
 // Downloads the chosen update asset into the user's Downloads folder and opens

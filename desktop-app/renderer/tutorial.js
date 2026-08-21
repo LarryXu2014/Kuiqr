@@ -59,7 +59,7 @@
     });
   }
 
-  let STEPS = getLocalizedSteps();
+  let STEPS = [];
 
   let root = null;
   let dimEl = null;
@@ -133,6 +133,7 @@
 
     cardEl.querySelector(".tut-skip").addEventListener("click", finish);
     cardEl.querySelector(".tut-skip").textContent = t("tut.skip");
+    backBtn.textContent = t("tut.back") || "Back";
     backBtn.addEventListener("click", () => go(current - 1));
     nextBtn.addEventListener("click", () => {
       if (current === STEPS.length - 1) finish();
@@ -349,6 +350,10 @@
     if (typeof onComplete === "function") onDone = onComplete;
     active = true;
     current = 0;
+
+    // Re-localize step content every time the tour starts, so language changes
+    // made in the setup wizard or Settings are reflected immediately.
+    STEPS = getLocalizedSteps();
 
     // Always start the tour from the home (Scan) tab so the early steps make sense.
     switchToTab("scan");
