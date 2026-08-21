@@ -32,6 +32,12 @@
       "internetEnabled": true,
       "title": "Kuiqr ${shortVersion}"
     },
+    "pkg": {
+      "installLocation": "/Applications",
+      "allowAnywhere": false,
+      "allowCurrentUserHome": false,
+      "allowRootDirectory": false
+    },
     "directories": {
       "output": "dist"
     },
@@ -57,7 +63,8 @@
       "bundleShortVersion": "2.4.2.3.1",
       "target": [
         { "target": "dmg", "arch": ["x64", "arm64"] },
-        { "target": "zip", "arch": ["x64", "arm64"] }
+        { "target": "zip", "arch": ["x64", "arm64"] },
+        { "target": "pkg", "arch": ["x64", "arm64"] }
       ],
       "icon": "icons/icon512.png"
     },
