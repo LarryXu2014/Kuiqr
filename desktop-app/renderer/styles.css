@@ -827,6 +827,23 @@ body {
   margin-bottom: 16px;
 }
 
+#update-modal-notes {
+  max-height: 180px;
+  overflow-y: auto;
+  white-space: pre-line;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  line-height: 1.55;
+}
+
+#update-modal-notes:empty,
+#update-modal-notes.hidden {
+  display: none;
+}
+
 .modal-actions {
   display: flex;
   flex-direction: column;

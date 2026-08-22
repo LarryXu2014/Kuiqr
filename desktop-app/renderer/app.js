@@ -1620,7 +1620,7 @@ function showUpdateModal(res) {
       .replace(/[*_`>#]/g, "")   // strip common markdown chars
       .trim();
     if (notes) {
-      notesEl.textContent = notes.length > 500 ? notes.slice(0, 500) + "…" : notes;
+      notesEl.textContent = notes;
       notesEl.classList.remove("hidden");
     } else {
       notesEl.textContent = "";
