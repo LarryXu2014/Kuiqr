@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Kuiqr",
-  "version": "2.4.2.3.6",
+  "version": "2.4.2.3.7",
   "description": "Right-click any QR code image to scan and open it in a new tab. Or set a custom shortcut (Options/Record) to scan from the screen with a drag-to-select overlay. Works on Chrome, Edge, Brave, and Firefox.",
   "icons": {
     "16": "icons/icon16.png",

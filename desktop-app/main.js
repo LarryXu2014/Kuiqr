@@ -49,7 +49,7 @@ const APP_VERSION = app.getVersion();
 // in package.json (and the GitHub release tag) each time a new version ships.
 // Only used if the packaged app can't read buildVersion from its package.json,
 // so the About/Update UI never shows "undefined".
-const FALLBACK_RELEASE_VERSION = "2.4.2.3.6";
+const FALLBACK_RELEASE_VERSION = "2.4.2.3.7";
 const RELEASE_VERSION = (() => {
   try {
     const pkg = require("./package.json");
@@ -188,8 +188,24 @@ if (!gotSingleInstanceLock) {
         }, 500);
       }
     } else {
-      // Returning user → menu-bar mode immediately (Dock hidden, tray, window hidden).
+      // Returning user → menu-bar mode, but briefly flash the window on launch so
+      // the user always sees the app opened successfully. This is critical after
+      // an update, because otherwise a hidden window + tiny tray icon can look
+      // like the app "quit" even though the process is still running.
       enterMenuBarMode();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        let startupFlashCanceled = false;
+        const cancelFlash = () => { startupFlashCanceled = true; };
+        mainWindow.once("focus", cancelFlash);
+        mainWindow.show();
+        mainWindow.focus();
+        setTimeout(() => {
+          mainWindow.off("focus", cancelFlash);
+          if (!startupFlashCanceled && menuBarMode && mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+            mainWindow.hide();
+          }
+        }, 1500);
+      }
     }
 
     await registerShortcut();
@@ -299,7 +315,7 @@ function showMainWindow() {
 // ============================================================
 
 function createTray() {
-  if (tray) return; // guard against double creation
+  if (tray) return true; // already created
 
   // Use a dedicated monochrome tray icon on macOS so it renders crisply as a
   // menu-bar template image. Windows keeps the colored 32 px icon.
@@ -314,17 +330,23 @@ function createTray() {
   let trayIcon = null;
   let usedPath = null;
   for (const p of candidates) {
-    const ni = nativeImage.createFromPath(p);
-    if (!ni.isEmpty()) {
-      trayIcon = ni;
-      usedPath = p;
-      break;
+    try {
+      const ni = nativeImage.createFromPath(p);
+      if (!ni.isEmpty()) {
+        trayIcon = ni;
+        usedPath = p;
+        break;
+      }
+    } catch (err) {
+      console.warn("Kuiqr: failed to load tray icon candidate", p, err);
     }
   }
   if (!trayIcon || trayIcon.isEmpty()) {
-    console.warn("Kuiqr: tray icon not found; tried", candidates);
-    trayIcon = nativeImage.createEmpty();
-  } else if (isMac) {
+    console.error("Kuiqr: tray icon failed to load from any candidate", candidates);
+    return false;
+  }
+
+  if (isMac) {
     // Retina-aware sizing: @2x sources are already 32 px for a 16 px logical item.
     if (!usedPath || !usedPath.includes("icon-tray@2x")) {
       trayIcon = trayIcon.resize({ width: 16, height: 16 });
@@ -332,7 +354,18 @@ function createTray() {
     trayIcon.setTemplateImage(true);
   }
 
-  tray = new Tray(trayIcon);
+  try {
+    tray = new Tray(trayIcon);
+  } catch (err) {
+    console.error("Kuiqr: new Tray() threw:", err);
+    return false;
+  }
+  if (!tray) {
+    console.error("Kuiqr: new Tray() returned null/undefined");
+    return false;
+  }
+
+  console.log("Kuiqr: tray created using", usedPath || "(unknown)");
   tray.setToolTip("Kuiqr");
 
   const contextMenu = Menu.buildFromTemplate([
@@ -397,18 +430,46 @@ function enterMenuBarMode() {
   menuBarMode = true;
   onboardingActive = false;
 
-  // macOS: become a pure menu-bar (background) app — no Dock icon, so rapid tray
-  // clicks can never terminate the app via Dock window/quit interplay.
-  if (isMac && app.dock && typeof app.dock.hide === "function") {
+  // CRITICAL: create the tray icon BEFORE hiding the Dock/window. If tray
+  // creation fails for any reason we must keep a visible UI (Dock + window)
+  // so the app never appears to have "quit" or vanished after launch.
+  const trayOk = createTray();
+
+  // macOS: become a pure menu-bar (background) app — no Dock icon — only once
+  // we know the tray is reachable. If the tray failed, the Dock stays so the
+  // user still has a way to focus/quit the app.
+  if (trayOk && isMac && app.dock && typeof app.dock.hide === "function") {
     try { app.dock.hide(); } catch { /* ignore */ }
   }
 
-  createTray();
-
-  // Tuck the window into the menu bar (it can be brought back via tray / shortcut).
-  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+  // Tuck the window into the menu bar only if the tray is healthy.
+  if (trayOk && mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
     mainWindow.hide();
   }
+
+  // If tray creation failed, keep the window visible and focused.
+  if (!trayOk && mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+
+  // Safety net: a few seconds after launch, if we somehow ended up in menu-bar
+  // mode with a hidden window and no reachable tray, force the window back so
+  // the user is never stranded with an invisible app.
+  setTimeout(() => {
+    try {
+      if (menuBarMode && mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+        const trayBounds = tray && typeof tray.getBounds === "function" ? tray.getBounds() : null;
+        if (!tray || !trayBounds || trayBounds.width === 0 || trayBounds.height === 0) {
+          console.warn("Kuiqr: tray appears unreachable after launch, showing window as fallback");
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      }
+    } catch (e) {
+      console.error("Kuiqr: menu-bar fallback timer error:", e);
+    }
+  }, 3500);
 }
 
 // ============================================================
