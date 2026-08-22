@@ -227,7 +227,7 @@
 
     <div class="about-section">
       <h3 data-i18n="about.title">About</h3>
-      <p id="about-version">Kuiqr v2.4.2.1</p>
+      <p id="about-version">Kuiqr v…</p>
       <p data-i18n="about.local">All processing is local. No data is sent to any server.</p>
       <p class="platform-info" id="platform-info"></p>
     </div>
@@ -340,6 +340,20 @@
       <div class="modal-actions">
         <button id="unsaved-save" class="btn-save" data-i18n="unsaved.save">Save changes</button>
         <button id="unsaved-discard" class="btn-text" data-i18n="unsaved.discard">Discard changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- In-app update prompt (no GitHub visit required) -->
+  <div id="update-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card">
+      <h3 id="update-modal-title" data-i18n="updates.modal.title">Update available</h3>
+      <p id="update-modal-sub" data-i18n="updates.modal.sub">A new version is available.</p>
+      <div id="update-modal-notes" class="modal-hint hidden"></div>
+      <div class="modal-actions">
+        <button id="update-now-btn" class="btn-save" type="button" data-i18n="updates.modal.now">Update Now</button>
+        <button id="update-later-btn" class="btn-text" type="button" data-i18n="updates.modal.later">Later</button>
       </div>
     </div>
   </div>

@@ -45,12 +45,17 @@ const APP_VERSION = app.getVersion();
 // GitHub release tag and the extension zip filenames. We expose build.buildVersion
 // to the packaged app via electron-builder's extraMetadata (see package.json),
 // so this read works both in dev and in the built app.
+// Fallback 4-part release version. MUST be kept in sync with the `buildVersion`
+// in package.json (and the GitHub release tag) each time a new version ships.
+// Only used if the packaged app can't read buildVersion from its package.json,
+// so the About/Update UI never shows "undefined".
+const FALLBACK_RELEASE_VERSION = "2.4.2.3.3";
 const RELEASE_VERSION = (() => {
   try {
     const pkg = require("./package.json");
-    return pkg.buildVersion || (pkg.build && pkg.build.buildVersion) || pkg.version || APP_VERSION;
+    return pkg.buildVersion || (pkg.build && pkg.build.buildVersion) || pkg.version || FALLBACK_RELEASE_VERSION;
   } catch {
-    return APP_VERSION;
+    return FALLBACK_RELEASE_VERSION;
   }
 })();
 
@@ -1580,6 +1585,75 @@ ipcMain.handle("download-update", async (event, url) => {
     return { ok: true, path: destPath };
   } catch (err) {
     console.error("Kuiqr: update download failed:", err);
+    return { ok: false, reason: err.message || String(err) };
+  }
+});
+
+// Downloads the latest update asset and installs it in-app (no GitHub visit
+// required). On macOS we mount the .dmg, copy Kuiqr.app into /Applications,
+// then relaunch the new build and quit the old one. For .pkg/.zip (and
+// Windows/Linux) we open the installer and let the user finish.
+// Returns { ok, relaunch?, reason?, fallbackOpened? }.
+ipcMain.handle("install-update", async (event, { url, assetName, latest } = {}) => {
+  if (!url || typeof url !== "string") {
+    return { ok: false, reason: "No download URL provided" };
+  }
+  try {
+    const filename = decodeURIComponent(url.split("?")[0].split("/").pop()) || "Kuiqr-update";
+    const destPath = path.join(app.getPath("downloads"), filename);
+
+    let response;
+    try {
+      response = await net.fetch(url);
+    } catch (netErr) {
+      console.warn("Kuiqr: net.fetch failed, falling back to native fetch:", netErr.message || netErr);
+      response = await fetch(url);
+    }
+    if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}`);
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(destPath, buffer);
+
+    if (isMac) {
+      const isDmg = /\.dmg$/i.test(destPath);
+      if (isDmg) {
+        try {
+          const mountOut = execSync(`hdiutil attach -nobrowse -noautoopen "${destPath}"`).toString();
+          const m = mountOut.match(/\/Volumes\/[^\n]+/);
+          const mountPoint = m ? m[0].trim() : null;
+          if (!mountPoint) throw new Error("Could not mount the update disk image");
+          const appPath = path.join(mountPoint, "Kuiqr.app");
+          if (!fs.existsSync(appPath)) throw new Error("Kuiqr.app was not found inside the update disk image");
+          // Replace the installed copy (rm then cp, so we overwrite cleanly).
+          try { execSync(`rm -rf "/Applications/Kuiqr.app"`); } catch { /* ignore */ }
+          execSync(`cp -R "${appPath}" "/Applications/Kuiqr.app"`);
+          // Detach the disk image (best-effort; don't fail the update if this errors).
+          try { execSync(`hdiutil detach "${mountPoint}" -force`); } catch { /* ignore */ }
+          // Relaunch the freshly installed copy, then quit this (old) process.
+          const newExe = "/Applications/Kuiqr.app/Contents/MacOS/Kuiqr";
+          setTimeout(() => {
+            try { app.relaunch({ execPath: newExe }); } catch { app.relaunch(); }
+            app.quit();
+          }, 800);
+          return { ok: true, relaunch: true };
+        } catch (e) {
+          // Auto-install failed — open the disk image so the user can drag the
+          // app into Applications manually.
+          console.error("Kuiqr: auto update failed:", e);
+          try { shell.openPath(destPath); } catch { /* ignore */ }
+          return { ok: false, reason: "auto-install-failed", fallbackOpened: true };
+        }
+      }
+      // .pkg / .zip → open the installer and let the user finish.
+      try { shell.openPath(destPath); } catch { /* ignore */ }
+      return { ok: false, reason: "manual-install", fallbackOpened: true };
+    }
+
+    // Windows / Linux: open the downloaded installer.
+    shell.openPath(destPath).catch(() => {});
+    return { ok: false, reason: "manual-install", fallbackOpened: true };
+  } catch (err) {
+    console.error("Kuiqr: install-update failed:", err);
     return { ok: false, reason: err.message || String(err) };
   }
 });

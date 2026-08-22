@@ -18,6 +18,11 @@ let pendingTabTarget = null;      // tab the user is trying to switch to while d
 let scanPopupTimer = null;        // auto-hide timer for the in-app scan toast
 let lastHistory = [];             // last loaded history (for re-render on language change)
 let latestUpdateAssetUrl = null;  // asset URL of the latest update (set by checkForUpdates)
+// Pending update info used by the in-app update modal + install flow.
+let pendingUpdateUrl = null;
+let pendingUpdateName = null;
+let pendingUpdateLatest = null;
+let updateModalDismissedVersion = null; // hide the modal again this session once "Later" is tapped
 
 document.addEventListener("DOMContentLoaded", async () => {
   // Detect platform
@@ -36,7 +41,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     const appVer = await window.qrAPI.getAppVersion();
     const aboutEl = document.getElementById("about-version");
-    if (aboutEl && appVer) aboutEl.textContent = "Kuiqr v" + appVer;
+    // Always populate from JS so the version is never stale or "undefined".
+    if (aboutEl) aboutEl.textContent = "Kuiqr v" + (appVer || "?");
   } catch (e) { /* non-fatal */ }
 
   // Tab navigation — respect unsaved settings changes
@@ -406,15 +412,16 @@ function runSetupWizard() {
     langSelect.value = window.getLang();
     langSelect.addEventListener("change", async () => {
       const lang = langSelect.value;
-      window.setLang(lang); // live-applies translations + dispatches kuiqr:localize
-      render();             // keep the wizard's dynamic button labels in sync
+      // Apply the new language in place (translates the whole DOM live — no
+      // restart needed). setLang() re-applies static text and dispatches
+      // kuiqr:localize so dynamic strings refresh too.
+      window.setLang(lang);
+      render(); // keep the wizard's dynamic button labels in sync
       try {
         const s = await window.qrAPI.getSettings();
         s.language = lang;
         await window.qrAPI.saveSettings(s);
       } catch (e) { /* non-fatal */ }
-      // Restart so the new language is applied everywhere (including the tour).
-      try { await window.qrAPI.restartApp(); } catch { /* ignore */ }
     });
   }
 
@@ -447,10 +454,11 @@ function runSetupWizard() {
 
   function finishSetup() {
     wizard.classList.add("hidden");
+    // Mark onboarding complete (clears the onboarding guard in the main
+    // process). We intentionally do NOT tuck the app into the menu bar here —
+    // that only happens when the user later closes the window, so the app
+    // stays open and visible after setup instead of appearing to "quit".
     try { window.qrAPI.markSetupComplete(); } catch (e) {}
-    // Move into menu-bar mode now so the app doesn't appear to quit when the
-    // user closes the main window after onboarding.
-    try { window.qrAPI.enterMenuBarMode(); } catch (e) {}
   }
 
   nextBtn.addEventListener("click", () => {
@@ -1326,15 +1334,15 @@ function setupLanguagePicker() {
   if (!sel) return;
   sel.addEventListener("change", async () => {
     const lang = sel.value;
-    window.setLang(lang); // applies translations + dispatches kuiqr:localize -> localize()
+    // Apply the new language immediately (setLang re-translates the whole UI
+    // in place and refreshes dynamic strings — no app restart required).
+    window.setLang(lang);
     // Persist the choice so it survives restarts.
     try {
       const settings = await window.qrAPI.getSettings();
       settings.language = lang;
       await window.qrAPI.saveSettings(settings);
     } catch (e) { /* non-fatal */ }
-    // Restart so the new language is fully applied everywhere.
-    try { await window.qrAPI.restartApp(); } catch { /* ignore */ }
   });
 }
 
@@ -1374,13 +1382,27 @@ function setupUpdates() {
   const dlBtn = document.getElementById("update-download-btn");
   const statusEl = document.getElementById("update-status");
   const currentEl = document.getElementById("update-current");
+  const modalLater = document.getElementById("update-later-btn");
+  const modalNow = document.getElementById("update-now-btn");
 
   window.qrAPI.getAppVersion().then((v) => {
     if (currentEl) currentEl.textContent = t("updates.current", { ver: v || "?" });
   });
 
   if (checkBtn) checkBtn.addEventListener("click", () => checkForUpdates(false));
-  if (dlBtn) dlBtn.addEventListener("click", downloadUpdate);
+  // The inline "Download Update" button is a secondary path; the primary prompt
+  // is the in-app update modal (see showUpdateModal).
+  if (dlBtn) dlBtn.addEventListener("click", () => { if (pendingUpdateUrl) installUpdate(pendingUpdateUrl, pendingUpdateName, pendingUpdateLatest); });
+
+  if (modalLater) modalLater.addEventListener("click", () => {
+    updateModalDismissedVersion = pendingUpdateLatest || null;
+    hideUpdateModal();
+  });
+  if (modalNow) modalNow.addEventListener("click", () => {
+    const url = pendingUpdateUrl, name = pendingUpdateName, latest = pendingUpdateLatest;
+    hideUpdateModal();
+    if (url) installUpdate(url, name, latest);
+  });
 
   // Silent background check on startup — skip if the machine is offline so we
   // don't flash a misleading "Could not check for updates" message.
@@ -1399,6 +1421,42 @@ async function probeInternet() {
   }
 }
 
+function showUpdateModal(res) {
+  if (updateModalDismissedVersion === (res && res.latest)) return;
+  pendingUpdateUrl = res.assetUrl || null;
+  pendingUpdateName = res.assetName || null;
+  pendingUpdateLatest = res.latest || null;
+
+  const modal = document.getElementById("update-modal");
+  const titleEl = document.getElementById("update-modal-title");
+  const subEl = document.getElementById("update-modal-sub");
+  const notesEl = document.getElementById("update-modal-notes");
+  const nowBtn = document.getElementById("update-now-btn");
+
+  if (titleEl) titleEl.textContent = t("updates.modal.title");
+  if (subEl) subEl.textContent = t("updates.modal.sub", { latest: res.latest || "?" });
+  if (notesEl) {
+    const notes = (res.notes || "")
+      .replace(/^#+\s?/gm, "")   // strip markdown headings
+      .replace(/[*_`>#]/g, "")   // strip common markdown chars
+      .trim();
+    if (notes) {
+      notesEl.textContent = notes.length > 500 ? notes.slice(0, 500) + "…" : notes;
+      notesEl.classList.remove("hidden");
+    } else {
+      notesEl.textContent = "";
+      notesEl.classList.add("hidden");
+    }
+  }
+  if (nowBtn) nowBtn.textContent = t("updates.modal.now");
+  if (modal) modal.classList.remove("hidden");
+}
+
+function hideUpdateModal() {
+  const modal = document.getElementById("update-modal");
+  if (modal) modal.classList.add("hidden");
+}
+
 async function checkForUpdates(silent) {
   const statusEl = document.getElementById("update-status");
   const dlBtn = document.getElementById("update-download-btn");
@@ -1410,26 +1468,17 @@ async function checkForUpdates(silent) {
   try {
     const res = await window.qrAPI.checkForUpdates();
     if (!res || !res.ok) throw new Error("no data");
-    latestUpdateAssetUrl = res.assetUrl || null;
+    pendingUpdateUrl = res.assetUrl || null;
+    pendingUpdateName = res.assetName || null;
+    pendingUpdateLatest = res.latest || null;
 
     if (res.updateAvailable) {
       if (statusEl) { statusEl.textContent = t("updates.status.available", { latest: res.latest }); statusEl.className = "update-status success"; }
-      if (dlBtn) { dlBtn.classList.remove("hidden"); if (res.assetUrl) dlBtn.dataset.url = res.assetUrl; }
-
-      // Only surface the toast once per new version.
-      const settings = await window.qrAPI.getSettings();
-      if (settings.lastUpdateNagVersion !== res.latest) {
-        if (window.qrAPI.showScreenToast) {
-          window.qrAPI.showScreenToast("info", t("update.toast.title"), t("update.toast.content", { latest: res.latest }), "");
-        }
-        try {
-          settings.lastUpdateNagVersion = res.latest;
-          await window.qrAPI.saveSettings(settings);
-        } catch (e) { /* non-fatal */ }
-      }
+      // Prompt the user in-app (no GitHub link needed).
+      showUpdateModal(res);
     } else {
       if (statusEl) {
-        statusEl.textContent = silent ? "" : t("updates.status.uptodate", { cur: res.current });
+        statusEl.textContent = silent ? "" : t("updates.status.uptodate", { cur: res.current || "?" });
         statusEl.className = "update-status" + (silent ? "" : " success");
       }
     }
@@ -1441,18 +1490,22 @@ async function checkForUpdates(silent) {
   }
 }
 
-async function downloadUpdate() {
-  const dlBtn = document.getElementById("update-download-btn");
+async function installUpdate(url, assetName, latest) {
   const statusEl = document.getElementById("update-status");
-  const url = (dlBtn && dlBtn.dataset.url) || latestUpdateAssetUrl;
-  if (!url) return;
-  if (statusEl) { statusEl.textContent = t("updates.status.downloading"); statusEl.className = "update-status"; }
+  if (statusEl) { statusEl.textContent = t("updates.status.installing"); statusEl.className = "update-status"; }
   try {
-    const res = await window.qrAPI.downloadUpdate(url);
-    if (res && res.ok) {
-      if (statusEl) { statusEl.textContent = t("updates.status.done"); statusEl.className = "update-status success"; }
-    } else {
-      if (statusEl) { statusEl.textContent = (res && res.reason) || t("updates.status.error"); statusEl.className = "update-status error"; }
+    const res = await window.qrAPI.installUpdate(url, assetName, latest);
+    if (res && res.ok && res.relaunch) {
+      // The main process will relaunch the new version automatically.
+      if (statusEl) { statusEl.textContent = t("updates.status.installed"); statusEl.className = "update-status success"; }
+      return;
+    }
+    // Auto-install didn't complete — the main process opened the installer for
+    // the user (or there was an error). Surface a clear message.
+    if (statusEl) {
+      const isManual = res && (res.reason === "manual-install" || res.reason === "auto-install-failed" || res.fallbackOpened);
+      statusEl.textContent = isManual ? t("updates.status.open") : ((res && res.reason) || t("updates.status.error"));
+      statusEl.className = "update-status" + (isManual ? "" : " error");
     }
   } catch (e) {
     if (statusEl) { statusEl.textContent = e.message || t("updates.status.error"); statusEl.className = "update-status error"; }

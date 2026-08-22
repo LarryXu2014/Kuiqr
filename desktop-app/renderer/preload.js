@@ -73,9 +73,10 @@ contextBridge.exposeInMainWorld("qrAPI", {
   markExtensionPromptShown: () => ipcRenderer.invoke("mark-extension-prompt-shown"),
   downloadExtension: (browserType) => ipcRenderer.invoke("download-extension", browserType),
 
-  // In-app update check + download
+  // In-app update check + download + install
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
   downloadUpdate: (url) => ipcRenderer.invoke("download-update", url),
+  installUpdate: (url, assetName, latest) => ipcRenderer.invoke("install-update", { url, assetName, latest }),
 
   // Internet connectivity probe
   checkInternet: () => ipcRenderer.invoke("check-internet"),

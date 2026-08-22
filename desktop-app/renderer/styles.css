@@ -1014,6 +1014,15 @@ body {
   font-size: 13px;
   margin-bottom: 0;
 }
+/* Keep update-group content away from the card borders (no touching edges). */
+.update-group .setting-desc,
+.update-group .update-row,
+.update-group .update-status {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.update-group .setting-desc { padding-top: 2px; padding-bottom: 4px; }
+.update-group .update-status { padding-bottom: 14px; }
 .update-status { font-size: 13px; color: var(--text-light); min-height: 18px; margin: 6px 0 2px; }
 .update-status.error { color: var(--error); }
 .update-status.success { color: var(--success); }
