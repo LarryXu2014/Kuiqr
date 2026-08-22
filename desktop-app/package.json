@@ -24,9 +24,9 @@
   "build": {
     "appId": "com.kuiqr.app",
     "productName": "Kuiqr",
-    "buildVersion": "2.4.2.3.3",
+    "buildVersion": "2.4.2.3.5",
     "extraMetadata": {
-      "buildVersion": "2.4.2.3.3"
+      "buildVersion": "2.4.2.3.5"
     },
     "dmg": {
       "internetEnabled": true,
@@ -53,34 +53,81 @@
       {
         "from": "native/qr-vision",
         "to": "native/qr-vision",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "mac": {
       "artifactName": "Kuiqr-${buildVersion}-mac-${arch}.${ext}",
       "identity": null,
       "category": "public.app-category.utilities",
-      "bundleShortVersion": "2.4.2.3.3",
+      "bundleShortVersion": "2.4.2.3.5",
       "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] },
-        { "target": "zip", "arch": ["x64", "arm64"] },
-        { "target": "pkg", "arch": ["x64", "arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "pkg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "icon": "icons/icon512.png"
     },
     "win": {
       "target": [
-        { "target": "portable", "arch": ["x64"] },
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "zip", "arch": ["x64"] }
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "icons/icon512.png"
     },
     "linux": {
       "artifactName": "Kuiqr-${buildVersion}-linux-${arch}.${ext}",
       "target": [
-        { "target": "AppImage", "arch": ["x64", "arm64"] },
-        { "target": "deb", "arch": ["x64", "arm64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "icon": "icons/icon512.png",
       "category": "Utility",

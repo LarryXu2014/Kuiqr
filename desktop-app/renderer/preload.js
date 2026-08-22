@@ -77,6 +77,7 @@ contextBridge.exposeInMainWorld("qrAPI", {
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
   downloadUpdate: (url) => ipcRenderer.invoke("download-update", url),
   installUpdate: (url, assetName, latest) => ipcRenderer.invoke("install-update", { url, assetName, latest }),
+  onUpdateProgress: (callback) => ipcRenderer.on("update-progress", (e, info) => callback(info)),
 
   // Internet connectivity probe
   checkInternet: () => ipcRenderer.invoke("check-internet"),

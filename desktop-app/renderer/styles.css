@@ -1027,6 +1027,14 @@ body {
 .update-status.error { color: var(--error); }
 .update-status.success { color: var(--success); }
 
+/* ── Update download progress bar ── */
+.update-progress-wrap { margin: 4px 0 10px; }
+.update-group .update-progress-wrap { padding-left: 16px; padding-right: 16px; }
+.update-progress-track { height: 8px; background: var(--border, #e5e7eb); border-radius: 4px; overflow: hidden; }
+.update-progress-bar { height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: 4px; transition: width 0.15s linear; }
+.update-progress-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-light); margin-top: 6px; }
+.update-progress-hint { font-size: 12px; color: var(--text-light); margin: 6px 0 0; line-height: 1.4; }
+
 /* ── First-launch setup wizard ── */
 .setup-card { max-width: 420px; }
 .setup-progress { display: flex; gap: 6px; justify-content: center; margin-bottom: 14px; }

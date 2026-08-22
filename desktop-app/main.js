@@ -1287,13 +1287,28 @@ ipcMain.handle("mark-onboarding-complete", () => {
 // Marks everything as seen so the wizard never re-appears, and clears the
 // onboarding guard so the FIRST window-close tucks the app into the menu bar.
 ipcMain.handle("mark-setup-complete", () => {
-  const settings = loadSettings();
-  settings.setupDone = true;
-  settings.extensionPromptShown = true;
-  settings.tutorialShown = true;
-  saveSettings(settings);
-  onboardingActive = false;
-  return { ok: true };
+  try {
+    const settings = loadSettings();
+    settings.setupDone = true;
+    settings.extensionPromptShown = true;
+    settings.tutorialShown = true;
+    saveSettings(settings);
+    onboardingActive = false;
+
+    // Create the tray icon immediately after setup so the user can reach Kuiqr
+    // from the menu bar. Keep the window visible and focused so the app does
+    // NOT appear to quit after finishing the wizard.
+    createTray();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (!mainWindow.isVisible()) mainWindow.show();
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("Kuiqr: mark-setup-complete failed:", err);
+    return { ok: false, reason: err.message || String(err) };
+  }
 });
 
 // Renderer calls this when first-launch onboarding is finished: tuck the app into
@@ -1598,6 +1613,22 @@ ipcMain.handle("install-update", async (event, { url, assetName, latest } = {}) 
   if (!url || typeof url !== "string") {
     return { ok: false, reason: "No download URL provided" };
   }
+
+  function sendProgress(info) {
+    try {
+      if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+        mainWindow.webContents.send("update-progress", info);
+      }
+    } catch { /* ignore */ }
+  }
+
+  function formatBytes(n) {
+    if (n === undefined || n === null || Number.isNaN(n)) return "";
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+  }
+
   try {
     const filename = decodeURIComponent(url.split("?")[0].split("/").pop()) || "Kuiqr-update";
     const destPath = path.join(app.getPath("downloads"), filename);
@@ -1611,8 +1642,29 @@ ipcMain.handle("install-update", async (event, { url, assetName, latest } = {}) 
     }
     if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}`);
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-    fs.writeFileSync(destPath, buffer);
+    const total = parseInt(response.headers.get("content-length") || "0", 10) || 0;
+    const chunks = [];
+    let downloaded = 0;
+
+    if (response.body && typeof response.body.getReader === "function") {
+      const reader = response.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(Buffer.from(value));
+        downloaded += value.length;
+        const pct = total > 0 ? Math.round((downloaded / total) * 100) : 0;
+        sendProgress({ percent: pct, downloaded: formatBytes(downloaded), total: formatBytes(total), filename, done: false });
+      }
+      fs.writeFileSync(destPath, Buffer.concat(chunks));
+    } else {
+      const buffer = Buffer.from(await response.arrayBuffer());
+      downloaded = buffer.length;
+      fs.writeFileSync(destPath, buffer);
+    }
+
+    sendProgress({ percent: 100, downloaded: formatBytes(downloaded), total: formatBytes(total || downloaded), filename, done: true });
+    sendProgress({ phase: "installing" });
 
     if (isMac) {
       const isDmg = /\.dmg$/i.test(destPath);

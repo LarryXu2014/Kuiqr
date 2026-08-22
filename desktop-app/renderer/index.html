@@ -223,6 +223,16 @@
         <button id="update-download-btn" class="btn-save btn-secondary hidden" type="button" data-i18n="updates.download">Download Update</button>
       </div>
       <p id="update-status" class="update-status"></p>
+      <div id="update-progress-wrap" class="update-progress-wrap hidden">
+        <div class="update-progress-track">
+          <div id="update-progress-bar" class="update-progress-bar" style="width: 0%"></div>
+        </div>
+        <div class="update-progress-meta">
+          <span id="update-progress-text" data-i18n="updates.progress.text">Downloading…</span>
+          <span id="update-progress-size"></span>
+        </div>
+        <p id="update-progress-hint" class="update-progress-hint" data-i18n="updates.progress.hint">The installer will be saved to your Downloads folder and opened automatically.</p>
+      </div>
     </div>
 
     <div class="about-section">

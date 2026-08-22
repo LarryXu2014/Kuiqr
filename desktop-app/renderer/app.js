@@ -550,24 +550,33 @@ function loadImageFile(file) {
 function showPreviewAndDecode(dataUrl) {
   const img = new Image();
   img.onload = async () => {
-    // Show preview
+    // Show preview (small, fast rendering).
     const container = document.getElementById("image-preview-container");
     const canvas = document.getElementById("preview-canvas");
     container.classList.remove("hidden");
 
-    // Limit preview size
-    const maxW = Math.min(img.width, 360);
-    const maxH = Math.min(img.height, 260);
-    const scale = Math.min(maxW / img.width, maxH / img.height, 1);
-    canvas.width = Math.round(img.width * scale);
-    canvas.height = Math.round(img.height * scale);
+    const previewMaxW = Math.min(img.width, 360);
+    const previewMaxH = Math.min(img.height, 260);
+    const previewScale = Math.min(previewMaxW / img.width, previewMaxH / img.height, 1);
+    canvas.width = Math.round(img.width * previewScale);
+    canvas.height = Math.round(img.height * previewScale);
+    const previewCtx = canvas.getContext("2d");
+    previewCtx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    // Decode at a higher resolution so artistic/embedded QR codes keep enough
+    // detail. Preview stays small; decoding canvas is separate.
+    const decodeMax = 1280;
+    const decodeScale = Math.min(decodeMax / img.width, decodeMax / img.height, 1);
+    const decodeW = Math.round(img.width * decodeScale);
+    const decodeH = Math.round(img.height * decodeScale);
+    const decodeCanvas = document.createElement("canvas");
+    decodeCanvas.width = decodeW;
+    decodeCanvas.height = decodeH;
+    const decodeCtx = decodeCanvas.getContext("2d", { willReadFrequently: true });
+    decodeCtx.drawImage(img, 0, 0, decodeW, decodeH);
 
-    // Decode using jsQR (loaded via script tag)
     try {
-      const result = decodeImageRobust(ctx, canvas.width, canvas.height);
+      const result = decodeImageRobust(decodeCtx, decodeW, decodeH, { deep: true });
       if (result) {
         await handleDecodedResult(result);
       } else {
@@ -597,40 +606,40 @@ function clearPreview() {
 // Goals:
 //   1. Instant feedback for empty / uniform areas (<< 50 ms).
 //   2. Most real QR codes decoded in the first 1-3 jsQR calls.
-//   3. Hard / artistic codes get a bounded, time-limited fallback.
+//   3. Hard / artistic / embedded codes get a bounded, time-limited fallback.
 //
 // Timing budgets (can be tuned):
 //   - Fast path:     ~80 ms  (original + small up/down-scales)
-//   - Medium path:  ~200 ms  (grayscale + contrast + a few thresholds)
-//   - Deep path:    ~500 ms  (multi-scale threshold sweep)
-//   - Absolute cap: 800 ms  (never hang on a bad selection)
+//   - Medium path:  ~220 ms  (grayscale + contrast + a few thresholds)
+//   - Deep path:    ~900 ms  (multi-scale, multi-channel, adaptive threshold)
+//   - Absolute cap: 1400 ms  (never hang on a bad selection)
 // ============================================================
 
 const DECODER_BUDGET_FAST = 80;
 const DECODER_BUDGET_MEDIUM = 220;
-const DECODER_BUDGET_DEEP = 550;
-const DECODER_BUDGET_ABSOLUTE = 800;
+const DECODER_BUDGET_DEEP = 900;
+const DECODER_BUDGET_ABSOLUTE = 1400;
 
-function decodeImageRobust(ctx, w, h) {
+function decodeImageRobust(ctx, w, h, opts = {}) {
+  const deep = opts.deep === true;
   const imageData = ctx.getImageData(0, 0, w, h);
   const start = performance.now();
+  const absoluteDeadline = start + DECODER_BUDGET_ABSOLUTE;
+  const deepDeadline = start + DECODER_BUDGET_DEEP;
 
   // Guard against tiny / degenerate captures.
   if (w < 50 || h < 50) return null;
 
   // ── Instant reject: uniform / blank / blurry selections ──
-  // If the image has almost no contrast, no QR code can be present.
-  if (looksEmptyOrUniform(imageData)) {
-    return null;
-  }
+  if (looksEmptyOrUniform(imageData)) return null;
 
   // ── FAST PATH ──
-  // 1. Original size, normal + inverted.
+  // Original size, normal + inverted.
   let result = jsQR(imageData.data, w, h, { inversionAttempts: "attemptBoth" });
   if (result) return result;
 
-  // 2. Small up-scales help tiny but otherwise clean codes.
-  for (const s of [1.5, 2]) {
+  // Small up-scales help tiny but otherwise clean codes.
+  for (const s of [1.5, 2, 2.5]) {
     if (performance.now() - start > DECODER_BUDGET_FAST) break;
     result = tryScaleDecode(ctx, w, h, s, (sd) =>
       jsQR(sd.data, sd.width, sd.height, { inversionAttempts: "attemptBoth" })
@@ -638,10 +647,11 @@ function decodeImageRobust(ctx, w, h) {
     if (result) return result;
   }
 
-  // 3. Quick down-scale for huge captures where the QR is small.
+  // Quick down-scales for huge captures where the QR is small.
   if (w > 600 || h > 600) {
-    if (performance.now() - start <= DECODER_BUDGET_FAST) {
-      result = tryScaleDecode(ctx, w, h, 0.5, (sd) =>
+    for (const s of [0.5, 0.75]) {
+      if (performance.now() - start > DECODER_BUDGET_FAST) break;
+      result = tryScaleDecode(ctx, w, h, s, (sd) =>
         jsQR(sd.data, sd.width, sd.height, { inversionAttempts: "attemptBoth" })
       );
       if (result) return result;
@@ -649,15 +659,15 @@ function decodeImageRobust(ctx, w, h) {
   }
 
   // ── MEDIUM PATH ──
-  // Grayscale + contrast stretch + a few threshold attempts at original size.
-  if (performance.now() - start <= DECODER_BUDGET_MEDIUM) {
-    let gray = grayscale(imageData);
+  // Grayscale + contrast stretch + threshold attempts at original size.
+  if (performance.now() <= start + DECODER_BUDGET_MEDIUM) {
+    let gray = grayscale(cloneImageData(imageData));
     gray = stretchContrast(gray);
 
     result = jsQR(gray.data, w, h, { inversionAttempts: "attemptBoth" });
     if (result) return result;
 
-    for (const thresh of [100, 128, 160]) {
+    for (const thresh of [80, 100, 128, 160, 180]) {
       if (performance.now() - start > DECODER_BUDGET_MEDIUM) break;
       const bin = binaryThreshold(gray, thresh);
       result = jsQR(bin.data, w, h, { inversionAttempts: "attemptBoth" });
@@ -666,36 +676,52 @@ function decodeImageRobust(ctx, w, h) {
   }
 
   // ── DEEP PATH ──
-  // Only for hard codes: low contrast, color backgrounds, decorative codes.
-  // Kept bounded so a bad selection never stalls for seconds.
-  const deepScales = [0.75, 1.25, 1.5];
+  // Only for hard codes: artistic/embedded, low contrast, color backgrounds.
+  if (!deep && performance.now() > start + DECODER_BUDGET_MEDIUM) return null;
+
+  const deepScales = [0.6, 0.8, 1.25, 1.5, 1.75];
+  const deepThresholds = [60, 80, 100, 120, 140, 160, 180, 200];
+  const channels = ["luma", "red", "green", "blue"];
+
   for (const s of deepScales) {
-    if (performance.now() - start > DECODER_BUDGET_DEEP) break;
+    if (performance.now() > deepDeadline) break;
 
     const sw = Math.round(w * s);
     const sh = Math.round(h * s);
     if (sw < 80 || sh < 80) continue;
 
     const sd = scaleImageData(ctx, w, h, sw, sh);
-    let gray = grayscale(sd);
-    gray = stretchContrast(gray);
 
-    result = jsQR(gray.data, sw, sh, { inversionAttempts: "attemptBoth" });
-    if (result) return result;
+    for (const channel of channels) {
+      if (performance.now() > deepDeadline) break;
 
-    for (const thresh of [80, 110, 140, 170]) {
-      if (performance.now() - start > DECODER_BUDGET_DEEP) break;
-      const bin = binaryThreshold(gray, thresh);
-      result = jsQR(bin.data, sw, sh, { inversionAttempts: "attemptBoth" });
+      let ch = extractChannel(sd, channel);
+      ch = stretchContrast(ch);
+
+      result = jsQR(ch.data, sw, sh, { inversionAttempts: "attemptBoth" });
       if (result) return result;
 
-      const invBin = invertBin(bin);
-      result = jsQR(invBin.data, sw, sh, { inversionAttempts: "attemptBoth" });
+      const sharpened = sharpen(ch);
+      result = jsQR(sharpened.data, sw, sh, { inversionAttempts: "attemptBoth" });
       if (result) return result;
+
+      const adapt = adaptiveThreshold(ch, 15, 0.2);
+      result = jsQR(adapt.data, sw, sh, { inversionAttempts: "attemptBoth" });
+      if (result) return result;
+
+      for (const thresh of deepThresholds) {
+        if (performance.now() > absoluteDeadline) break;
+        const bin = binaryThreshold(ch, thresh);
+        result = jsQR(bin.data, sw, sh, { inversionAttempts: "attemptBoth" });
+        if (result) return result;
+
+        const invBin = invertBin(bin);
+        result = jsQR(invBin.data, sw, sh, { inversionAttempts: "attemptBoth" });
+        if (result) return result;
+      }
     }
   }
 
-  // Absolute cap — if we somehow got here, give up so the UI never hangs.
   return null;
 }
 
@@ -806,6 +832,112 @@ function invertBin(imageData) {
   return out;
 }
 
+function cloneImageData(imageData) {
+  return new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+}
+
+// Extract a single color channel as grayscale. "luma" uses the standard
+// luminance formula; RGB channels help when a QR code is hidden in one color.
+function extractChannel(imageData, channel) {
+  const out = new ImageData(new Uint8ClampedArray(imageData.data.length), imageData.width, imageData.height);
+  const src = imageData.data;
+  const dst = out.data;
+  for (let i = 0; i < src.length; i += 4) {
+    let v;
+    switch (channel) {
+      case "red": v = src[i]; break;
+      case "green": v = src[i + 1]; break;
+      case "blue": v = src[i + 2]; break;
+      default: v = 0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2];
+    }
+    dst[i] = dst[i + 1] = dst[i + 2] = v;
+    dst[i + 3] = 255;
+  }
+  return out;
+}
+
+// Simple 3x3 unsharp mask to make blurred QR modules crisper.
+function sharpen(imageData) {
+  const w = imageData.width;
+  const h = imageData.height;
+  const src = imageData.data;
+  const out = new ImageData(new Uint8ClampedArray(src.length), w, h);
+  const dst = out.data;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = (y * w + x) * 4;
+      let sum = 0;
+      for (let ky = -1; ky <= 1; ky++) {
+        for (let kx = -1; kx <= 1; kx++) {
+          const j = ((y + ky) * w + (x + kx)) * 4;
+          const weight = (ky === 0 && kx === 0) ? 5 : -0.5;
+          sum += src[j] * weight;
+        }
+      }
+      const v = Math.max(0, Math.min(255, Math.round(sum)));
+      dst[i] = dst[i + 1] = dst[i + 2] = v;
+      dst[i + 3] = 255;
+    }
+  }
+  return out;
+}
+
+// Sauvola-like adaptive threshold using summed-area tables. Handles uneven
+// lighting and colorful/artistic backgrounds where a global threshold fails.
+function adaptiveThreshold(imageData, windowSize, k) {
+  const w = imageData.width;
+  const h = imageData.height;
+  const src = imageData.data;
+  const out = new ImageData(new Uint8ClampedArray(src.length), w, h);
+  const dst = out.data;
+  const half = Math.floor(windowSize / 2);
+  const R = 128;
+
+  // Build integral images for mean and variance in one pass.
+  const integral = new Float64Array((w + 1) * (h + 1));
+  const integralSq = new Float64Array((w + 1) * (h + 1));
+  for (let y = 1; y <= h; y++) {
+    let rowSum = 0;
+    let rowSumSq = 0;
+    for (let x = 1; x <= w; x++) {
+      const v = src[((y - 1) * w + (x - 1)) * 4];
+      rowSum += v;
+      rowSumSq += v * v;
+      const idx = y * (w + 1) + x;
+      integral[idx] = integral[idx - (w + 1)] + rowSum;
+      integralSq[idx] = integralSq[idx - (w + 1)] + rowSumSq;
+    }
+  }
+
+  function rectSum(table, x1, y1, x2, y2) {
+    return table[(y2 + 1) * (w + 1) + (x2 + 1)]
+      - table[(y1) * (w + 1) + (x2 + 1)]
+      - table[(y2 + 1) * (w + 1) + (x1)]
+      + table[(y1) * (w + 1) + (x1)];
+  }
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const x1 = Math.max(0, x - half);
+      const y1 = Math.max(0, y - half);
+      const x2 = Math.min(w - 1, x + half);
+      const y2 = Math.min(h - 1, y + half);
+      const count = (x2 - x1 + 1) * (y2 - y1 + 1);
+      const sum = rectSum(integral, x1, y1, x2, y2);
+      const sumSq = rectSum(integralSq, x1, y1, x2, y2);
+      const mean = sum / count;
+      const variance = sumSq / count - mean * mean;
+      const std = Math.sqrt(Math.max(0, variance));
+      const threshold = mean * (1 + k * ((std / R) - 1));
+      const i = (y * w + x) * 4;
+      const v = src[i] >= threshold ? 255 : 0;
+      dst[i] = dst[i + 1] = dst[i + 2] = v;
+      dst[i + 3] = 255;
+    }
+  }
+  return out;
+}
+
 // ============================================================
 // Hidden decode worker: decode a captured PNG buffer (from the main process).
 // Reuses the same robust decoder as the in-app scanner.
@@ -819,9 +951,9 @@ async function decodeBufferToText(buffer) {
   const canvas = document.createElement("canvas");
   canvas.width = bmp.width;
   canvas.height = bmp.height;
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.drawImage(bmp, 0, 0);
-  const result = decodeImageRobust(ctx, canvas.width, canvas.height);
+  const result = decodeImageRobust(ctx, canvas.width, canvas.height, { deep: true });
   return result ? result.data.trim() : null;
 }
 
@@ -1384,12 +1516,59 @@ function setupUpdates() {
   const currentEl = document.getElementById("update-current");
   const modalLater = document.getElementById("update-later-btn");
   const modalNow = document.getElementById("update-now-btn");
+  const progressWrap = document.getElementById("update-progress-wrap");
+  const progressBar = document.getElementById("update-progress-bar");
+  const progressText = document.getElementById("update-progress-text");
+  const progressSize = document.getElementById("update-progress-size");
+  const progressHint = document.getElementById("update-progress-hint");
+
+  function setProgress(info) {
+    const pct = info && typeof info.percent === "number" ? info.percent : 0;
+    const downloaded = info && info.downloaded;
+    const total = info && info.total;
+    const filename = info && info.filename;
+    if (progressBar) progressBar.style.width = pct + "%";
+    if (progressText) progressText.textContent = t("updates.progress.text");
+    if (progressSize) progressSize.textContent = (downloaded && total) ? t("updates.progress.size", { downloaded, total }) : "";
+    if (progressHint) progressHint.textContent = t("updates.progress.hint", { filename: filename || "Kuiqr-update" });
+  }
+
+  function showProgress(show) {
+    if (progressWrap) progressWrap.classList.toggle("hidden", !show);
+  }
+
+  function resetProgress() {
+    if (progressBar) progressBar.style.width = "0%";
+    if (progressText) progressText.textContent = t("updates.progress.text");
+    if (progressSize) progressSize.textContent = "";
+  }
 
   window.qrAPI.getAppVersion().then((v) => {
     if (currentEl) currentEl.textContent = t("updates.current", { ver: v || "?" });
   });
 
-  if (checkBtn) checkBtn.addEventListener("click", () => checkForUpdates(false));
+  // Live download progress pushed from the main process.
+  window.qrAPI.onUpdateProgress((info) => {
+    if (info && info.phase === "installing") {
+      if (statusEl) { statusEl.textContent = t("updates.status.installing"); statusEl.className = "update-status"; }
+      showProgress(false);
+      resetProgress();
+      return;
+    }
+    if (info && info.done) {
+      showProgress(false);
+      resetProgress();
+      return;
+    }
+    showProgress(true);
+    setProgress(info);
+  });
+
+  if (checkBtn) checkBtn.addEventListener("click", () => {
+    showProgress(false);
+    resetProgress();
+    checkForUpdates(false);
+  });
   // The inline "Download Update" button is a secondary path; the primary prompt
   // is the in-app update modal (see showUpdateModal).
   if (dlBtn) dlBtn.addEventListener("click", () => { if (pendingUpdateUrl) installUpdate(pendingUpdateUrl, pendingUpdateName, pendingUpdateLatest); });
@@ -1492,9 +1671,15 @@ async function checkForUpdates(silent) {
 
 async function installUpdate(url, assetName, latest) {
   const statusEl = document.getElementById("update-status");
-  if (statusEl) { statusEl.textContent = t("updates.status.installing"); statusEl.className = "update-status"; }
+  const progressWrap = document.getElementById("update-progress-wrap");
+  const progressBar = document.getElementById("update-progress-bar");
+  if (progressWrap) progressWrap.classList.remove("hidden");
+  if (progressBar) progressBar.style.width = "0%";
+  if (statusEl) { statusEl.textContent = t("updates.status.downloading"); statusEl.className = "update-status"; }
   try {
     const res = await window.qrAPI.installUpdate(url, assetName, latest);
+    if (progressWrap) progressWrap.classList.add("hidden");
+    if (progressBar) progressBar.style.width = "0%";
     if (res && res.ok && res.relaunch) {
       // The main process will relaunch the new version automatically.
       if (statusEl) { statusEl.textContent = t("updates.status.installed"); statusEl.className = "update-status success"; }
@@ -1508,6 +1693,8 @@ async function installUpdate(url, assetName, latest) {
       statusEl.className = "update-status" + (isManual ? "" : " error");
     }
   } catch (e) {
+    if (progressWrap) progressWrap.classList.add("hidden");
+    if (progressBar) progressBar.style.width = "0%";
     if (statusEl) { statusEl.textContent = e.message || t("updates.status.error"); statusEl.className = "update-status error"; }
   }
 }
