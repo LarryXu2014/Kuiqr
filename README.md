@@ -111,8 +111,6 @@ If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 | macOS (Apple Silicon, .dmg)| [Kuiqr-2.4.2.3.2-mac-arm64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.2-mac-arm64.dmg)     | ~95 MB | Verified |
 | macOS (Intel)              | [Kuiqr-2.4.2.3.2-mac-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.2-mac-x64.zip)         | ~97 MB | Verified |
 | macOS (Intel, .dmg)        | [Kuiqr-2.4.2.3.2-mac-x64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.2-mac-x64.dmg)         | ~100 MB | Verified |
-| macOS (Apple Silicon, .pkg)| [Kuiqr-2.4.2.3.2-mac-arm64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.2-mac-arm64.pkg)    | ~97 MB | Verified |
-| macOS (Intel, .pkg)        | [Kuiqr-2.4.2.3.2-mac-x64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.2-mac-x64.pkg)        | ~97 MB | Verified |
 | Windows (x64) — Setup      | [Kuiqr-2.4.2.3.2-windows-x64-setup.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.2-windows-x64-setup.exe) | ~70 MB | Verified |
 | Windows (x64) — Portable   | [Kuiqr-2.4.2.3.2-windows-x64-portable.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.2-windows-x64-portable.exe) | ~70 MB | Verified |
 | Windows (x64) — Zip       | [Kuiqr-2.4.2.3.2-windows-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.2-windows-x64.zip) | ~70 MB | Verified |
