@@ -49,7 +49,7 @@ const APP_VERSION = app.getVersion();
 // in package.json (and the GitHub release tag) each time a new version ships.
 // Only used if the packaged app can't read buildVersion from its package.json,
 // so the About/Update UI never shows "undefined".
-const FALLBACK_RELEASE_VERSION = "2.4.2.3.7";
+const FALLBACK_RELEASE_VERSION = "2.4.2.3.8";
 const RELEASE_VERSION = (() => {
   try {
     const pkg = require("./package.json");

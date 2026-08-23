@@ -1657,7 +1657,7 @@ async function checkForUpdates(silent) {
       showUpdateModal(res);
     } else {
       if (statusEl) {
-        statusEl.textContent = silent ? "" : t("updates.status.uptodate", { cur: res.current || "?" });
+        statusEl.textContent = silent ? "" : t("updates.status.uptodate", { cur: res.currentVersion || "?" });
         statusEl.className = "update-status" + (silent ? "" : " success");
       }
     }
