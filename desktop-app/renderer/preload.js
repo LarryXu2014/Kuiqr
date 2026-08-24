@@ -34,6 +34,9 @@ contextBridge.exposeInMainWorld("qrAPI", {
   // Tab switching from tray/main process
   onSwitchTab: (callback) => ipcRenderer.on("switch-tab", (e, tab) => callback(tab)),
 
+  // Tell the main process the active tab changed (so overlay scans restore it).
+  notifyTabChanged: (tab) => ipcRenderer.send("tab-changed", tab),
+
   // Hidden decode worker (macOS native scan path): main sends the captured PNG,
   // the renderer decodes it and reports the result back.
   onDecodeBuffer: (callback) => ipcRenderer.on("decode-buffer", (e, buffer) => callback(buffer)),

@@ -244,6 +244,13 @@ function switchTab(tabName) {
 
   if (tab) tab.classList.add("active");
   if (content) content.classList.add("active");
+
+  // Keep the main process in sync so overlay scans restore the user's last page.
+  try {
+    if (window.qrAPI && window.qrAPI.notifyTabChanged) {
+      window.qrAPI.notifyTabChanged(tabName);
+    }
+  } catch (e) { /* ignore */ }
 }
 
 // ============================================================

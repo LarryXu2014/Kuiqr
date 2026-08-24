@@ -33,6 +33,7 @@ let pendingDecodeBuffer = null; // captured PNG waiting for the renderer to be r
 let menuBarMode = false;        // true once the app has tucked itself into the menu bar (tray + hidden window)
 let onboardingActive = false;   // true during first-launch onboarding (window shown, no tray yet)
 let lastOverlayScreenshotPath = null; // temp screenshot for the Windows/Linux overlay (cleaned up after)
+let lastActiveTab = "scan";     // last tab the renderer was on, so overlay scans restore the right page
 
 const isMac = process.platform === "darwin";
 const isWin = process.platform === "win32";
@@ -49,7 +50,7 @@ const APP_VERSION = app.getVersion();
 // in package.json (and the GitHub release tag) each time a new version ships.
 // Only used if the packaged app can't read buildVersion from its package.json,
 // so the About/Update UI never shows "undefined".
-const FALLBACK_RELEASE_VERSION = "2.4.2.3.8";
+const FALLBACK_RELEASE_VERSION = "2.4.2.3.9";
 const RELEASE_VERSION = (() => {
   try {
     const pkg = require("./package.json");
@@ -154,6 +155,13 @@ if (!gotSingleInstanceLock) {
 
   app.whenReady().then(async () => {
     createMainWindow();
+
+    // Hide the default Electron menu bar on Windows/Linux — the app UI is
+    // self-contained and the File/Edit/View/Window/Help menu makes it look like
+    // a Mac app. macOS keeps its expected app menu.
+    if (!isMac) {
+      try { Menu.setApplicationMenu(null); } catch { /* ignore */ }
+    }
 
     // ── Decide the launch mode ──
     // First launch (the setup wizard has not been completed): keep the app as a
@@ -713,6 +721,12 @@ ipcMain.handle("check-automation-permission", async () => {
 });
 
 async function triggerScan() {
+  // Ignore repeated hotkey presses while a scan is already in progress.
+  if (isInOverlayMode) {
+    console.log("Kuiqr: scan already in progress, ignoring hotkey");
+    return;
+  }
+
   try {
     if (isMac) {
       // Native macOS selection UI — no Electron window is ever involved.
@@ -840,16 +854,29 @@ function runScreencapture(tmpPath) {
 
 // ── Windows / other: Electron overlay (reuses the main window) ───────────────
 async function scanWithOverlay() {
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.size;
-  const scaleFactor = primaryDisplay.scaleFactor;
+  // Capture the display where the user's cursor currently is. This works
+  // correctly on multi-monitor setups and matches macOS behaviour where the
+  // crosshair appears wherever the user is looking.
+  const cursor = screen.getCursorScreenPoint();
+  const targetDisplay = screen.getDisplayNearestPoint(cursor);
+  const { x, y, width, height } = targetDisplay.bounds;
+  const scaleFactor = targetDisplay.scaleFactor;
+
+  // Very large native thumbnails can come back empty on high-DPI Windows
+  // screens. Cap the requested size to a sane maximum while preserving aspect
+  // ratio. The overlay still fills the screen because CSS stretches the image.
+  const MAX_CAPTURE = 2560;
+  let reqW = Math.round(width * scaleFactor);
+  let reqH = Math.round(height * scaleFactor);
+  if (reqW > MAX_CAPTURE || reqH > MAX_CAPTURE) {
+    const ratio = Math.min(MAX_CAPTURE / reqW, MAX_CAPTURE / reqH);
+    reqW = Math.round(reqW * ratio);
+    reqH = Math.round(reqH * ratio);
+  }
 
   const sources = await desktopCapturer.getSources({
     types: ["screen"],
-    thumbnailSize: {
-      width: Math.round(width * scaleFactor),
-      height: Math.round(height * scaleFactor),
-    },
+    thumbnailSize: { width: reqW, height: reqH },
   });
 
   if (!sources || sources.length === 0) {
@@ -857,22 +884,41 @@ async function scanWithOverlay() {
     return;
   }
 
-  const source = sources[0];
+  // Try to pick the source matching the target display; fall back to primary.
+  let source = sources[0];
+  const targetId = String(targetDisplay.id);
+  for (const s of sources) {
+    if (String(s.display_id) === targetId || String(s.id) === targetId) {
+      source = s;
+      break;
+    }
+  }
   lastScreenshot = source.thumbnail;
+
+  // If the chosen thumbnail is empty, try any other screen source as a fallback.
+  if (lastScreenshot.isEmpty()) {
+    for (const s of sources) {
+      if (s.thumbnail && !s.thumbnail.isEmpty()) {
+        lastScreenshot = s.thumbnail;
+        source = s;
+        break;
+      }
+    }
+  }
 
   if (lastScreenshot.isEmpty()) {
     showNotification(
       "Screen capture blocked",
-      "Please grant Screen Recording permission in System Settings → Privacy & Security, then try again."
+      "Please grant screen capture permission in Settings and try again."
     );
     return;
   }
 
-  const tempPath = path.join(app.getPath("temp"), "qr-scan-screenshot.png");
+  const tempPath = path.join(app.getPath("temp"), `qr-scan-screenshot-${Date.now()}.png`);
   fs.writeFileSync(tempPath, lastScreenshot.toPNG());
   lastOverlayScreenshotPath = tempPath;
 
-  enterOverlayMode(tempPath, { width, height, scaleFactor });
+  enterOverlayMode(tempPath, { x, y, width, height, scaleFactor });
 }
 
 // ============================================================
@@ -883,7 +929,7 @@ function enterOverlayMode(screenshotPath, displayInfo) {
   if (!mainWindow || mainWindow.isDestroyed() || isInOverlayMode) return;
   isInOverlayMode = true;
 
-  const { width, height } = displayInfo;
+  const { x, y, width, height } = displayInfo;
 
   // Save current window state so we can restore it after scanning
   savedWindowState = {
@@ -899,13 +945,12 @@ function enterOverlayMode(screenshotPath, displayInfo) {
   mainWindow.focus();
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   mainWindow.setResizable(false);
-  mainWindow.setBounds({ x: 0, y: 0, width, height });
-  // Use setBackgroundMaterial for transparency on macOS / DWM blur on Windows
+  mainWindow.setBounds({ x, y, width, height });
+  // Keep the background material off so the screenshot is shown crisply rather
+  // than blurred by the DWM acrylic effect.
   try {
-    mainWindow.setBackgroundMaterial("acrylic");
-  } catch (e) {
-    // fallback: just rely on transparent: true + CSS background
-  }
+    mainWindow.setBackgroundMaterial("none");
+  } catch (e) { /* ignore */ }
 
   // Load overlay.html into the SAME window (replaces index.html temporarily)
   mainWindow.loadFile(path.join(__dirname, "overlay.html"), {
@@ -943,6 +988,20 @@ function exitOverlayMode() {
   try {
     mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
   } catch { /* ignore */ }
+
+  // Restore whichever tab the user was on before the scan, instead of always
+  // landing back on the default Scan tab after index.html reloads.
+  if (lastActiveTab && lastActiveTab !== "scan" && mainWindow && mainWindow.webContents) {
+    try {
+      mainWindow.webContents.once("did-finish-load", () => {
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+            mainWindow.webContents.send("switch-tab", lastActiveTab);
+          }
+        }, 80);
+      });
+    } catch { /* ignore */ }
+  }
 
   // Clean up the temp screenshot we wrote for the overlay scan.
   if (lastOverlayScreenshotPath) {
@@ -1152,6 +1211,12 @@ ipcMain.on("open-tab", (event, tab) => {
   if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
     setTimeout(() => mainWindow.webContents.send("switch-tab", tab), 50);
   }
+});
+
+// Renderer → main: track the currently active tab so that after a Windows
+// overlay scan we can return to the user's previous page instead of Scan.
+ipcMain.on("tab-changed", (event, tab) => {
+  if (typeof tab === "string" && tab) lastActiveTab = tab;
 });
 
 // Renderer → main: fully quit the app (used by the in-app right-click menu).
