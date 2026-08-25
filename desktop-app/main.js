@@ -35,6 +35,11 @@ let onboardingActive = false;   // true during first-launch onboarding (window s
 let lastOverlayScreenshotPath = null; // temp screenshot for the Windows/Linux overlay (cleaned up after)
 let lastActiveTab = "scan";     // last tab the renderer was on, so overlay scans restore the right page
 
+// Tray icon state (macOS): normal = white QR template; update-available = blue QR.
+let trayIconWhite = null;       // solid QR motif, used as a template (renders white)
+let trayIconBlue = null;        // same motif in blue, used as a real-color image when an update is available
+let trayUpdateState = false;    // false = normal (white), true = update available (blue)
+
 const isMac = process.platform === "darwin";
 const isWin = process.platform === "win32";
 
@@ -359,6 +364,21 @@ function createTray() {
       trayIcon = trayIcon.resize({ width: 16, height: 16 });
     }
     trayIcon.setTemplateImage(true);
+    trayIconWhite = trayIcon;
+
+    // Colored variant for the "update available" state. It must NOT be a template
+    // image, otherwise macOS strips the color and shows it as white/black.
+    try {
+      let bi = nativeImage.createFromPath(path.join(__dirname, "icons", "icon-tray-blue.png"));
+      if (!bi.isEmpty()) {
+        const sz = trayIcon.getSize();
+        bi = bi.resize({ width: sz.width, height: sz.height });
+        bi.setTemplateImage(false);
+        trayIconBlue = bi;
+      }
+    } catch (e) {
+      console.warn("Kuiqr: failed to load blue tray icon:", e);
+    }
   }
 
   try {
@@ -423,6 +443,29 @@ function createTray() {
       console.error("Kuiqr: tray right-click handler error:", err);
     }
   });
+
+  // Apply whatever update state we already know about (e.g. an update was
+  // detected before the tray existed). Defaults to the normal white icon.
+  setTrayUpdateAvailable(trayUpdateState);
+}
+
+// Swaps the menu-bar icon between the normal (white QR template) and the
+// "update available" (blue QR) state. No-op on non-macOS or before tray exists.
+function setTrayUpdateAvailable(isAvail) {
+  trayUpdateState = !!isAvail;
+  if (!tray || !isMac) return;
+  try {
+    if (trayUpdateState && trayIconBlue) {
+      tray.setImage(trayIconBlue);
+      tray.setToolTip("Kuiqr — update available");
+    } else if (trayIconWhite) {
+      tray.setImage(trayIconWhite);
+      trayIconWhite.setTemplateImage(true);
+      tray.setToolTip("Kuiqr");
+    }
+  } catch (err) {
+    console.error("Kuiqr: setTrayUpdateAvailable failed:", err);
+  }
 }
 
 // ============================================================
@@ -1627,6 +1670,9 @@ async function performUpdateCheck() {
       const assets = rel.assets || [];
       const asset = updateAvailable ? pickUpdateAsset(latestVersion, assets) : null;
       const assetUrl = asset ? asset.browser_download_url : null;
+
+      // Reflect the update state in the menu-bar icon (white → blue when available).
+      setTrayUpdateAvailable(updateAvailable);
 
       const result = {
         ok: true,
