@@ -89,6 +89,20 @@ Then double-click the app normally. You only need to do this once.
 
 **Alternative:** Right-click the app → "Open" → confirm in the dialog.
 
+### macOS `.pkg` installer is blocked by Gatekeeper
+
+The `.pkg` installers are **not signed or notarized** (no Apple Developer certificate), so macOS refuses to open them: *"Kuiqr-2.4.2.3.9-mac-arm64.pkg can't be opened because Apple cannot check it for malicious software."*
+
+**Recommended:** skip the `.pkg` and use the **`.zip`** or **`.dmg`** above — they only need a one-time right-click → "Open" on first launch.
+
+**If you must use the `.pkg`:**
+1. Click **Done** on the warning (do **not** "Move to Trash").
+2. Open **System Settings → Privacy & Security**.
+3. Scroll to the bottom — you'll see *"Kuiqr-2.4.2.3.9-mac-arm64.pkg" was blocked from use because it is not from an identified developer* with an **Open Anyway** button.
+4. Click **Open Anyway**, enter your password, then re-run the installer.
+
+Once Apple code-signing is set up, the `.pkg` will open without this warning.
+
 ### Download is very slow
 
 GitHub's release server (`objects.githubusercontent.com`) is throttled in some regions. Use a mirror instead:
@@ -111,8 +125,8 @@ If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 | macOS (Apple Silicon, .dmg)| [Kuiqr-2.4.2.3.9-mac-arm64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.9-mac-arm64.dmg)     | ~95 MB | Verified |
 | macOS (Intel)              | [Kuiqr-2.4.2.3.9-mac-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.9-mac-x64.zip)         | ~97 MB | Verified |
 | macOS (Intel, .dmg)        | [Kuiqr-2.4.2.3.9-mac-x64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.9-mac-x64.dmg)         | ~100 MB | Verified |
-| macOS (Apple Silicon, .pkg)| [Kuiqr-2.4.2.3.9-mac-arm64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.9-mac-arm64.pkg)     | ~95 MB | Verified |
-| macOS (Intel, .pkg)        | [Kuiqr-2.4.2.3.9-mac-x64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.9-mac-x64.pkg)         | ~95 MB | Verified |
+| macOS (Apple Silicon, .pkg)| [Kuiqr-2.4.2.3.9-mac-arm64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.9-mac-arm64.pkg)     | ~95 MB | ⚠ Unsigned — needs bypass |
+| macOS (Intel, .pkg)        | [Kuiqr-2.4.2.3.9-mac-x64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.9-mac-x64.pkg)         | ~95 MB | ⚠ Unsigned — needs bypass |
 | Windows (x64) — Setup      | [Kuiqr-2.4.2.3.9-windows-x64-setup.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.9-windows-x64-setup.exe) | ~70 MB | Verified |
 | Windows (x64) — Portable   | [Kuiqr-2.4.2.3.9-windows-x64-portable.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.9-windows-x64-portable.exe) | ~70 MB | Verified |
 | Windows (x64) — Zip       | [Kuiqr-2.4.2.3.9-windows-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.9-windows-x64.zip) | ~70 MB | Verified |
@@ -122,6 +136,8 @@ If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 | Linux (arm64, .deb)        | [Kuiqr-2.4.2.3.9-linux-arm64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.9-linux-arm64.deb) | ~90 MB | Verified |
 
 All binaries verified: ZIPs no errors, EXE valid PE32, AppImage runs headless. (The macOS `.zip` is the recommended download — just unzip and open `Kuiqr.app`.)
+
+> **macOS `.pkg` installers are unsigned.** macOS Gatekeeper will block them with *"Kuiqr-2.4.2.3.9-mac-arm64.pkg can't be opened because Apple cannot check it for malicious software."* Use the **`.zip`** or **`.dmg`** instead (right-click → Open on first launch) — or see the "`.pkg` blocked by Gatekeeper" note in Troubleshooting to bypass it.
 
 ---
 
