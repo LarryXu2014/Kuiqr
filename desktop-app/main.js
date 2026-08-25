@@ -38,27 +38,26 @@ let lastActiveTab = "scan";     // last tab the renderer was on, so overlay scan
 const isMac = process.platform === "darwin";
 const isWin = process.platform === "win32";
 
-// App version — use Electron's app.getVersion(), which returns the npm `version`
-// field (3-part semver, e.g. "2.4.1"). Used for display only.
-const APP_VERSION = app.getVersion();
-
-// Release version — the 4-part build version (e.g. "2.4.1.4") that matches the
-// GitHub release tag and the extension zip filenames. We expose build.buildVersion
-// to the packaged app via electron-builder's extraMetadata (see package.json),
-// so this read works both in dev and in the built app.
-// Fallback 4-part release version. MUST be kept in sync with the `buildVersion`
-// in package.json (and the GitHub release tag) each time a new version ships.
-// Only used if the packaged app can't read buildVersion from its package.json,
-// so the About/Update UI never shows "undefined".
+// Release version — the 4-part build version (e.g. "2.4.2.3.10") that matches the
+// GitHub release tag and the extension zip filenames. In the PACKAGED app,
+// electron-builder strips `build.buildVersion` out of package.json, so we must fall
+// back to the hard-coded FALLBACK_RELEASE_VERSION (kept in sync with package.json
+// build.buildVersion and the GitHub tag each release) BEFORE the npm `version` field.
+// The npm `version` is only the 3-part semver ("2.4.1") and would otherwise make every
+// built app report as 2.4.1 and always think it is outdated.
 const FALLBACK_RELEASE_VERSION = "2.4.2.3.9";
 const RELEASE_VERSION = (() => {
   try {
     const pkg = require("./package.json");
-    return pkg.buildVersion || (pkg.build && pkg.build.buildVersion) || pkg.version || FALLBACK_RELEASE_VERSION;
+    return pkg.buildVersion || (pkg.build && pkg.build.buildVersion) || FALLBACK_RELEASE_VERSION || pkg.version;
   } catch {
     return FALLBACK_RELEASE_VERSION;
   }
 })();
+
+// App version for display — use the REAL 4-part release version so the UI shows the
+// exact build the user is running (e.g. "2.4.2.3.10"), not the npm 3-part semver.
+const APP_VERSION = RELEASE_VERSION;
 
 // ── macOS native Vision QR helper path ──
 // In dev: native/qr-vision next to main.js. In the packaged app: extraResources

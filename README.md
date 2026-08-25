@@ -233,6 +233,7 @@ All processing happens on your device. Zero server communication.
 - **Windows overlay no longer looks like another app window** — removed the DWM acrylic blur so the captured screenshot is shown crisply, and added a guard so repeated hotkey presses don't stack overlays.
 - **Windows scans return to the page you were on** — after an overlay scan the app restores your previous tab (History/Settings/Generate) instead of always jumping back to the Scan tab.
 - **macOS tray icon is now the real QR-KR glyph** — regenerated the menu-bar icon so it shows the actual logo instead of a blank white square. This also fixes cases where the icon appeared invisible or missing.
+- **App now reports the correct version (2.4.2.3.9)** — fixed a version-resolution bug where the packaged app fell back to the npm `version` (`2.4.1`) instead of the real build version. This made Settings show `2.4.1` and the update check always report an available update even on the newest build, which could make it look like the update never applied.
 
 ### v2.4.2.3.8
 - **Update status now shows the real current version** — fixed a field-name mismatch that made the "You're up to date" message display `v?` instead of the actual installed version.
