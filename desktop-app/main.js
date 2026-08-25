@@ -369,7 +369,10 @@ function createTray() {
     // Colored variant for the "update available" state. It must NOT be a template
     // image, otherwise macOS strips the color and shows it as white/black.
     try {
-      let bi = nativeImage.createFromPath(path.join(__dirname, "icons", "icon-tray-blue.png"));
+      const bluePath = (usedPath && usedPath.includes("@2x"))
+        ? path.join(__dirname, "icons", "icon-tray-blue@2x.png")
+        : path.join(__dirname, "icons", "icon-tray-blue.png");
+      let bi = nativeImage.createFromPath(bluePath);
       if (!bi.isEmpty()) {
         const sz = trayIcon.getSize();
         bi = bi.resize({ width: sz.width, height: sz.height });
