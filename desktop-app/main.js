@@ -101,6 +101,7 @@ const DEFAULT_SETTINGS = {
   setupDone: false,                 // whether the first-launch setup wizard has been completed
   dynamicBackendUrl: "",             // base URL of the Kuiqr dynamic-QR redirect/analytics backend
   dynamicApiKey: "",                // API key for that backend (POST /api/codes, GET .../stats)
+  qrStyle: null,                    // persisted QR styling defaults (fg/bg/ecc/dotStyle/finder colors/quiet/logo omitted)
 };
 
 function loadSettings() {
@@ -147,6 +148,91 @@ function addToHistory(data, type) {
   history.unshift({ data, type, timestamp: Date.now() });
   saveHistory(history);
   return history;
+}
+
+// ── Wi-Fi network scan (used by the WiFi QR template's SSID picker) ──
+// Returns [{ ssid, signal (0-100 or null) }]. Best-effort per platform.
+// macOS: modern versions redact nearby SSIDs without Location permission, so we
+// merge the *connected* network (networksetup, always visible) with any unredacted
+// entries from system_profiler. Windows (netsh) and Linux (nmcli) list everything.
+function scanWifiNetworks() {
+  return new Promise((resolve, reject) => {
+    if (process.platform === "darwin") {
+      // Find the actual Wi-Fi interface (usually en0, but not always), then query
+      // it plus system_profiler in parallel and merge.
+      runCmd("networksetup", ["-listallhardwareports"]).then((ports) => {
+        const m = ports.match(/Hardware Port: Wi-Fi\s*\nDevice: (\w+)/);
+        const iface = m ? m[1] : "en0";
+        const jobs = [runCmd("networksetup", ["-getairportnetwork", iface]), runCmd("/usr/sbin/system_profiler", ["SPAirPortDataType"])];
+        Promise.all(jobs.map((p) => p.catch(() => ""))).then(([cur, prof]) => {
+          try {
+            const networks = parseWifiScan(cur + "\n" + prof, "darwin");
+            if (!networks.length) reject(new Error("no-networks"));
+            else resolve(networks);
+          } catch (e) { reject(e); }
+        });
+      }, () => reject(new Error("networksetup failed")));
+      return;
+    }
+    let cmd, args;
+    if (process.platform === "win32") {
+      cmd = "netsh"; args = ["wlan", "show", "networks", "mode=bssid"];
+    } else {
+      cmd = "nmcli"; args = ["-f", "SSID,SIGNAL", "dev", "wifi", "list"];
+    }
+    runCmd(cmd, args).then((out) => {
+      try {
+        const networks = parseWifiScan(out, process.platform);
+        if (!networks.length) reject(new Error("no-networks"));
+        else resolve(networks);
+      } catch (e) { reject(e); }
+    }, reject);
+  });
+}
+function runCmd(cmd, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { windowsHide: true });
+    let out = "", err = "";
+    child.stdout.on("data", (d) => (out += d));
+    child.stderr.on("data", (d) => (err += d));
+    child.on("error", reject);
+    child.on("close", () => resolve(out));
+  });
+}
+function parseWifiScan(out, platform) {
+  const seen = new Set();
+  const result = [];
+  const push = (ssid, signal) => {
+    ssid = String(ssid || "").trim();
+    // Skip empty, redacted (macOS privacy) and placeholder entries.
+    if (!ssid || /^<.*redacted.*>$/i.test(ssid) || ssid === "--") return;
+    if (seen.has(ssid)) return;
+    seen.add(ssid);
+    result.push({ ssid, signal: signal == null ? null : signal });
+  };
+  if (platform === "darwin") {
+    // networksetup: "Current Wi-Fi Network: MyNet" (or "You are not associated…")
+    const cur = out.match(/Current Wi-Fi Network:\s*(.+?)\s*$/m);
+    if (cur) push(cur[1], null);
+    // system_profiler: lines like "          SSID: MyNet" (may be redacted → skipped)
+    const ssidRe = /^[ \t]+SSID:\s*(.+?)\s*$/gm;
+    let m;
+    while ((m = ssidRe.exec(out))) push(m[1], null);
+  } else if (platform === "win32") {
+    const re = /SSID\s+\d+\s*:\s*(.+?)\r?\n/gm;
+    let m;
+    while ((m = re.exec(out))) push(m[1], null);
+  } else {
+    // nmcli: lines "  <SSID>  <SIGNAL>" — skip header.
+    const lines = out.split("\n").map((l) => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      const sigMatch = line.match(/^(.*?)\s+(\d+)$/);
+      if (!sigMatch) continue;
+      const signal = parseInt(sigMatch[2], 10);
+      push(sigMatch[1], isNaN(signal) ? null : signal);
+    }
+  }
+  return result;
 }
 
 // ============================================================
@@ -1356,6 +1442,26 @@ ipcMain.handle("write-file", (event, { path: p, dataUrl, text }) => {
     return { ok: true };
   } catch (err) {
     return { ok: false, reason: err.message || String(err) };
+  }
+});
+ipcMain.handle("get-qr-style", () => {
+  try { return { ok: true, style: loadSettings().qrStyle || null }; }
+  catch (err) { return { ok: false, reason: err.message || String(err) }; }
+});
+ipcMain.handle("set-qr-style", (event, style) => {
+  try {
+    const s = loadSettings();
+    s.qrStyle = style || null;
+    saveSettings(s);
+    return { ok: true };
+  } catch (err) { return { ok: false, reason: err.message || String(err) }; }
+});
+ipcMain.handle("scan-wifi", async () => {
+  try {
+    const list = await scanWifiNetworks();
+    return { ok: true, networks: list };
+  } catch (err) {
+    return { ok: false, reason: err.message || String(err), networks: [] };
   }
 });
 ipcMain.handle("zip-folder", (event, { folder, outName }) => {

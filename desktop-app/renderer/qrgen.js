@@ -95,6 +95,7 @@
   let selfCheckTimer = null;
   let eccBeforeLogo = "M";
   let batchCancelled = false;
+  let wifiScanOutsideHandler = null;
 
   // ── Escaping helpers ────────────────────────────────────────────────────
   function escWifi(s) { return String(s == null ? "" : s).replace(/([\\;,":])/g, "\\$1"); }
@@ -378,6 +379,62 @@
         render();
       });
     }
+    // Wi-Fi: nearby-network picker so users can pick the SSID instead of typing it.
+    if (tpl === "wifi") wireWifiScan(host);
+  }
+
+  // ── Wi-Fi nearby SSID picker ─────────────────────────────────────────────
+  function wireWifiScan(host) {
+    const input = $("tpl-wifi-ssid");
+    if (!input || !window.qrAPI || !window.qrAPI.scanWifi) return;
+    // Wrap the input in a row with a scan button and a dropdown list.
+    const wrap = document.createElement("div");
+    wrap.className = "wifi-scan";
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn-text wifi-scan-btn";
+    btn.textContent = t("tpl.wifi.scan");
+    wrap.appendChild(btn);
+    const list = document.createElement("div");
+    list.className = "wifi-scan-list hidden";
+    wrap.appendChild(list);
+
+    btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      list.classList.remove("hidden");
+      list.innerHTML = `<div class="wifi-scan-empty">${t("tpl.wifi.scanning")}</div>`;
+      let res;
+      try { res = await window.qrAPI.scanWifi(); }
+      catch (e) { res = { ok: false, reason: String((e && e.message) || e) }; }
+      btn.disabled = false;
+      if (!res || !res.ok || !res.networks || !res.networks.length) {
+        const why = res && res.reason === "no-networks" ? t("tpl.wifi.none") : t("tpl.wifi.fail");
+        list.innerHTML = `<div class="wifi-scan-empty">${why}</div>`;
+        return;
+      }
+      list.innerHTML = "";
+      for (const n of res.networks.slice(0, 12)) {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "wifi-scan-item";
+        const sig = (n.signal != null && n.signal >= 0) ? `<span class="wifi-scan-sig">${n.signal}%</span>` : "";
+        item.innerHTML = `<span class="wifi-scan-ssid"></span>${sig}`;
+        item.querySelector(".wifi-scan-ssid").textContent = n.ssid;
+        item.addEventListener("click", () => {
+          input.value = n.ssid;
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          list.classList.add("hidden");
+        });
+        list.appendChild(item);
+      }
+    });
+    // Hide the list when clicking outside (one live document listener at a time).
+    if (wifiScanOutsideHandler) document.removeEventListener("click", wifiScanOutsideHandler);
+    wifiScanOutsideHandler = (e) => { if (!wrap.contains(e.target)) list.classList.add("hidden"); };
+    document.addEventListener("click", wifiScanOutsideHandler);
   }
 
   function switchTemplate(tpl) {
@@ -395,14 +452,44 @@
   }
 
   // ── Styling persistence + wiring ────────────────────────────────────────────
+  // Styling is persisted in TWO places, in this order of authority:
+  //   1. main-process settings.json (via qrAPI.getQrStyle/setQrStyle) — survives
+  //      userData changes, dev↔release app swaps, and localStorage wipes.
+  //   2. renderer localStorage (kuiqr.qrstyle) — instant synchronous fallback.
+  let styleSyncReady = false; // true once the main-process style has been merged in
   function loadStyling() {
     try {
       const saved = JSON.parse(localStorage.getItem(STYLE_KEY) || "{}");
       state.styling = Object.assign(state.styling, saved);
     } catch { /* ignore */ }
+    // Merge the durable main-process copy (async; render() is re-run after).
+    if (window.qrAPI && window.qrAPI.getQrStyle) {
+      window.qrAPI.getQrStyle().then((res) => {
+        styleSyncReady = true;
+        if (res && res.ok && res.style && typeof res.style === "object") {
+          // The main-process copy wins ONLY if it is fresher than the local copy
+          // (both layers write savedAt on every change).
+          const localAt = (() => { try { const l = JSON.parse(localStorage.getItem(STYLE_KEY) || "null"); return (l && l.savedAt) || 0; } catch { return 0; } })();
+          const mainAt = res.style.savedAt || 0;
+          if (mainAt > localAt) {
+            state.styling = Object.assign(state.styling, res.style);
+            applyStylingControls();
+            render();
+            updateContrastWarning();
+          }
+        }
+      }).catch(() => { styleSyncReady = true; });
+    } else {
+      styleSyncReady = true;
+      // No qrAPI (e.g. selftest page) — keep localStorage-only behaviour.
+    }
   }
   function saveStyling() {
+    state.styling.savedAt = Date.now();
     try { localStorage.setItem(STYLE_KEY, JSON.stringify(state.styling)); } catch { /* ignore */ }
+    if (styleSyncReady && window.qrAPI && window.qrAPI.setQrStyle) {
+      window.qrAPI.setQrStyle(state.styling).catch(() => {});
+    }
   }
   function applyStylingControls() {
     const s = state.styling;
@@ -962,9 +1049,54 @@
     return o;
   }
 
+  // ── Collapsible panels (Style / Export) ────────────────────────────────────
+  // Both panels start collapsed; the collapsed state itself is remembered so a
+  // user who always expands Style doesn't have to re-expand every launch.
+  function setupCollapsiblePanels() {
+    const panels = [
+      { toggle: "style-toggle", body: "style-body", panel: "style-panel", store: "kuiqr.genpanel.style" },
+      { toggle: "export-toggle", body: "export-body", panel: "export-panel", store: "kuiqr.genpanel.export" },
+    ];
+    for (const p of panels) {
+      const toggle = $(p.toggle), body = $(p.body);
+      if (!toggle || !body) continue;
+      let open = false;
+      try { open = localStorage.getItem(p.store) === "open"; } catch { /* ignore */ }
+      setPanel(open);
+      toggle.addEventListener("click", () => setPanel(!body.classList.contains("open")));
+      function setPanel(v) {
+        body.classList.toggle("open", v);
+        toggle.setAttribute("aria-expanded", v ? "true" : "false");
+        toggle.parentElement.classList.toggle("collapsed", !v);
+        try { localStorage.setItem(p.store, v ? "open" : "closed"); } catch { /* ignore */ }
+      }
+    }
+  }
+
+  // ── Reset styling to defaults ──────────────────────────────────────────────
+  function resetStyle() {
+    state.styling = {
+      fg: "#000000", bg: "#ffffff",
+      ecc: "M",
+      dotStyle: "square",
+      finderColor: "#000000",
+      finderDotColor: "#000000",
+      quietModules: 4,
+    };
+    state.logo = null;
+    saveStyling();
+    applyStylingControls();
+    onLogoChange();   // clears ECC lock + note when logo is removed
+    updateContrastWarning();
+    render();
+  }
+
   // ── Public init ────────────────────────────────────────────────────────────
   function init() {
     loadStyling();
+    // Collapsible Style / Export panels (collapsed by default so the preview
+    // is visible immediately after entering content).
+    setupCollapsiblePanels();
     // Template selector
     const sel = $("gen-template");
     if (sel) {
@@ -1009,6 +1141,8 @@
     });
     const logoClear = $("style-logo-clear");
     if (logoClear) logoClear.addEventListener("click", () => { state.logo = null; onLogoChange(); });
+    // Reset style button
+    if ($("style-reset")) $("style-reset").addEventListener("click", resetStyle);
 
     // Export buttons
     if ($("gen-download")) $("gen-download").addEventListener("click", exportPNG);

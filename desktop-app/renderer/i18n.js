@@ -314,9 +314,16 @@ const I18N = {
   "tpl.geo.latPh": { en: "37.4219" },
   "tpl.geo.lng": { en: "Longitude" },
   "tpl.geo.lngPh": { en: "-122.0840" },
+  "tpl.wifi.scan": { en: "Scan nearby" },
+  "tpl.wifi.scanning": { en: "Scanning for networks…" },
+  "tpl.wifi.none": { en: "No visible networks. macOS only shows the network you're connected to unless Location Services is enabled — you can still type the name." },
+  "tpl.wifi.fail": { en: "Couldn't scan — you can still type the network name." },
 
   // ── QR Generator: styling (Step 2) ──
   "gen.style": { en: "Style & Colors" },
+  "gen.styleHint": { en: "colors · logo · dots · quiet zone" },
+  "gen.styleReset": { en: "Reset to default style" },
+  "gen.exportHint": { en: "sizes · DPI · caption" },
   "gen.fg": { en: "Foreground" },
   "gen.bg": { en: "Background" },
   "gen.contrastLow": { en: "Contrast is too low — this QR may fail to scan. Use a darker foreground or lighter background." },

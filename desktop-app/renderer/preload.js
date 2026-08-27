@@ -113,6 +113,15 @@ contextBridge.exposeInMainWorld("qrAPI", {
   startLocalBackend: () => ipcRenderer.invoke("start-local-backend"),
   stopLocalBackend: () => ipcRenderer.invoke("stop-local-backend"),
 
+  // ── Persisted QR styling defaults (sync main-process settings) ──
+  // Get the saved styling object or null.
+  getQrStyle: () => ipcRenderer.invoke("get-qr-style"),
+  // Save styling defaults (fg/bg/ecc/dotStyle/finder/quiet — logo not persisted).
+  setQrStyle: (style) => ipcRenderer.invoke("set-qr-style", style),
+
+  // ── Wi-Fi scan (nearby SSID picker in the WiFi QR template) ──
+  scanWifi: () => ipcRenderer.invoke("scan-wifi"),
+
   // Restart the app
   restartApp: () => ipcRenderer.invoke("restart-app"),
 
