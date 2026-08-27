@@ -94,6 +94,8 @@ const DEFAULT_SETTINGS = {
   language: "en",                   // UI language code (en, zh-CN, zh-TW, ja, ko, es, fr, de)
   lastUpdateNagVersion: "",         // last version we already nagged the user about updating to
   setupDone: false,                 // whether the first-launch setup wizard has been completed
+  dynamicBackendUrl: "",             // base URL of the Kuiqr dynamic-QR redirect/analytics backend
+  dynamicApiKey: "",                // API key for that backend (POST /api/codes, GET .../stats)
 };
 
 function loadSettings() {
@@ -1742,6 +1744,49 @@ ipcMain.handle("restart-app", () => {
   app.relaunch();
   app.quit();
   return { ok: true };
+});
+
+// ── Dynamic QR (Kuiqr redirect + analytics backend) ──
+// The renderer proxies through the main process so the API key stays server-side
+// (it is stored in settings and never handed to the renderer). Config lives in
+// Settings: dynamicBackendUrl + dynamicApiKey.
+async function callDynamicApi(apiPath, { method = "GET", body } = {}) {
+  const settings = loadSettings();
+  const base = (settings.dynamicBackendUrl || "").replace(/\/+$/, "");
+  const key = settings.dynamicApiKey || "";
+  if (!base) return { ok: false, reason: "backend-not-configured" };
+  const headers = { "Content-Type": "application/json" };
+  if (key) headers["x-api-key"] = key;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    const res = await net.fetch(`${base}${apiPath}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (!res.ok) {
+      return { ok: false, status: res.status, reason: (data && data.error) || `http-${res.status}`, data };
+    }
+    return { ok: true, data };
+  } catch (e) {
+    return { ok: false, reason: "network", error: String((e && e.message) || e) };
+  }
+}
+
+ipcMain.handle("dynamic-create", async (event, { destination, note, expiresAt } = {}) => {
+  if (!destination) return { ok: false, reason: "destination-required" };
+  return callDynamicApi("/api/codes", { method: "POST", body: { destination, note, expiresAt } });
+});
+
+ipcMain.handle("dynamic-stats", async (event, { code } = {}) => {
+  if (!code) return { ok: false, reason: "code-required" };
+  return callDynamicApi(`/api/codes/${encodeURIComponent(code)}/stats`);
 });
 
 // Downloads the chosen update asset into the user's Downloads folder and opens

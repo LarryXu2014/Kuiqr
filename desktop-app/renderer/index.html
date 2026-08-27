@@ -32,6 +32,10 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M7 14h.01M7 17h.01M10 14v4M17 7h.01"/></svg>
       <span data-i18n="tab.generate">Generate</span>
     </button>
+    <button class="tab" data-tab="stats">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span data-i18n="tab.stats">Stats</span>
+    </button>
   </nav>
 
   <!-- ===== Scan Tab ===== -->
@@ -206,6 +210,25 @@
       </label>
     </div>
 
+    <div class="settings-group dynamic-settings-group">
+      <h3 class="group-title" data-i18n="set.dynamicGroup">Dynamic QR (analytics)</h3>
+      <p class="setting-desc" data-i18n="gen.dynamicDesc">Encode a redirect link so you can see scan analytics. Requires a backend set in Settings.</p>
+      <div class="setting-item">
+        <div class="setting-info">
+          <div class="setting-label" data-i18n="set.dynamicBackend">Backend URL</div>
+          <div class="setting-desc" data-i18n="set.dynamicBackendDesc">Base URL of your redirect/analytics server (e.g. https://qr.yourdomain.com)</div>
+        </div>
+        <input type="text" id="setting-dynamic-backend" class="setting-input" placeholder="https://qr.yourdomain.com" />
+      </div>
+      <div class="setting-item">
+        <div class="setting-info">
+          <div class="setting-label" data-i18n="set.dynamicApiKey">API key</div>
+          <div class="setting-desc" data-i18n="set.dynamicApiKeyDesc">Secret used to create codes. Stored locally on this device.</div>
+        </div>
+        <input type="password" id="setting-dynamic-apikey" class="setting-input" placeholder="••••••••" />
+      </div>
+    </div>
+
     <button id="save-settings-btn" class="btn-save" data-i18n="btn.save">Save Settings</button>
     <p id="settings-saved" class="settings-saved hidden" data-i18n="settings.saved">Settings saved!</p>
 
@@ -253,6 +276,25 @@
       <textarea id="gen-input" class="generate-input" data-i18n-ph="gen.placeholder" placeholder="https://example.com or any text…" rows="4"></textarea>
     </div>
 
+    <div class="generate-group">
+      <label class="setting-item toggle-row">
+        <div class="setting-info">
+          <div class="setting-label" data-i18n="gen.dynamic">Dynamic (trackable) QR</div>
+          <div class="setting-desc" data-i18n="gen.dynamicDesc">Encode a redirect link so you can see scan analytics. Requires a backend set in Settings.</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="gen-dynamic" />
+          <span class="toggle-slider"></span>
+        </label>
+      </label>
+
+      <div id="gen-dynamic-panel" class="dynamic-panel hidden">
+        <button id="gen-create-trackable" class="btn-save" data-i18n="gen.createTrackable">Create trackable QR</button>
+        <div id="gen-dynamic-status" class="dynamic-status hidden"></div>
+        <p class="setting-desc gen-dynamic-hint" data-i18n="gen.dynamicHint">Turn on to encode a redirect link so you can track scans. Needs a backend set in Settings.</p>
+      </div>
+    </div>
+
     <div class="generate-row">
       <div class="generate-col">
         <label class="setting-label" for="gen-ecc" data-i18n="gen.ecc">Error correction</label>
@@ -274,6 +316,27 @@
       <button id="gen-download" class="btn-save" data-i18n="gen.download">Download PNG</button>
       <button id="gen-copy-qr" class="btn-text" data-i18n="gen.copyqr">Copy QR Code</button>
       <button id="gen-copy" class="btn-text" data-i18n="gen.copytext">Copy Text</button>
+    </div>
+  </div>
+
+  <!-- ===== Stats Tab ===== -->
+  <div id="tab-stats" class="tab-content">
+    <h2 class="settings-title" data-i18n="stats.title">QR Analytics</h2>
+    <p class="setting-desc" data-i18n="stats.desc">Scan analytics for the trackable QR codes you have created.</p>
+    <div class="stats-layout">
+      <div id="stats-list" class="stats-list">
+        <p class="empty-state" id="stats-empty" data-i18n="stats.empty">No trackable QR codes yet. Create one on the Generate tab.</p>
+      </div>
+      <div id="stats-detail" class="stats-detail hidden">
+        <button id="stats-back" class="btn-text" data-i18n="stats.back">← Back to list</button>
+        <div id="stats-summary" class="stats-summary"></div>
+        <h3 data-i18n="stats.byDay">Scans per day</h3>
+        <div id="stats-byday" class="stats-chart"></div>
+        <h3 data-i18n="stats.byCountry">By country</h3>
+        <div id="stats-bycountry" class="stats-bars"></div>
+        <h3 data-i18n="stats.byDevice">By device</h3>
+        <div id="stats-bydevice" class="stats-bars"></div>
+      </div>
     </div>
   </div>
 

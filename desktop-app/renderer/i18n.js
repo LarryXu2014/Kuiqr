@@ -118,6 +118,39 @@ const I18N = {
   "gen.copytext": { en: "Copy Text", "zh-CN": "复制文本", "zh-TW": "複製文字", ja: "テキストをコピー", ko: "텍스트 복사", es: "Copiar texto", fr: "Copier le texte", de: "Text kopieren" },
   "gen.error": { en: "Could not generate: {msg}", "zh-CN": "无法生成：{msg}", "zh-TW": "無法產生：{msg}", ja: "生成できませんでした：{msg}", ko: "생성할 수 없음: {msg}", es: "No se pudo generar: {msg}", fr: "Impossible de générer : {msg}", de: "Erzeugung fehlgeschlagen: {msg}" },
 
+  // Dynamic (trackable) QR
+  "gen.dynamic": { en: "Dynamic (trackable) QR" },
+  "gen.dynamicDesc": { en: "Encode a redirect link so you can see scan analytics. Requires a backend set in Settings." },
+  "gen.createTrackable": { en: "Create trackable QR" },
+  "gen.creating": { en: "Creating…" },
+  "gen.trackableActive": { en: "Trackable QR ready:" },
+  "gen.viewStats": { en: "View stats" },
+  "gen.createFirst": { en: "Click \"Create trackable QR\" to generate a redirect link for this destination." },
+  "gen.needDestination": { en: "Enter a destination first." },
+  "gen.dynamicError": { en: "Could not create trackable QR: {reason}" },
+  "gen.dynamicHint": { en: "Turn on to encode a redirect link so you can track scans. Needs a backend set in Settings." },
+
+  // Stats tab
+  "tab.stats": { en: "Stats" },
+  "stats.title": { en: "QR Analytics" },
+  "stats.desc": { en: "Scan analytics for the trackable QR codes you have created." },
+  "stats.empty": { en: "No trackable QR codes yet. Create one on the Generate tab." },
+  "stats.back": { en: "← Back to list" },
+  "stats.loading": { en: "Loading…" },
+  "stats.total": { en: "Total scans" },
+  "stats.unique": { en: "Unique" },
+  "stats.destination": { en: "Destination" },
+  "stats.byDay": { en: "Scans per day" },
+  "stats.byCountry": { en: "By country" },
+  "stats.byDevice": { en: "By device" },
+
+  // Settings — Dynamic QR backend
+  "set.dynamicGroup": { en: "Dynamic QR (analytics)" },
+  "set.dynamicBackend": { en: "Backend URL" },
+  "set.dynamicBackendDesc": { en: "Base URL of your redirect/analytics server (e.g. https://qr.yourdomain.com)" },
+  "set.dynamicApiKey": { en: "API key" },
+  "set.dynamicApiKeyDesc": { en: "Secret used to create codes. Stored locally on this device." },
+
   // Modals — extension prompt
   "ext.title": { en: "Get the browser extension", "zh-CN": "获取浏览器扩展", "zh-TW": "取得瀏覽器擴充功能", ja: "ブラウザ拡張機能を入手", ko: "브라우저 확장 설치", es: "Obtén la extensión del navegador", fr: "Obtenez l'extension navigateur", de: "Hol dir die Browser-Erweiterung" },
   "ext.desc": { en: "Kuiqr works best with its browser extension. Would you like to download it now?", "zh-CN": "Kuiqr 配合浏览器扩展使用效果最佳。要现在下载吗？", "zh-TW": "Kuiqr 搭配瀏覽器擴充功能效果最佳。要現在下載嗎？", ja: "Kuiqrはブラウザ拡張機能と一緒に使うと最も便利です。今すぐダウンロードしますか？", ko: "Kuiqr는 브라우저 확장과 함께 사용할 때 가장 좋습니다. 지금 다운로드할까요?", es: "Kuiqr funciona mejor con su extensión de navegador. ¿Quieres descargarla ahora?", fr: "Kuiqr est meilleur avec son extension navigateur. Voulez-vous la télécharger maintenant ?", de: "Kuiqr ist am besten mit seiner Browser-Erweiterung. Möchtest du sie jetzt herunterladen?" },

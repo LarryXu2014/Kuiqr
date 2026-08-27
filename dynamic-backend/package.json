@@ -1,0 +1,19 @@
+{
+  "name": "kuiqr-dynamic-backend",
+  "version": "1.0.0",
+  "description": "Dynamic QR redirect + analytics service for Kuiqr (Fastify + SQLite + GeoIP).",
+  "main": "server.js",
+  "license": "GPL-3.0",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "bash test_local.sh"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "geoip-lite": "^1.4.10",
+    "ua-parser-js": "^1.0.39"
+  }
+}

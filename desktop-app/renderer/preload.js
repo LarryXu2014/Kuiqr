@@ -85,6 +85,12 @@ contextBridge.exposeInMainWorld("qrAPI", {
   // Internet connectivity probe
   checkInternet: () => ipcRenderer.invoke("check-internet"),
 
+  // Dynamic QR: create a trackable short code on the configured backend, and
+  // fetch scan analytics. The API key is held by the main process and never
+  // exposed to the renderer.
+  createDynamicCode: (payload) => ipcRenderer.invoke("dynamic-create", payload),
+  getDynamicStats: (payload) => ipcRenderer.invoke("dynamic-stats", payload),
+
   // Restart the app
   restartApp: () => ipcRenderer.invoke("restart-app"),
 

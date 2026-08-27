@@ -169,6 +169,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("save-settings-btn").addEventListener("click", saveSettings);
   setupShortcutRecorder();
   setupGenerate();
+  setupStats();
   setupSettingsDirtyTracking();
   setupUnsavedPrompt();
 
@@ -265,6 +266,8 @@ function getSettingsFormValues() {
     showScanPopup: document.getElementById("setting-showscanpopup").checked,
     maxHistory: parseInt(document.getElementById("setting-maxhistory").value, 10) || 50,
     shortcut: currentShortcut,
+    dynamicBackendUrl: (document.getElementById("setting-dynamic-backend").value || "").trim(),
+    dynamicApiKey: document.getElementById("setting-dynamic-apikey").value || "",
   };
 }
 
@@ -277,7 +280,9 @@ function updateSettingsDirtyState() {
     current.browserExtensionPriority !== savedSettingsSnapshot.browserExtensionPriority ||
     current.showScanPopup !== savedSettingsSnapshot.showScanPopup ||
     current.maxHistory !== savedSettingsSnapshot.maxHistory ||
-    current.shortcut !== savedSettingsSnapshot.shortcut;
+    current.shortcut !== savedSettingsSnapshot.shortcut ||
+    current.dynamicBackendUrl !== savedSettingsSnapshot.dynamicBackendUrl ||
+    current.dynamicApiKey !== savedSettingsSnapshot.dynamicApiKey;
 
   settingsDirty = dirty;
   const saveBtn = document.getElementById("save-settings-btn");
@@ -294,7 +299,7 @@ function markSettingsClean() {
 }
 
 function setupSettingsDirtyTracking() {
-  const ids = ["setting-autoopen", "setting-copytext", "setting-browserpriority", "setting-showscanpopup", "setting-maxhistory"];
+  const ids = ["setting-autoopen", "setting-copytext", "setting-browserpriority", "setting-showscanpopup", "setting-maxhistory", "setting-dynamic-backend", "setting-dynamic-apikey"];
   ids.forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("change", updateSettingsDirtyState);
@@ -1171,6 +1176,8 @@ async function loadSettingsForm() {
   document.getElementById("setting-browserpriority").checked = !!settings.browserExtensionPriority;
   document.getElementById("setting-showscanpopup").checked = settings.showScanPopup !== false;
   document.getElementById("setting-maxhistory").value = settings.maxHistory || 50;
+  document.getElementById("setting-dynamic-backend").value = settings.dynamicBackendUrl || "";
+  document.getElementById("setting-dynamic-apikey").value = settings.dynamicApiKey || "";
 
   // Track the active shortcut and reflect it everywhere
   currentShortcut = settings.shortcut || "CommandOrControl+Shift+Y";
@@ -1359,6 +1366,8 @@ async function saveSettings() {
     browserExtensionPriority: document.getElementById("setting-browserpriority").checked,
     showScanPopup: document.getElementById("setting-showscanpopup").checked,
     maxHistory: parseInt(document.getElementById("setting-maxhistory").value, 10) || 50,
+    dynamicBackendUrl: (document.getElementById("setting-dynamic-backend").value || "").trim(),
+    dynamicApiKey: document.getElementById("setting-dynamic-apikey").value || "",
   };
 
   await window.qrAPI.saveSettings(settings);
@@ -1375,6 +1384,16 @@ async function saveSettings() {
 // Generate QR Code
 // ============================================================
 
+// Local store of trackable QR codes the user has created (so the Stats tab can
+// list them and re-open analytics). Keyed by short code.
+const DYNAMIC_STORE_KEY = "kuiqr.dynamicCodes";
+function loadDynamicCodes() {
+  try { return JSON.parse(localStorage.getItem(DYNAMIC_STORE_KEY) || "[]"); } catch { return []; }
+}
+function saveDynamicCodes(list) {
+  try { localStorage.setItem(DYNAMIC_STORE_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+}
+
 function setupGenerate() {
   const input = document.getElementById("gen-input");
   const ecc = document.getElementById("gen-ecc");
@@ -1384,18 +1403,25 @@ function setupGenerate() {
   const copyQrBtn = document.getElementById("gen-copy-qr");
   const copyBtn = document.getElementById("gen-copy");
 
-  let lastDataUrl = "";
+  // Dynamic (trackable) QR elements
+  const dynToggle = document.getElementById("gen-dynamic");
+  const dynPanel = document.getElementById("gen-dynamic-panel");
+  const dynCreateBtn = document.getElementById("gen-create-trackable");
+  const dynStatus = document.getElementById("gen-dynamic-status");
 
-  function render() {
-    const text = input.value;
+  let lastDataUrl = "";
+  let currentDynamic = null; // { code, shortUrl, destination, createdAt }
+
+  function setStatus(html, isError) {
+    if (!dynStatus) return;
+    dynStatus.innerHTML = html || "";
+    dynStatus.classList.toggle("hidden", !html);
+    dynStatus.classList.toggle("status-error", !!isError);
+  }
+
+  function encodeAndShow(text) {
     errorEl.classList.add("hidden");
-    if (!text) {
-      img.style.display = "none";
-      lastDataUrl = "";
-      return;
-    }
     try {
-      // qrcode(typeNumber=0 → auto, errorCorrectionLevel) from qrcode-generator (UMD)
       const qr = qrcode(0, ecc.value);
       qr.addData(text);
       qr.make();
@@ -1412,9 +1438,75 @@ function setupGenerate() {
     }
   }
 
+  function render() {
+    const text = input.value;
+    const dynamic = !!(dynToggle && dynToggle.checked);
+    if (dynPanel) dynPanel.classList.toggle("hidden", !dynamic);
+
+    if (!text) {
+      img.style.display = "none";
+      lastDataUrl = "";
+      if (dynamic && dynStatus) setStatus(t("gen.dynamicHint"));
+      return;
+    }
+
+    if (dynamic) {
+      if (currentDynamic && currentDynamic.destination === text) {
+        encodeAndShow(currentDynamic.shortUrl);
+        setStatus(
+          `<div class="dyn-ok">${t("gen.trackableActive")} <code>${escapeHtml(currentDynamic.shortUrl)}</code></div>` +
+          `<button class="btn-text" id="dyn-view-stats">${t("gen.viewStats")}</button>`
+        );
+        const vs = document.getElementById("dyn-view-stats");
+        if (vs) vs.addEventListener("click", () => requestSwitchTab("stats"));
+      } else {
+        img.style.display = "none";
+        lastDataUrl = "";
+        setStatus(`<div class="dyn-warn">${t("gen.createFirst")}</div>`);
+      }
+      return;
+    }
+
+    // Static mode: encode the content directly.
+    encodeAndShow(text);
+  }
+
   if (input) {
     input.addEventListener("input", render);
     ecc.addEventListener("change", render);
+  }
+  if (dynToggle) dynToggle.addEventListener("change", render);
+
+  if (dynCreateBtn) {
+    dynCreateBtn.addEventListener("click", async () => {
+      const destination = (input.value || "").trim();
+      if (!destination) { setStatus(t("gen.needDestination"), true); return; }
+      dynCreateBtn.disabled = true;
+      dynCreateBtn.textContent = t("gen.creating");
+      try {
+        const res = await window.qrAPI.createDynamicCode({ destination });
+        if (!res || !res.ok) {
+          setStatus(t("gen.dynamicError", { reason: (res && res.reason) || "unknown" }), true);
+          return;
+        }
+        currentDynamic = {
+          code: res.data.code,
+          shortUrl: res.data.shortUrl,
+          destination,
+          createdAt: res.data.createdAt,
+        };
+        const list = loadDynamicCodes().filter((c) => c.code !== currentDynamic.code);
+        list.unshift(currentDynamic);
+        saveDynamicCodes(list);
+        if (window.__kuiqrRefreshStatsList) window.__kuiqrRefreshStatsList();
+        render();
+      } catch (e) {
+        setStatus(t("gen.dynamicError", { reason: String((e && e.message) || e) }), true);
+      } finally {
+        dynCreateBtn.disabled = false;
+        dynCreateBtn.textContent = t("gen.createTrackable");
+      }
+    });
   }
 
   if (downloadBtn) {
@@ -1455,13 +1547,89 @@ function setupGenerate() {
 
   if (copyBtn) {
     copyBtn.addEventListener("click", () => {
-      if (!input.value) return;
-      window.qrAPI.copyClipboard(input.value);
+      const dynamic = !!(dynToggle && dynToggle.checked);
+      const textToCopy = (dynamic && currentDynamic) ? currentDynamic.shortUrl : input.value;
+      if (!textToCopy) return;
+      window.qrAPI.copyClipboard(textToCopy);
       copyBtn.textContent = t("result.copied");
       setTimeout(() => { copyBtn.textContent = t("gen.copytext"); }, 1500);
       showScanPopup("success", t("textCopied"), t("textCopiedSub"));
     });
   }
+}
+
+// ============================================================
+// Stats (Dynamic QR analytics)
+// ============================================================
+
+function setupStats() {
+  const listEl = document.getElementById("stats-list");
+  const emptyEl = document.getElementById("stats-empty");
+  const detailEl = document.getElementById("stats-detail");
+  const backBtn = document.getElementById("stats-back");
+  const summaryEl = document.getElementById("stats-summary");
+  const byDayEl = document.getElementById("stats-byday");
+  const byCountryEl = document.getElementById("stats-bycountry");
+  const byDeviceEl = document.getElementById("stats-bydevice");
+
+  function renderBars(container, items, showSub) {
+    if (!items || !items.length) { container.innerHTML = `<p class="setting-desc">—</p>`; return; }
+    const max = Math.max.apply(null, items.map((i) => i.value).concat([1]));
+    container.innerHTML = items.map((i) => {
+      const pct = Math.max(4, Math.round((i.value / max) * 100));
+      const sub = showSub && i.sub ? ` <span class="bar-sub">(${escapeHtml(i.sub)})</span>` : "";
+      return `<div class="bar-row">
+        <div class="bar-label">${escapeHtml(String(i.label))}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <div class="bar-val">${i.value}${sub}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderList() {
+    const codes = loadDynamicCodes();
+    listEl.querySelectorAll(".stats-code-item").forEach((n) => n.remove());
+    if (!codes.length) { emptyEl.classList.remove("hidden"); return; }
+    emptyEl.classList.add("hidden");
+    codes.forEach((c) => {
+      const item = document.createElement("button");
+      item.className = "stats-code-item";
+      item.innerHTML =
+        `<div class="sci-code">${escapeHtml(c.code)}</div>` +
+        `<div class="sci-dest">${escapeHtml(c.destination)}</div>` +
+        `<div class="sci-meta">${escapeHtml(c.shortUrl || "")}</div>`;
+      item.addEventListener("click", () => showStats(c.code));
+      listEl.appendChild(item);
+    });
+  }
+
+  async function showStats(code) {
+    detailEl.classList.remove("hidden");
+    summaryEl.innerHTML = `<p class="setting-desc">${t("stats.loading")}</p>`;
+    byDayEl.innerHTML = ""; byCountryEl.innerHTML = ""; byDeviceEl.innerHTML = "";
+    const res = await window.qrAPI.getDynamicStats({ code });
+    if (!res || !res.ok) {
+      summaryEl.innerHTML = `<p class="generate-error">${escapeHtml((res && res.reason) || t("scanFailedMsg"))}</p>`;
+      return;
+    }
+    const s = res.data;
+    summaryEl.innerHTML =
+      `<div class="stat-cards">` +
+        `<div class="stat-card"><div class="stat-num">${s.total}</div><div class="stat-lbl">${t("stats.total")}</div></div>` +
+        `<div class="stat-card"><div class="stat-num">${s.unique}</div><div class="stat-lbl">${t("stats.unique")}</div></div>` +
+      `</div>` +
+      `<p class="setting-desc"><b>${t("stats.destination")}:</b> ${escapeHtml(s.destination || "")}</p>` +
+      `<p class="setting-desc">${escapeHtml(s.shortUrl || "")}</p>`;
+    renderBars(byDayEl, s.byDay.map((d) => ({ label: d.day, value: d.total, sub: t("stats.unique") + ": " + d.unique_scans })), true);
+    renderBars(byCountryEl, s.byCountry.map((d) => ({ label: d.country, value: d.total })));
+    renderBars(byDeviceEl, s.byDevice.map((d) => ({ label: d.device, value: d.total })));
+  }
+
+  backBtn.addEventListener("click", () => detailEl.classList.add("hidden"));
+  window.__kuiqrRefreshStatsList = renderList;
+  const statsTabBtn = document.querySelector('.tab[data-tab="stats"]');
+  if (statsTabBtn) statsTabBtn.addEventListener("click", renderList);
+  renderList();
 }
 
 // ============================================================
