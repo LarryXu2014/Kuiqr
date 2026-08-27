@@ -128,7 +128,7 @@ const I18N = {
   "gen.createFirst": { en: "Click \"Create trackable QR\" to generate a redirect link for this destination." },
   "gen.needDestination": { en: "Enter a destination first." },
   "gen.dynamicError": { en: "Could not create trackable QR: {reason}" },
-  "gen.dynamicHint": { en: "Turn on to encode a redirect link so you can track scans. Needs a backend set in Settings." },
+  "gen.dynamicHint": { en: "Turn on to encode a redirect link so you can track scans. No backend yet? Set up a free local one in Settings → Dynamic QR." },
 
   // Stats tab
   "tab.stats": { en: "Stats" },
@@ -372,7 +372,23 @@ const I18N = {
   // ── Region watch (Step 5) ──
   "watch.btn": { en: "Region Watch…" },
   "watch.running": { en: "Watching region" },
-  "watch.paused": { en: "Paused" },
+  "watch.paused": { en: "Paused (Settings focused)" },
+  "watch.stop": { en: "Stop Region Watch" },
+  "watch.newRegion": { en: "New region…" },
+  "watch.checking": { en: "Watching — checking every {ms}ms" },
+  "watch.lastScan": { en: "Last scan: {code}" },
+
+  // Dynamic (trackable) QR — help + local backend
+  "set.dynamicHelpTitle": { en: "What is this? (Don't have a backend?)" },
+  "set.dynamicHelp1": { en: "A trackable QR encodes a short redirect link instead of the final destination. When someone scans it, your server logs the visit and forwards them to the real page — so you can see how many times it was scanned." },
+  "set.dynamicHelp2": { en: "Backend URL is the address of that server (e.g. https://qr.yourdomain.com). API key is a secret the app sends to create codes; you set it on the server and paste the same value here." },
+  "set.dynamicHelp3": { en: "You don't need to buy anything. Kuiqr ships with a free, self-hosted backend you can run on this Mac with one click (button below). Or point it at your own server / a compatible service." },
+  "set.dynamicLocalStart": { en: "Run local backend (free)" },
+  "set.dynamicLocalStop": { en: "Stop local backend" },
+  "set.dynamicLocalStarting": { en: "Starting local backend…" },
+  "set.dynamicLocalRunning": { en: "Local backend running at {url} — URL & key saved." },
+  "set.dynamicLocalFailed": { en: "Could not start local backend: {reason}" },
+  "set.dynamicLocalStopped": { en: "Local backend stopped." },
 };
 
 // ── Localized step lists ──

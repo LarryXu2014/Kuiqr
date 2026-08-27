@@ -1183,6 +1183,16 @@ input[type="range"] { flex: 1; }
 .region-watch-status.running { color: #047857; background: #ecfdf5; }
 .region-watch-status.paused { color: #b45309; background: #fff7ed; }
 
+/* Dynamic QR help + local backend controls */
+.dyn-help { margin: 8px 0 4px; }
+.dyn-help summary { cursor: pointer; font-size: 13px; color: #1d4ed8; user-select: none; }
+.dyn-help-body { font-size: 12.5px; line-height: 1.5; color: var(--text, #111); padding: 8px 0 4px; }
+.dyn-help-body code { background: #f1f5f9; padding: 1px 4px; border-radius: 4px; font-size: 12px; }
+.dyn-help-body p { margin: 0 0 8px; }
+.dyn-help-body p:last-child { margin-bottom: 0; }
+.dyn-local { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.dyn-local .btn-save { width: auto; }
+
 /* Batch modal */
 .batch-card { width: 560px; max-width: 92vw; }
 .batch-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }

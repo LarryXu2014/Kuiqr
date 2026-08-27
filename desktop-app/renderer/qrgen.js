@@ -546,22 +546,82 @@
         }
       });
     }
+
+    // ── One-click local (self-hosted) analytics backend ──
+    const localStart = $("dyn-local-start");
+    const localStop = $("dyn-local-stop");
+    const localStatus = $("dyn-local-status");
+    const setLocalStatus = (html, isError) => {
+      if (!localStatus) return;
+      localStatus.innerHTML = html || "";
+      localStatus.classList.toggle("hidden", !html);
+      localStatus.classList.toggle("status-error", !!isError);
+    };
+    const fillAndSave = () => {
+      const saveBtn = document.getElementById("save-settings-btn");
+      if (saveBtn) saveBtn.click();
+    };
+    if (localStart) localStart.addEventListener("click", async () => {
+      localStart.disabled = true;
+      localStart.textContent = t("set.dynamicLocalStarting");
+      try {
+        const res = await window.qrAPI.startLocalBackend();
+        if (!res || !res.ok) { setLocalStatus(t("set.dynamicLocalFailed", { reason: (res && res.reason) || "unknown" }), true); return; }
+        const be = document.getElementById("setting-dynamic-backend");
+        const ak = document.getElementById("setting-dynamic-apikey");
+        if (be) be.value = res.url;
+        if (ak) ak.value = res.apiKey;
+        fillAndSave();
+        setLocalStatus(t("set.dynamicLocalRunning", { url: res.url }), false);
+        if (localStop) localStop.classList.remove("hidden");
+      } catch (e) {
+        setLocalStatus(t("set.dynamicLocalFailed", { reason: String((e && e.message) || e) }), true);
+      } finally {
+        localStart.disabled = false;
+        localStart.textContent = t("set.dynamicLocalStart");
+      }
+    });
+    if (localStop) localStop.addEventListener("click", async () => {
+      try { await window.qrAPI.stopLocalBackend(); } catch { /* ignore */ }
+      setLocalStatus(t("set.dynamicLocalStopped"), false);
+      localStop.classList.add("hidden");
+    });
   }
 
   // ── Region watch (Step 5) ────────────────────────────────────────────────
   function setupRegionWatch() {
     const btn = $("region-watch-btn");
+    const stopBtn = $("region-watch-stop");
     const statusEl = $("region-watch-status");
+    const labelEl = btn ? btn.querySelector(".btn-label") : null;
     if (btn) btn.addEventListener("click", () => {
       if (window.qrAPI && window.qrAPI.openRegionWatch) window.qrAPI.openRegionWatch();
+    });
+    if (stopBtn) stopBtn.addEventListener("click", () => {
+      if (window.qrAPI && window.qrAPI.stopRegionWatch) window.qrAPI.stopRegionWatch();
     });
     if (window.qrAPI && window.qrAPI.onRegionWatchStatus) {
       window.qrAPI.onRegionWatchStatus((s) => {
         if (!statusEl) return;
-        if (!s || !s.running) { statusEl.textContent = ""; statusEl.className = "region-watch-status hidden"; return; }
+        if (!s || !s.running) {
+          statusEl.textContent = ""; statusEl.className = "region-watch-status hidden";
+          if (labelEl) labelEl.textContent = t("watch.btn");
+          if (stopBtn) stopBtn.classList.add("hidden");
+          return;
+        }
+        if (stopBtn) stopBtn.classList.remove("hidden");
+        if (labelEl) labelEl.textContent = t("watch.newRegion");
+        let txt;
+        if (s.paused) {
+          txt = "⏸ " + t("watch.paused");
+        } else if (s.lastCode) {
+          txt = "✅ " + t("watch.lastScan", { code: s.lastCode.slice(0, 40) });
+        } else {
+          txt = "🔍 " + t("watch.checking", { ms: 500 });
+        }
+        const last = s.lastActivity ? new Date(s.lastActivity).toLocaleTimeString() : "";
+        statusEl.textContent = txt + (last ? "  ·  " + last : "");
         statusEl.className = "region-watch-status " + (s.paused ? "paused" : "running");
-        statusEl.textContent = (s.paused ? "⏸ " : "● ") + (s.paused ? t("watch.paused") : t("watch.running")) +
-          (s.lastCode ? " — " + s.lastCode.slice(0, 40) : "");
       });
     }
   }

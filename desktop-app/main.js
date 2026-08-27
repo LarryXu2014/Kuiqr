@@ -21,6 +21,7 @@ const { app, BrowserWindow, globalShortcut, screen, desktopCapturer, ipcMain, Tr
 const path = require("path");
 const fs = require("fs");
 const { execSync, spawn, exec } = require("child_process");
+const crypto = require("crypto");
 
 // jsQR runs in the main process so the region-watch loop can decode captured
 // frames directly (no round-trip to the renderer).
@@ -254,6 +255,8 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   isQuiting = true;
+  stopLocalBackend();
+  stopRegionWatch();
   stopForegroundMonitor();
   globalShortcut.unregisterAll();
 });
@@ -1380,11 +1383,14 @@ let currentTab = "scan";
 const regionWatch = {
   active: false, paused: false, rect: null, displayId: null,
   intervalMs: 500, timer: null, lastPayload: null, lastFire: 0,
+  lastActivity: 0, lastSeenAt: 0,
 };
 
 function broadcastWatchStatus() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  const s = regionWatch.active ? { running: true, paused: regionWatch.paused, lastCode: regionWatch.lastPayload } : null;
+  const s = regionWatch.active
+    ? { running: true, paused: regionWatch.paused, lastCode: regionWatch.lastPayload, lastActivity: regionWatch.lastActivity, lastSeenAt: regionWatch.lastSeenAt }
+    : null;
   mainWindow.webContents.send("region-watch-status", s);
 }
 function updateWatchPause() {
@@ -1441,23 +1447,36 @@ async function regionWatchTick() {
   for (const s of sources) { if (String(s.display_id) === tid || String(s.id) === tid) { src = s; break; } }
   const thumb = src.thumbnail;
   if (!thumb || thumb.isEmpty()) return;
-  const cx = Math.round(x * sf), cy = Math.round(y * sf);
-  const cw = Math.max(1, Math.round(w * sf)), ch = Math.max(1, Math.round(h * sf));
+  // The captured thumbnail is the full screen at `thumbnailSize`, which may be
+  // downscaled (capped at MAX px). Map the CSS-px rect onto the *actual* thumbnail
+  // resolution so we crop the correct region on Retina / high-DPI displays.
+  const size = thumb.getSize();
+  const physW = display.bounds.width * sf;
+  const thumbScale = size.width / (physW || size.width);
+  const cx = Math.round(x * sf * thumbScale);
+  const cy = Math.round(y * sf * thumbScale);
+  const cw = Math.max(1, Math.round(w * sf * thumbScale));
+  const ch = Math.max(1, Math.round(h * sf * thumbScale));
   const cropped = thumb.crop({ x: cx, y: cy, width: cw, height: ch });
   if (cropped.isEmpty()) return;
-  const size = cropped.getSize();
+  const csize = cropped.getSize();
+  regionWatch.lastActivity = Date.now();
   let res = null;
-  try { res = jsQR(new Uint8ClampedArray(cropped.getBitmap()), size.width, size.height); }
+  try { res = jsQR(new Uint8ClampedArray(cropped.getBitmap()), csize.width, csize.height); }
   catch { return; }
-  if (!res || !res.data) return;
-  const payload = res.data.trim();
-  if (!payload) return;
-  if (payload === regionWatch.lastPayload) return; // debounce identical payloads
-  const now = Date.now();
-  if (now - regionWatch.lastFire < 600) return;  // extra debounce window
-  regionWatch.lastPayload = payload;
-  regionWatch.lastFire = now;
-  applyDecodedResult(payload);
+  if (res && res.data && res.data.trim()) {
+    const payload = res.data.trim();
+    regionWatch.lastSeenAt = Date.now();
+    const now = Date.now();
+    // Only fire the actions on a NEW payload (debounced) — but keep the "last scan"
+    // timestamp fresh so the UI shows the code is currently visible.
+    if (payload !== regionWatch.lastPayload && now - regionWatch.lastFire >= 600) {
+      regionWatch.lastPayload = payload;
+      regionWatch.lastFire = now;
+      try { showNotification("Kuiqr — QR detected", payload.slice(0, 120)); } catch { /* ignore */ }
+      applyDecodedResult(payload);
+    }
+  }
   broadcastWatchStatus();
 }
 ipcMain.handle("region-watch-rect", (event, rect) => {
@@ -1478,6 +1497,64 @@ ipcMain.handle("region-watch-cancel", () => {
 });
 ipcMain.handle("region-watch-start", () => { openWatchOverlay(); return { ok: true }; });
 ipcMain.handle("region-watch-stop", () => { stopRegionWatch(); return { ok: true }; });
+
+// ── Local (self-hosted) analytics backend ──
+// Lets a user run the bundled `dynamic-backend` on their own machine with one
+// click — no purchase, no external service. We spawn `npm start` in that folder,
+// wait for its /health endpoint, and return the URL + API key to the renderer,
+// which then fills Settings automatically.
+let localBackendProc = null;
+let localBackendInfo = null;
+async function startLocalBackend() {
+  if (localBackendProc && !localBackendProc.killed) {
+    return { ok: true, url: localBackendInfo && localBackendInfo.url, apiKey: localBackendInfo && localBackendInfo.apiKey, alreadyRunning: true };
+  }
+  const backendDir = path.join(__dirname, "..", "dynamic-backend");
+  if (!fs.existsSync(path.join(backendDir, "server.js"))) return { ok: false, reason: "backend-not-found" };
+  if (!fs.existsSync(path.join(backendDir, "node_modules", "fastify"))) return { ok: false, reason: "backend-not-installed" };
+  const apiKey = crypto.randomBytes(24).toString("hex");
+  const url = "http://localhost:3000";
+  const env = Object.assign({}, process.env, {
+    PORT: "3000", BASE_URL: url, API_KEY: apiKey,
+    DB_PATH: path.join(backendDir, "data", "qr.db"),
+  });
+  try {
+    localBackendProc = spawn("npm", ["start"], { cwd: backendDir, env, detached: true, stdio: "ignore" });
+    localBackendProc.unref();
+  } catch (e) {
+    return { ok: false, reason: "spawn-failed:" + String((e && e.message) || e) };
+  }
+  // Poll /health until the server is ready (or time out).
+  const deadline = Date.now() + 15000;
+  let healthy = false;
+  while (Date.now() < deadline) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 1500);
+      const r = await fetch(url + "/health", { signal: ctrl.signal });
+      clearTimeout(t);
+      if (r.ok) { healthy = true; break; }
+    } catch { /* not up yet */ }
+    await new Promise((res) => setTimeout(res, 500));
+  }
+  if (!healthy) {
+    try { if (localBackendProc && !localBackendProc.killed) process.kill(-localBackendProc.pid, "SIGTERM"); } catch { /* ignore */ }
+    localBackendProc = null;
+    return { ok: false, reason: "health-timeout" };
+  }
+  localBackendInfo = { url, apiKey };
+  return { ok: true, url, apiKey };
+}
+function stopLocalBackend() {
+  if (localBackendProc && !localBackendProc.killed) {
+    try { process.kill(-localBackendProc.pid, "SIGTERM"); } catch { /* ignore */ }
+  }
+  localBackendProc = null;
+  localBackendInfo = null;
+  return { ok: true };
+}
+ipcMain.handle("start-local-backend", async () => startLocalBackend());
+ipcMain.handle("stop-local-backend", () => stopLocalBackend());
 
 // Auto-pause the watch loop while the Settings window is focused.
 function wireWatchFocus() {

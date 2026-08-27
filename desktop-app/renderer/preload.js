@@ -109,6 +109,10 @@ contextBridge.exposeInMainWorld("qrAPI", {
   // Main → renderer status updates (running / paused / last code).
   onRegionWatchStatus: (callback) => ipcRenderer.on("region-watch-status", (e, s) => callback(s)),
 
+  // Self-hosted analytics backend (one-click local run).
+  startLocalBackend: () => ipcRenderer.invoke("start-local-backend"),
+  stopLocalBackend: () => ipcRenderer.invoke("stop-local-backend"),
+
   // Restart the app
   restartApp: () => ipcRenderer.invoke("restart-app"),
 
