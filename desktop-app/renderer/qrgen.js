@@ -533,10 +533,30 @@
           list.unshift(cur); saveDynamicCodes(list);
           if (window.__kuiqrRefreshStatsList) window.__kuiqrRefreshStatsList();
           state.external = cur.shortUrl;
-          setStatus(`<div class="dyn-ok">${t("gen.trackableActive")} <code>${escapeHtml(cur.shortUrl)}</code></div>` +
-            `<button class="btn-text" id="dyn-view-stats">${t("gen.viewStats")}</button>`);
+          setStatus(
+            `<div class="dyn-card">` +
+              `<div class="dyn-card-title">${t("gen.trackableActive")}</div>` +
+              `<p class="dyn-card-body">${t("gen.trackableExplainer")}</p>` +
+              `<div class="dyn-link-row">` +
+                `<code class="dyn-link-code">${escapeHtml(cur.shortUrl)}</code>` +
+                `<button class="btn-text dyn-copy-link" id="dyn-copy-link">${t("gen.copyShortLink")}</button>` +
+              `</div>` +
+              `<p class="dyn-card-dest">${t("gen.trackableDestination", { url: escapeHtml(destination) })}</p>` +
+              `<div class="dyn-card-actions">` +
+                `<button class="btn-text dyn-view-stats" id="dyn-view-stats">${t("gen.viewStats")}</button>` +
+              `</div>` +
+            `</div>`
+          );
           const vs = $("dyn-view-stats");
           if (vs) vs.addEventListener("click", () => { if (window.requestSwitchTab) window.requestSwitchTab("stats"); });
+          const cp = $("dyn-copy-link");
+          if (cp) cp.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(cur.shortUrl);
+              cp.textContent = t("gen.copied");
+              setTimeout(() => cp.textContent = t("gen.copyShortLink"), 1500);
+            } catch { cp.textContent = t("gen.copyFailed"); }
+          });
           render();
         } catch (e) {
           setStatus(t("gen.dynamicError", { reason: String((e && e.message) || e) }), true);

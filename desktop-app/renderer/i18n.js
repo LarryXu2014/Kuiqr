@@ -123,11 +123,17 @@ const I18N = {
   "gen.dynamicDesc": { en: "Encode a redirect link so you can see scan analytics. Requires a backend set in Settings." },
   "gen.createTrackable": { en: "Create trackable QR" },
   "gen.creating": { en: "Creating…" },
-  "gen.trackableActive": { en: "Trackable QR ready:" },
+  "gen.trackableActive": { en: "Trackable QR ready" },
+  "gen.trackableExplainer": { en: "This QR encodes the short link below. When someone scans it, the visit is logged and they're redirected to your original link." },
+  "gen.copyShortLink": { en: "Copy short link" },
+  "gen.copied": { en: "Copied!" },
+  "gen.copyFailed": { en: "Could not copy" },
+  "gen.trackableDestination": { en: "Redirects to: {url}" },
   "gen.viewStats": { en: "View stats" },
   "gen.createFirst": { en: "Click \"Create trackable QR\" to generate a redirect link for this destination." },
   "gen.needDestination": { en: "Enter a destination first." },
   "gen.dynamicError": { en: "Could not create trackable QR: {reason}" },
+  "gen.dynamicInfo": { en: "When on, the QR encodes a short redirect link. Each scan is counted in Analytics, then the visitor is sent to your real link." },
   "gen.dynamicHint": { en: "Turn on to encode a redirect link so you can track scans. No backend yet? Set up a free local one in Settings → Dynamic QR." },
 
   // Stats tab

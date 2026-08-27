@@ -550,6 +550,35 @@ body {
   border-bottom: none;
 }
 
+/* Keep group-level text and controls from touching the card edges. */
+.settings-group > .setting-desc,
+.settings-group > .update-row,
+.settings-group > .update-status,
+.settings-group > .dyn-help,
+.settings-group > .dyn-local,
+.settings-group > .tutorial-replay {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.settings-group > .setting-desc {
+  padding-top: 12px;
+  padding-bottom: 4px;
+  margin: 0;
+}
+.settings-group > .setting-desc:last-child {
+  padding-bottom: 16px;
+}
+.settings-group > .dyn-help {
+  padding-top: 2px;
+  padding-bottom: 12px;
+}
+.settings-group > .dyn-local {
+  padding-bottom: 16px;
+}
+.update-group .update-row {
+  margin-top: 8px;
+}
+
 .setting-item:has(.toggle) {
   flex-direction: row;
   align-items: center;
@@ -1069,12 +1098,43 @@ body {
 
 /* ── Dynamic (trackable) QR ── */
 .dynamic-panel { margin-top: 10px; }
+.dynamic-info {
+  font-size: 12px;
+  color: var(--text-muted, #6b7280);
+  line-height: 1.45;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+}
 .dynamic-status { margin-top: 10px; font-size: 13px; line-height: 1.5; }
 .dynamic-status.status-error { color: #dc2626; }
 .dynamic-status code {
   background: var(--border, #eef0f3);
   padding: 1px 6px; border-radius: 5px; font-size: 12px; word-break: break-all;
 }
+.dyn-card {
+  background: #f8fafc;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.dyn-card-title { font-weight: 700; color: #047857; margin-bottom: 6px; }
+.dyn-card-body { font-size: 12px; color: var(--text, #111); margin: 0 0 10px; line-height: 1.45; }
+.dyn-card-dest { font-size: 12px; color: var(--text-muted, #6b7280); margin: 8px 0 0; word-break: break-all; }
+.dyn-link-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dyn-link-code {
+  flex: 1;
+  background: var(--border, #eef0f3);
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  word-break: break-all;
+  min-width: 0;
+}
+.dyn-copy-link { flex: 0 0 auto; font-size: 12px; }
+.dyn-card-actions { margin-top: 10px; }
 .dyn-ok { color: #16a34a; margin-bottom: 4px; }
 .dyn-warn { color: var(--text-light, #6b7280); }
 
@@ -1110,12 +1170,43 @@ body {
 
 /* ── Dynamic (trackable) QR ── */
 .dynamic-panel { margin-top: 10px; }
+.dynamic-info {
+  font-size: 12px;
+  color: var(--text-muted, #6b7280);
+  line-height: 1.45;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+}
 .dynamic-status { margin-top: 10px; font-size: 13px; line-height: 1.5; }
 .dynamic-status.status-error { color: #dc2626; }
 .dynamic-status code {
   background: var(--border, #eef0f3);
   padding: 1px 6px; border-radius: 5px; font-size: 12px; word-break: break-all;
 }
+.dyn-card {
+  background: #f8fafc;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.dyn-card-title { font-weight: 700; color: #047857; margin-bottom: 6px; }
+.dyn-card-body { font-size: 12px; color: var(--text, #111); margin: 0 0 10px; line-height: 1.45; }
+.dyn-card-dest { font-size: 12px; color: var(--text-muted, #6b7280); margin: 8px 0 0; word-break: break-all; }
+.dyn-link-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dyn-link-code {
+  flex: 1;
+  background: var(--border, #eef0f3);
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  word-break: break-all;
+  min-width: 0;
+}
+.dyn-copy-link { flex: 0 0 auto; font-size: 12px; }
+.dyn-card-actions { margin-top: 10px; }
 .dyn-ok { color: #16a34a; margin-bottom: 4px; }
 .dyn-warn { color: var(--text-light, #6b7280); }
 

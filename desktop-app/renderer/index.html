@@ -311,7 +311,7 @@
 
     <div id="tpl-form" class="tpl-form"></div>
 
-    <div class="generate-group">
+    <div class="generate-group dynamic-group">
       <label class="setting-item toggle-row">
         <div class="setting-info">
           <div class="setting-label" data-i18n="gen.dynamic">Dynamic (trackable) QR</div>
@@ -323,9 +323,9 @@
         </label>
       </label>
       <div id="gen-dynamic-panel" class="dynamic-panel hidden">
+        <p class="dynamic-info" data-i18n="gen.dynamicInfo">When on, the QR encodes a short redirect link. Each scan is counted in Analytics, then the visitor is sent to your real link.</p>
         <button id="gen-create-trackable" class="btn-save" data-i18n="gen.createTrackable">Create trackable QR</button>
         <div id="gen-dynamic-status" class="dynamic-status hidden"></div>
-        <p class="setting-desc gen-dynamic-hint" data-i18n="gen.dynamicHint">Turn on to encode a redirect link so you can track scans. Needs a backend set in Settings.</p>
       </div>
     </div>
 
