@@ -17,10 +17,14 @@
 //      provides a Settings button to jump to System Settings → Privacy & Security → Automation
 // ============================================================
 
-const { app, BrowserWindow, globalShortcut, screen, desktopCapturer, ipcMain, Tray, Menu, nativeImage, shell, clipboard, Notification, net } = require("electron");
+const { app, BrowserWindow, globalShortcut, screen, desktopCapturer, ipcMain, Tray, Menu, nativeImage, shell, clipboard, Notification, net, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { execSync, spawn, exec } = require("child_process");
+
+// jsQR runs in the main process so the region-watch loop can decode captured
+// frames directly (no round-trip to the renderer).
+const jsQR = require("./jsQR.js");
 
 let mainWindow = null;
 let tray = null;
@@ -282,6 +286,8 @@ function createMainWindow() {
     },
   });
 
+  wireWatchFocus();
+
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
 
   mainWindow.on("close", (e) => {
@@ -402,6 +408,9 @@ function createTray() {
 
   const contextMenu = Menu.buildFromTemplate([
     { label: "Scan Screen", click: () => triggerScan() },
+    { type: "separator" },
+    { label: "Region Watch…", click: () => { if (regionWatch.active) stopRegionWatch(); else openWatchOverlay(); } },
+    { label: "Stop Region Watch", click: () => stopRegionWatch() },
     { type: "separator" },
     { label: "Show Window", click: () => showMainWindow() },
     { label: "Settings", click: () => {
@@ -1263,7 +1272,7 @@ ipcMain.on("open-tab", (event, tab) => {
 // Renderer → main: track the currently active tab so that after a Windows
 // overlay scan we can return to the user's previous page instead of Scan.
 ipcMain.on("tab-changed", (event, tab) => {
-  if (typeof tab === "string" && tab) lastActiveTab = tab;
+  if (typeof tab === "string" && tab) { lastActiveTab = tab; currentTab = tab; updateWatchPause(); }
 });
 
 // Renderer → main: fully quit the app (used by the in-app right-click menu).
@@ -1316,6 +1325,165 @@ function applyDecodedResult(data) {
     sendScanToast("text", "QR Found — Copied to Clipboard", text.slice(0, 100));
   }
   return { result: "text", data: text };
+}
+
+// ============================================================
+// IPC: file dialogs + write (QR exports, batch generation)
+// ============================================================
+ipcMain.handle("show-save-dialog", (event, opts) => {
+  if (!dialog) return null;
+  const res = dialog.showSaveDialogSync(mainWindow, opts || {});
+  return res || null;
+});
+ipcMain.handle("show-open-dialog", (event, opts) => {
+  if (!dialog) return { filePaths: [] };
+  const res = dialog.showOpenDialogSync(mainWindow, opts || {});
+  return { filePaths: res || [] };
+});
+ipcMain.handle("write-file", (event, { path: p, dataUrl, text }) => {
+  try {
+    if (text != null) {
+      fs.writeFileSync(p, text, "utf-8");
+    } else if (dataUrl) {
+      const base64 = String(dataUrl).split(",")[1] || "";
+      fs.writeFileSync(p, Buffer.from(base64, "base64"));
+    } else {
+      return { ok: false, reason: "No content provided" };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err.message || String(err) };
+  }
+});
+ipcMain.handle("zip-folder", (event, { folder, outName }) => {
+  try {
+    const out = path.join(folder, outName || "archive.zip");
+    if (isWin) {
+      execSync(`powershell -NoProfile -Command "Compress-Archive -Path '${folder}/*' -DestinationPath '${out}' -Force"`, { stdio: "ignore" });
+    } else {
+      execSync(`zip -r -q '${out}' .`, { cwd: folder, stdio: "ignore" });
+    }
+    return { ok: true, path: out };
+  } catch (err) {
+    return { ok: false, reason: err.message || String(err) };
+  }
+});
+
+// ============================================================
+// Region Watch mode (Step 5)
+//   User drags a rectangle (transparent overlay) → main captures that screen
+//   region every N ms, decodes it, and fires the normal scan actions on a NEW
+//   payload. Pause/resume from tray; auto-pause while Settings is focused.
+// ============================================================
+let watchOverlayWindow = null;
+let currentTab = "scan";
+const regionWatch = {
+  active: false, paused: false, rect: null, displayId: null,
+  intervalMs: 500, timer: null, lastPayload: null, lastFire: 0,
+};
+
+function broadcastWatchStatus() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const s = regionWatch.active ? { running: true, paused: regionWatch.paused, lastCode: regionWatch.lastPayload } : null;
+  mainWindow.webContents.send("region-watch-status", s);
+}
+function updateWatchPause() {
+  if (!regionWatch.active) return;
+  const focused = !!(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused());
+  regionWatch.paused = focused && currentTab === "settings";
+  broadcastWatchStatus();
+}
+function openWatchOverlay() {
+  if (watchOverlayWindow) return;
+  const cursor = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(cursor);
+  watchOverlayWindow = new BrowserWindow({
+    x: display.bounds.x, y: display.bounds.y, width: display.bounds.width, height: display.bounds.height,
+    transparent: true, frame: false, alwaysOnTop: true, skipTaskbar: true,
+    resizable: false, movable: false, hasShadow: false, backgroundColor: "#00000000",
+    webPreferences: { preload: path.join(__dirname, "watch-preload.js"), contextIsolation: true, nodeIntegration: false },
+  });
+  watchOverlayWindow.loadFile(path.join(__dirname, "watch-overlay.html"), {
+    query: { displayId: String(display.id), x: String(display.bounds.x), y: String(display.bounds.y) },
+  });
+  watchOverlayWindow.on("closed", () => { watchOverlayWindow = null; });
+}
+function stopRegionWatch() {
+  regionWatch.active = false;
+  regionWatch.paused = false;
+  regionWatch.rect = null;
+  if (regionWatch.timer) { clearInterval(regionWatch.timer); regionWatch.timer = null; }
+  if (watchOverlayWindow && !watchOverlayWindow.isDestroyed()) { try { watchOverlayWindow.close(); } catch { /* ignore */ } }
+  watchOverlayWindow = null;
+  broadcastWatchStatus();
+}
+function startWatchLoop() {
+  if (regionWatch.timer) clearInterval(regionWatch.timer);
+  regionWatch.timer = setInterval(() => { regionWatchTick().catch(() => {}); }, regionWatch.intervalMs);
+  broadcastWatchStatus();
+}
+async function regionWatchTick() {
+  if (!regionWatch.active || regionWatch.paused || !regionWatch.rect) return;
+  const { x, y, w, h, displayId } = regionWatch.rect;
+  let display;
+  try { display = screen.getDisplayById(parseInt(displayId, 10)); } catch { display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()); }
+  if (!display) return;
+  const sf = display.scaleFactor;
+  const MAX = 2560;
+  let reqW = Math.round(display.bounds.width * sf), reqH = Math.round(display.bounds.height * sf);
+  if (reqW > MAX || reqH > MAX) { const r = Math.min(MAX / reqW, MAX / reqH); reqW = Math.round(reqW * r); reqH = Math.round(reqH * r); }
+  let sources;
+  try { sources = await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: reqW, height: reqH } }); }
+  catch { return; }
+  if (!sources || !sources.length) return;
+  let src = sources[0];
+  const tid = String(display.id);
+  for (const s of sources) { if (String(s.display_id) === tid || String(s.id) === tid) { src = s; break; } }
+  const thumb = src.thumbnail;
+  if (!thumb || thumb.isEmpty()) return;
+  const cx = Math.round(x * sf), cy = Math.round(y * sf);
+  const cw = Math.max(1, Math.round(w * sf)), ch = Math.max(1, Math.round(h * sf));
+  const cropped = thumb.crop({ x: cx, y: cy, width: cw, height: ch });
+  if (cropped.isEmpty()) return;
+  const size = cropped.getSize();
+  let res = null;
+  try { res = jsQR(new Uint8ClampedArray(cropped.getBitmap()), size.width, size.height); }
+  catch { return; }
+  if (!res || !res.data) return;
+  const payload = res.data.trim();
+  if (!payload) return;
+  if (payload === regionWatch.lastPayload) return; // debounce identical payloads
+  const now = Date.now();
+  if (now - regionWatch.lastFire < 600) return;  // extra debounce window
+  regionWatch.lastPayload = payload;
+  regionWatch.lastFire = now;
+  applyDecodedResult(payload);
+  broadcastWatchStatus();
+}
+ipcMain.handle("region-watch-rect", (event, rect) => {
+  regionWatch.rect = rect;
+  regionWatch.displayId = rect.displayId;
+  regionWatch.lastPayload = null;
+  regionWatch.active = true;
+  regionWatch.paused = false;
+  if (watchOverlayWindow && !watchOverlayWindow.isDestroyed()) { try { watchOverlayWindow.close(); } catch { /* ignore */ } }
+  watchOverlayWindow = null;
+  startWatchLoop();
+  return { ok: true };
+});
+ipcMain.handle("region-watch-cancel", () => {
+  if (watchOverlayWindow && !watchOverlayWindow.isDestroyed()) { try { watchOverlayWindow.close(); } catch { /* ignore */ } }
+  watchOverlayWindow = null;
+  return { ok: true };
+});
+ipcMain.handle("region-watch-start", () => { openWatchOverlay(); return { ok: true }; });
+ipcMain.handle("region-watch-stop", () => { stopRegionWatch(); return { ok: true }; });
+
+// Auto-pause the watch loop while the Settings window is focused.
+function wireWatchFocus() {
+  if (!mainWindow) return;
+  mainWindow.on("focus", updateWatchPause);
+  mainWindow.on("blur", updateWatchPause);
 }
 
 // Renderer tells us it's ready to receive decode jobs (so we never lose a

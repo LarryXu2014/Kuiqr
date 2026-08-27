@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<!-- Copyright 2026 LarryXu. Licensed under GPL-3.0. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kuiqr QR self-test</title>
+</head>
+<body>
+  <pre id="out">running…</pre>
+  <!-- Libs must match the app: jsQR + qrcode-generator live one level up. -->
+  <script src="../jsQR.js"></script>
+  <script src="qrcode.js"></script>
+  <script src="qr-styling.umd.js"></script>
+  <script src="qrgen.js"></script>
+  <script>
+    (async () => {
+      const out = document.getElementById("out");
+      try {
+        if (!window.QRGen || typeof window.QRGen.runSelfTest !== "function") {
+          throw new Error("QRGen.runSelfTest not available");
+        }
+        const r = await window.QRGen.runSelfTest();
+        window.__selftest = r;
+        const fmtFail = (r.formatChecks || []).filter((c) => !c.ok);
+        let txt = "SCAN TESTS: pass=" + r.pass + " fail=" + r.fail + "\n";
+        txt += "FORMAT TESTS: " + ((r.formatChecks || []).length - fmtFail.length) + "/" + (r.formatChecks || []).length + " ok\n";
+        if (r.fail > 0) txt += "\nScan failures:\n" + r.details.filter((d) => !d.ok).map((d) => "  " + d.name + ": " + (d.error || d.decoded)).join("\n") + "\n";
+        if (fmtFail.length) txt += "\nFormat failures:\n" + fmtFail.map((c) => "  " + c.name + "\n    got:      " + JSON.stringify(c.got) + "\n    expected: " + JSON.stringify(c.expected)).join("\n") + "\n";
+        out.textContent = txt;
+        const ok = r.fail === 0 && fmtFail.length === 0;
+        document.title = ok ? "SELFTEST_OK" : "SELFTEST_FAIL";
+      } catch (e) {
+        out.textContent = "ERROR: " + (e && e.message);
+        document.title = "SELFTEST_ERROR";
+      }
+    })();
+  </script>
+</body>
+</html>

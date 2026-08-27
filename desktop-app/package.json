@@ -47,6 +47,8 @@
       "renderer/**/*",
       "overlay.html",
       "overlay-preload.js",
+      "watch-overlay.html",
+      "watch-preload.js",
       "icons/**/*"
     ],
     "extraResources": [

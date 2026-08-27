@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<!-- Copyright 2026 LarryXu. Licensed under GPL-3.0. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kuiqr — Region Watch</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+    body {
+      background: rgba(0, 0, 0, 0); /* fully transparent — we only draw the selection */
+      cursor: crosshair;
+    }
+    /* Dim everything slightly so the dragged area reads as "selected". */
+    #dim { position: fixed; inset: 0; background: rgba(10, 12, 20, 0.18); }
+    #sel {
+      position: fixed; left: 0; top: 0; width: 0; height: 0;
+      border: 2px solid #4f8cff; background: rgba(79, 140, 255, 0.12);
+      box-shadow: 0 0 0 9999px rgba(10, 12, 20, 0.28);
+      box-sizing: border-box; pointer-events: none;
+    }
+    #hint {
+      position: fixed; left: 50%; top: 16px; transform: translateX(-50%);
+      font: 13px/1.4 -apple-system, system-ui, sans-serif; color: #fff;
+      background: rgba(0,0,0,0.55); padding: 6px 12px; border-radius: 8px;
+      pointer-events: none; user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="dim"></div>
+  <div id="sel"></div>
+  <div id="hint">Drag a rectangle around the area to watch · Esc to cancel</div>
+  <script>
+    (function () {
+      const sel = document.getElementById("sel");
+      const hint = document.getElementById("hint");
+      // The display this overlay covers (passed by main via ?displayId=).
+      const params = new URLSearchParams(location.search);
+      const displayId = params.get("displayId");
+      // Display bounds in CSS px (passed via ?x&y&w&h by main).
+      const ox = parseFloat(params.get("x") || "0");
+      const oy = parseFloat(params.get("y") || "0");
+
+      let dragging = false, sx = 0, sy = 0;
+
+      function clampRect(r) {
+        const x = Math.min(r.x0, r.x1), y = Math.min(r.y0, r.y1);
+        const w = Math.abs(r.x1 - r.x0), h = Math.abs(r.y1 - r.y0);
+        return { x, y, w, h };
+      }
+      function draw(r) {
+        sel.style.left = r.x + "px"; sel.style.top = r.y + "px";
+        sel.style.width = r.w + "px"; sel.style.height = r.h + "px";
+      }
+      function localPt(e) {
+        // e.clientX/Y are already in the overlay's CSS coordinate space (which
+        // equals the display's CSS space because the window matches the display).
+        return { x: e.clientX - ox, y: e.clientY - oy };
+      }
+
+      window.addEventListener("mousedown", (e) => {
+        dragging = true; const p = localPt(e); sx = p.x; sy = p.y;
+        draw(clampRect({ x0: sx, y0: sy, x1: sx, y1: sy }));
+        hint.style.display = "none";
+      });
+      window.addEventListener("mousemove", (e) => {
+        if (!dragging) return;
+        const p = localPt(e);
+        draw(clampRect({ x0: sx, y0: sy, x1: p.x, y1: p.y }));
+      });
+      window.addEventListener("mouseup", (e) => {
+        if (!dragging) return;
+        dragging = false;
+        const p = localPt(e);
+        const r = clampRect({ x0: sx, y0: sy, x1: p.x, y1: p.y });
+        if (r.w < 8 || r.h < 8) { draw({ x: 0, y: 0, w: 0, h: 0 }); hint.style.display = ""; return; }
+        if (window.watchOverlay) {
+          window.watchOverlay.submit({ x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h), displayId });
+        }
+      });
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && window.watchOverlay) window.watchOverlay.cancel();
+      });
+    })();
+  </script>
+</body>
+</html>

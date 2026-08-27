@@ -1,0 +1,1 @@
+{"name":"kuiqr-tests","private":true,"type":"module","scripts":{"selftest":"node run-selftest.mjs"},"dependencies":{"playwright":"^1.47.2"}}

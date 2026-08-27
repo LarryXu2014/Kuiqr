@@ -91,6 +91,24 @@ contextBridge.exposeInMainWorld("qrAPI", {
   createDynamicCode: (payload) => ipcRenderer.invoke("dynamic-create", payload),
   getDynamicStats: (payload) => ipcRenderer.invoke("dynamic-stats", payload),
 
+  // ── QR export / file I/O (Steps 3 & 4) ──
+  // Open the OS save dialog; resolves to the chosen path string or null.
+  showSaveDialog: (opts) => ipcRenderer.invoke("show-save-dialog", opts),
+  // Open the OS open dialog (e.g. pick an output folder); resolves to { filePaths }.
+  showOpenDialog: (opts) => ipcRenderer.invoke("show-open-dialog", opts),
+  // Write a file. Pass either { path, dataUrl } (base64) or { path, text } (utf-8).
+  writeFile: (payload) => ipcRenderer.invoke("write-file", payload),
+  // Zip a folder into <folder>/<outName> via the system archiver.
+  zipFolder: (payload) => ipcRenderer.invoke("zip-folder", payload),
+
+  // ── Region watch mode (Step 5) ──
+  // Ask the main process to open the region-selection overlay and start watching.
+  openRegionWatch: () => ipcRenderer.invoke("region-watch-start"),
+  // Stop the active region watch loop.
+  stopRegionWatch: () => ipcRenderer.invoke("region-watch-stop"),
+  // Main → renderer status updates (running / paused / last code).
+  onRegionWatchStatus: (callback) => ipcRenderer.on("region-watch-status", (e, s) => callback(s)),
+
   // Restart the app
   restartApp: () => ipcRenderer.invoke("restart-app"),
 
