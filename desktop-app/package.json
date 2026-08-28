@@ -24,9 +24,9 @@
   "build": {
     "appId": "com.kuiqr.app",
     "productName": "Kuiqr",
-    "buildVersion": "2.4.2.5.0",
+    "buildVersion": "2.4.2.5.1",
     "extraMetadata": {
-      "buildVersion": "2.4.2.5.0"
+      "buildVersion": "2.4.2.5.1"
     },
     "dmg": {
       "internetEnabled": true,
@@ -64,7 +64,7 @@
       "artifactName": "Kuiqr-${buildVersion}-mac-${arch}.${ext}",
       "identity": null,
       "category": "public.app-category.utilities",
-      "bundleShortVersion": "2.4.2.5.0",
+      "bundleShortVersion": "2.4.2.5.1",
       "target": [
         {
           "target": "dmg",

@@ -1038,6 +1038,9 @@ async function handleDecodedResult(qrResult) {
   const trackable = isUrl ? findTrackableCode(text) : null;
   if (trackable) {
     showTrackableResult(trackable, text);
+    // Reciprocity: celebrate the first successful scan here too (trackable link).
+    const scanResultEl = document.getElementById("scan-result");
+    if (scanResultEl) window.kuiqrGiftHint(scanResultEl, "gift.scan", "kuiqr.giftScanSeen");
     // Record history + show the toast, but skip the blind auto-open.
     const response = await window.qrAPI.onDecoded(text, { noAutoOpen: true });
     await loadHistory();
@@ -1052,6 +1055,11 @@ async function handleDecodedResult(qrResult) {
   } else {
     showResult("text", text, null, false);
   }
+
+  // Reciprocity: after the user's first real successful scan, celebrate the win
+  // so they feel the value (free / instant / offline) before any ask.
+  const scanResultEl = document.getElementById("scan-result");
+  if (scanResultEl) window.kuiqrGiftHint(scanResultEl, "gift.scan", "kuiqr.giftScanSeen");
 
   // Scan success feedback is delivered as an IN-APP overlay by the main process
   // (applyDecodedResult), controlled by the "Show scan notifications" setting.
@@ -1112,12 +1120,6 @@ function showResult(type, data, sub, isUrl) {
     subEl.className = "result-sub";
     subEl.textContent = sub;
     actionsEl.appendChild(subEl);
-  }
-
-  // Reciprocity: after a real (non-error) scan, acknowledge the free/instant
-  // value the user just received (shown once).
-  if (type === "url" || type === "text") {
-    window.kuiqrGiftHint(el, "gift.scan", "kuiqr.giftScanSeen");
   }
 }
 

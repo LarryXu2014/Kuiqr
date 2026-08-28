@@ -279,8 +279,10 @@
       lastDataUrl = await blobToDataURL(blob);
       if (img) { img.src = lastDataUrl; img.style.display = "block"; }
       if (errEl) errEl.classList.add("hidden");
-      // Reciprocity: acknowledge the free/instant QR the user just got (once).
-      if (window.kuiqrGiftHint) window.kuiqrGiftHint($("gen-preview"), "gift.gen", "kuiqr.giftGenSeen");
+      // Reciprocity: celebrate the first QR the user actually generated themselves.
+      // Skip the auto-seeded sample so the win feels earned, not spammed.
+      const isSampleDefault = state.template === "text" && content === SAMPLE_DEFAULT;
+      if (window.kuiqrGiftHint && !isSampleDefault) window.kuiqrGiftHint($("gen-preview"), "gift.gen", "kuiqr.giftGenSeen");
       scheduleSelfCheck();
     } catch (e) {
       if (errEl) {

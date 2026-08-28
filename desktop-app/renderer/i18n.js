@@ -111,10 +111,11 @@ const I18N = {
   "gen.content": { en: "Content", "zh-CN": "内容", "zh-TW": "內容", ja: "内容", ko: "내용", es: "Contenido", fr: "Contenu", de: "Inhalt" },
   "gen.placeholder": { en: "https://example.com or any text…", "zh-CN": "https://example.com 或任意文本…", "zh-TW": "https://example.com 或任意文字…", ja: "https://example.com または任意のテキスト…", ko: "https://example.com 또는 아무 텍스트…", es: "https://example.com o cualquier texto…", fr: "https://example.com ou n'importe quel texte…", de: "https://example.com oder beliebiger Text…" },
   "gen.previewPlaceholder": { en: "Your QR code will appear here", "zh-CN": "二维码将在此显示", "zh-TW": "QR Code 將在此顯示", ja: "QRコードがここに表示されます", ko: "QR 코드가 여기에 표시됩니다", es: "El código QR aparecerá aquí", fr: "Le QR code apparaîtra ici", de: "Der QR-Code erscheint hier" },
-  // Reciprocity: a one-time "gift" acknowledgement shown after the user receives
-  // real value for free/instant/offline — they should FEEL the gift before any ask.
-  "gift.scan": { en: "Scanned instantly — free, no account, works 100% offline.", "zh-CN": "瞬间完成扫描——免费、无需账号、完全离线可用。", "zh-TW": "瞬間完成掃描——免費、無需帳號、完全離線可用。", ja: "即座にスキャン完了 — 無料・アカウント不要・完全オフライン動作。", ko: "즉시 스캔 완료 — 무료, 계정 불필요, 100% 오프라인 동작.", es: "Escaneado al instante — gratis, sin cuenta, funciona 100% sin conexión.", fr: "Scanné instantanément — gratuit, sans compte, fonctionne 100% hors ligne.", de: "Sofort gescannt — kostenlos, kein Konto, funktioniert 100% offline." },
-  "gift.gen": { en: "Your QR is ready — no sign-up needed, works entirely offline.", "zh-CN": "二维码已就绪——无需注册，完全离线可用。", "zh-TW": "QR Code 已就緒——無需註冊，完全離線可用。", ja: "QRコード完成 — 登録不要、完全オフラインで動作。", ko: "QR 코드 완성 — 가입 불필요, 완전 오프라인 동작.", es: "Tu QR está listo — sin registro, funciona totalmente offline.", fr: "Votre QR est prêt — sans inscription, fonctionne entièrement hors ligne.", de: "Dein QR ist fertig — keine Anmeldung nötig, funktioniert komplett offline." },
+  // Reciprocity: a one-time, human-sounding "gift" acknowledgement shown after
+  // the user's first successful scan and first generated QR. It must feel like a
+  // real person celebrating the win, not a corporate label.
+  "gift.scan": { en: "That's it — you successfully scanned your first QR code! Instantly, free, no account, and 100% offline.", "zh-CN": "搞定——你成功扫描了第一个二维码！瞬间完成，免费、无需账号、完全离线可用。", "zh-TW": "搞定——你成功掃描了第一個 QR Code！瞬間完成，免費、無需帳號、完全離線可用。", ja: "できた——初めてのQRコードをスキャンしました！即座に、無料、アカウント不要、完全オフライン。", ko: "완료——첫 번째 QR 코드 스캔에 성공했습니다! 즉시, 무료, 계정 불필요, 100% 오프라인 동작.", es: "¡Listo — escaneaste tu primer código QR! Al instante, gratis, sin cuenta y 100% sin conexión.", fr: "Voilà — vous avez scanné votre premier QR code ! Instantanément, gratuitement, sans compte et 100% hors ligne.", de: "Fertig — du hast deinen ersten QR-Code gescannt! Sofort, kostenlos, kein Konto, 100% offline." },
+  "gift.gen": { en: "That's it — you successfully generated your first QR code! No sign-up needed, and it works entirely offline.", "zh-CN": "搞定——你成功生成了第一个二维码！无需注册，完全离线可用。", "zh-TW": "搞定——你成功產生了第一個 QR Code！無需註冊，完全離線可用。", ja: "できた——初めてのQRコードを生成しました！登録不要、完全オフラインで動作します。", ko: "완료——첫 번째 QR 코드 생성에 성공했습니다! 가입 불필요, 완전 오프라인 동작.", es: "¡Listo — generaste tu primer código QR! Sin registro y funciona totalmente offline.", fr: "Voilà — vous avez généré votre premier QR code ! Sans inscription et fonctionne entièrement hors ligne.", de: "Fertig — du hast deinen ersten QR-Code erzeugt! Keine Anmeldung nötig, funktioniert komplett offline." },
   "gen.ecc": { en: "Error correction", "zh-CN": "纠错级别", "zh-TW": "糾錯級別", ja: "誤り訂正レベル", ko: "오류 수정 수준", es: "Corrección de errores", fr: "Correction d'erreur", de: "Fehlerkorrektur" },
   "gen.ecc.L": { en: "Low", "zh-CN": "低", "zh-TW": "低", ja: "低", ko: "낮음", es: "Baja", fr: "Faible", de: "Niedrig" },
   "gen.ecc.M": { en: "Medium", "zh-CN": "中", "zh-TW": "中", ja: "中", ko: "중간", es: "Media", fr: "Moyenne", de: "Mittel" },
@@ -178,6 +179,16 @@ const I18N = {
   "set.appearanceGroup": { en: "Appearance", "zh-CN": "外观", "zh-TW": "外觀", ja: "外観", ko: "화면 스타일", es: "Apariencia", fr: "Apparence", de: "Erscheinungsbild" },
   "set.accent": { en: "Accent color", "zh-CN": "主题色", "zh-TW": "主題色", ja: "アクセントカラー", ko: "강조 색상", es: "Color de acento", fr: "Couleur d'accentuation", de: "Akzentfarbe" },
   "set.accentDesc": { en: "Colors the buttons, tabs and highlights. Applies live; save to keep it.", "zh-CN": "用于按钮、标签页和高亮颜色。实时生效，保存后永久保留。", "zh-TW": "用於按鈕、分頁和高亮顏色。即時生效，儲存後永久保留。", ja: "ボタン・タブ・ハイライトの色になります。即時反映、保存すると保持されます。", ko: "버튼·탭·강조 표시의 색상입니다. 실시간 적용되며 저장하면 유지됩니다.", es: "Colorea los botones, las pestañas y los resaltes. Se aplica al instante; guárdalo para conservarlo.", fr: "Colore les boutons, onglets et éléments mis en valeur. Appliqué en direct ; enregistrez pour le conserver.", de: "Färbt Schaltflächen, Tabs und Hervorhebungen. Wird sofort angewendet; zum Beibehalten speichern." },
+  // Accent swatch titles describe the mood each color evokes, not the raw color name.
+  "accent.focus": { en: "Focus", "zh-CN": "专注", "zh-TW": "專注", ja: "集中", ko: "집중", es: "Enfoque", fr: "Concentration", de: "Fokus" },
+  "accent.calm": { en: "Calm", "zh-CN": "平静", "zh-TW": "平靜", ja: "落ち着き", ko: "평온", es: "Tranquilidad", fr: "Calme", de: "Ruhe" },
+  "accent.fresh": { en: "Fresh", "zh-CN": "清新", "zh-TW": "清新", ja: "爽やか", ko: "상쾌", es: "Frescura", fr: "Frais", de: "Frisch" },
+  "accent.natural": { en: "Natural", "zh-CN": "自然", "zh-TW": "自然", ja: "自然", ko: "자연", es: "Natural", fr: "Nature", de: "Natur" },
+  "accent.warm": { en: "Warm", "zh-CN": "温暖", "zh-TW": "溫暖", ja: "温かみ", ko: "따뜻함", es: "Calidez", fr: "Chaleur", de: "Wärme" },
+  "accent.bold": { en: "Bold", "zh-CN": "大胆", "zh-TW": "大膽", ja: "大胆", ko: "대담", es: "Audacia", fr: "Audace", de: "Kühn" },
+  "accent.playful": { en: "Playful", "zh-CN": "活泼", "zh-TW": "活潑", ja: "遊び心", ko: "장난기", es: "Juego", fr: "Joyeux", de: "Verspielt" },
+  "accent.creative": { en: "Creative", "zh-CN": "创意", "zh-TW": "創意", ja: "創造性", ko: "창의", es: "Creatividad", fr: "Créatif", de: "Kreativ" },
+  "accent.custom": { en: "Custom", "zh-CN": "自定义", "zh-TW": "自訂", ja: "カスタム", ko: "사용자 지정", es: "Personalizado", fr: "Personnalisé", de: "Benutzerdefiniert" },
 
   // Modals — extension prompt
   "ext.title": { en: "Get the browser extension", "zh-CN": "获取浏览器扩展", "zh-TW": "取得瀏覽器擴充功能", ja: "ブラウザ拡張機能を入手", ko: "브라우저 확장 설치", es: "Obtén la extensión del navegador", fr: "Obtenez l'extension navigateur", de: "Hol dir die Browser-Erweiterung" },
