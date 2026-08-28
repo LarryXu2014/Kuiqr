@@ -156,14 +156,18 @@
       case "phone":
         return "tel:" + (v.number || "").trim();
       case "event": {
-        const lines = ["BEGIN:VEVENT"];
+        // RFC 5545: a VEVENT must be wrapped in a VCALENDAR envelope for
+        // iOS/Android camera data detectors to recognize calendar QR codes.
+        // CRLF line endings per spec; UID/DTSTAMP are omitted here to keep
+        // the payload compact (added when exporting an .ics file).
+        const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Kuiqr//EN", "BEGIN:VEVENT"];
         const s = toICal(v.start), e2 = toICal(v.end);
         if (s) lines.push("DTSTART:" + s);
         if (e2) lines.push("DTEND:" + e2);
         const sum = (v.summary || "").trim(); if (sum) lines.push("SUMMARY:" + escV(sum));
         const loc = (v.location || "").trim(); if (loc) lines.push("LOCATION:" + escV(loc));
-        lines.push("END:VEVENT");
-        return lines.join("\n");
+        lines.push("END:VEVENT", "END:VCALENDAR");
+        return lines.join("\r\n");
       }
       case "geo": {
         const lat = (v.lat || "").trim(), lng = (v.lng || "").trim();
@@ -444,6 +448,8 @@
     if (dynToggle) dynToggle.checked = false;
     const dynPanel = $("gen-dynamic-panel");
     if (dynPanel) dynPanel.classList.add("hidden");
+    const dynGroup = document.getElementById("dynamic-group");
+    if (dynGroup) dynGroup.classList.remove("expanded");
     const sel = $("gen-template");
     if (sel) sel.value = tpl;
     if (tpl === "text" && $("gen-input")) $("gen-input").value = (state.values.text && state.values.text.text) || "";
@@ -601,15 +607,24 @@
       dynStatus.classList.toggle("status-error", !!isError);
     };
     const content = () => buildContent();
+    const dynGroup = document.getElementById("dynamic-group");
+    const setExpanded = (on) => { if (dynGroup) dynGroup.classList.toggle("expanded", !!on); };
     dynToggle.addEventListener("change", () => {
       const on = dynToggle.checked;
       if (dynPanel) dynPanel.classList.toggle("hidden", !on);
+      setExpanded(on);
       if (!on) { state.external = null; setStatus(""); render(); }
     });
     if (dynCreateBtn) {
       dynCreateBtn.addEventListener("click", async () => {
         const destination = (content() || "").trim();
         if (!destination) { setStatus(t("gen.needDestination"), true); return; }
+        // A trackable QR must encode a redirect URL. Non-URL payloads (WiFi,
+        // vCard, etc.) cannot be handled by an HTTP redirect.
+        if (!/^https?:\/\//i.test(destination)) {
+          setStatus(t("gen.dynamicNeedsUrl"), true);
+          return;
+        }
         dynCreateBtn.disabled = true;
         dynCreateBtn.textContent = t("gen.creating");
         try {
@@ -620,6 +635,8 @@
           list.unshift(cur); saveDynamicCodes(list);
           if (window.__kuiqrRefreshStatsList) window.__kuiqrRefreshStatsList();
           state.external = cur.shortUrl;
+          const isLocalBackend = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|127\.0\.0\.1|localhost)/i.test(new URL(cur.shortUrl).hostname || "");
+          const networkNote = isLocalBackend ? `<p class="dyn-note">${t("gen.trackableLocalNote")}</p>` : "";
           setStatus(
             `<div class="dyn-card">` +
               `<div class="dyn-card-title">${t("gen.trackableActive")}</div>` +
@@ -629,6 +646,7 @@
                 `<button class="btn-text dyn-copy-link" id="dyn-copy-link">${t("gen.copyShortLink")}</button>` +
               `</div>` +
               `<p class="dyn-card-dest">${t("gen.trackableDestination", { url: escapeHtml(destination) })}</p>` +
+              networkNote +
               `<div class="dyn-card-actions">` +
                 `<button class="btn-text dyn-view-stats" id="dyn-view-stats">${t("gen.viewStats")}</button>` +
               `</div>` +
@@ -679,7 +697,32 @@
         if (be) be.value = res.url;
         if (ak) ak.value = res.apiKey;
         fillAndSave();
-        setLocalStatus(t("set.dynamicLocalRunning", { url: res.url }), false);
+        // Migrate short links stored from earlier localhost sessions: their QR
+        // pointed at "localhost:3000", which phones can't reach (nothing was
+        // counted). Re-point them at this machine's LAN address so the stored
+        // list — and any QR regenerated from it — works from a phone.
+        try {
+          if (res.lanIp) {
+            const list = loadDynamicCodes();
+            let changed = false;
+            for (const c of list) {
+              if (c && c.shortUrl && /\/\/(localhost|127\.0\.0\.1)(:3000)?\//i.test(c.shortUrl)) {
+                try {
+                  const u = new URL(c.shortUrl);
+                  u.host = res.lanIp + ":3000";
+                  c.shortUrl = u.toString().replace(/\/$/, "");
+                  changed = true;
+                } catch { /* keep old */ }
+              }
+            }
+            if (changed) { saveDynamicCodes(list); if (window.__kuiqrRefreshStatsList) window.__kuiqrRefreshStatsList(); }
+          }
+        } catch { /* best effort */ }
+        setLocalStatus(
+          t("set.dynamicLocalRunning", { url: res.url }) +
+          (res.lanIp ? `<div class="dyn-note">${t("set.dynamicLocalLanNote", { url: escapeHtml(res.url) })}</div>` : ""),
+          false
+        );
         if (localStop) localStop.classList.remove("hidden");
       } catch (e) {
         setLocalStatus(t("set.dynamicLocalFailed", { reason: String((e && e.message) || e) }), true);
@@ -863,14 +906,15 @@
       case "sms": return "SMSTO:" + col("number").trim() + ":" + (col("message") || "").replace(/\n/g, " ").trim();
       case "phone": return "tel:" + col("number").trim();
       case "event": {
-        const lines = ["BEGIN:VEVENT"];
+        // Same VCALENDAR envelope as the single-event builder (RFC 5545).
+        const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Kuiqr//EN", "BEGIN:VEVENT"];
         const s = toICal(col("start")), e2 = toICal(col("end"));
         if (s) lines.push("DTSTART:" + s);
         if (e2) lines.push("DTEND:" + e2);
         const sum = col("summary").trim(); if (sum) lines.push("SUMMARY:" + escV(sum));
         const loc = col("location").trim(); if (loc) lines.push("LOCATION:" + escV(loc));
-        lines.push("END:VEVENT");
-        return lines.join("\n");
+        lines.push("END:VEVENT", "END:VCALENDAR");
+        return lines.join("\r\n");
       }
       case "geo": { const lat = col("lat").trim(), lng = col("lng").trim(); if (!lat || !lng) return ""; return "geo:" + lat + "," + lng; }
       default: return "";
@@ -971,7 +1015,7 @@
       { name: "email", content: "mailto:jane@acme.com?subject=Hi&body=Hello" },
       { name: "sms", content: "SMSTO:15550100:Hello there" },
       { name: "phone", content: "tel:+15550100" },
-      { name: "event", content: "BEGIN:VEVENT\nDTSTART:20260827T140000\nDTEND:20260827T150000\nSUMMARY:Meeting\nLOCATION:Office\nEND:VEVENT" },
+      { name: "event", content: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Kuiqr//EN\r\nBEGIN:VEVENT\r\nDTSTART:20260827T140000\r\nDTEND:20260827T150000\r\nSUMMARY:Meeting\r\nLOCATION:Office\r\nEND:VEVENT\r\nEND:VCALENDAR" },
       { name: "geo", content: "geo:37.421999,-122.084" },
     ];
     const styleSets = [
@@ -1019,7 +1063,7 @@
       { name: "phone", tpl: "phone", v: { number: "+1 555 0100" },
         expected: "tel:+1 555 0100" },
       { name: "event", tpl: "event", v: { start: "2026-08-27T14:00", end: "2026-08-27T15:00", summary: "Meeting", location: "Office" },
-        expected: "BEGIN:VEVENT\nDTSTART:20260827T140000\nDTEND:20260827T150000\nSUMMARY:Meeting\nLOCATION:Office\nEND:VEVENT" },
+        expected: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Kuiqr//EN\r\nBEGIN:VEVENT\r\nDTSTART:20260827T140000\r\nDTEND:20260827T150000\r\nSUMMARY:Meeting\r\nLOCATION:Office\r\nEND:VEVENT\r\nEND:VCALENDAR" },
       { name: "geo", tpl: "geo", v: { lat: "37.4219", lng: "-122.0840" },
         expected: "geo:37.4219,-122.0840" },
     ];

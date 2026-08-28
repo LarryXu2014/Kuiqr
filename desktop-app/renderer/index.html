@@ -222,38 +222,67 @@
       </label>
     </div>
 
-    <div class="settings-group dynamic-settings-group">
-      <h3 class="group-title" data-i18n="set.dynamicGroup">Dynamic QR (analytics)</h3>
-      <p class="setting-desc" data-i18n="gen.dynamicDesc">Encode a redirect link so you can see scan analytics. Requires a backend set in Settings.</p>
-
-      <details class="dyn-help">
-        <summary data-i18n="set.dynamicHelpTitle">What is this? (Don't have a backend?)</summary>
-        <div class="dyn-help-body">
-          <p data-i18n="set.dynamicHelp1">A <b>trackable QR</b> encodes a short redirect link instead of the final destination. When someone scans it, your server logs the visit and forwards them to the real page — so you can see how many times it was scanned.</p>
-          <p data-i18n="set.dynamicHelp2"><b>Backend URL</b> is the address of that server (e.g. <code>https://qr.yourdomain.com</code>). <b>API key</b> is a secret the app sends to create codes; you set it on the server and paste the same value here.</p>
-          <p data-i18n="set.dynamicHelp3">You don't need to buy anything. Kuiqr ships with a free, self-hosted backend you can run on this Mac with one click (button below). Or point it at your own server / a compatible service.</p>
-        </div>
-      </details>
-
+    <div class="settings-group">
+      <h3 class="group-title" data-i18n="set.appearanceGroup">Appearance</h3>
       <div class="setting-item">
         <div class="setting-info">
-          <div class="setting-label" data-i18n="set.dynamicBackend">Backend URL</div>
-          <div class="setting-desc" data-i18n="set.dynamicBackendDesc">Base URL of your redirect/analytics server (e.g. https://qr.yourdomain.com)</div>
+          <div class="setting-label" data-i18n="set.accent">Accent color</div>
+          <div class="setting-desc" data-i18n="set.accentDesc">Colors the buttons, tabs and highlights. Applies live; save to keep it.</div>
         </div>
-        <input type="text" id="setting-dynamic-backend" class="setting-input" placeholder="https://qr.yourdomain.com" />
       </div>
-      <div class="setting-item">
-        <div class="setting-info">
-          <div class="setting-label" data-i18n="set.dynamicApiKey">API key</div>
-          <div class="setting-desc" data-i18n="set.dynamicApiKeyDesc">Secret used to create codes. Stored locally on this device.</div>
-        </div>
-        <input type="password" id="setting-dynamic-apikey" class="setting-input" placeholder="••••••••" />
+      <div class="accent-row" id="accent-row">
+        <button type="button" class="accent-swatch" data-accent="#4f46e5" style="background:#4f46e5" title="Indigo"></button>
+        <button type="button" class="accent-swatch" data-accent="#2563eb" style="background:#2563eb" title="Blue"></button>
+        <button type="button" class="accent-swatch" data-accent="#0d9488" style="background:#0d9488" title="Teal"></button>
+        <button type="button" class="accent-swatch" data-accent="#16a34a" style="background:#16a34a" title="Green"></button>
+        <button type="button" class="accent-swatch" data-accent="#d97706" style="background:#d97706" title="Amber"></button>
+        <button type="button" class="accent-swatch" data-accent="#dc2626" style="background:#dc2626" title="Red"></button>
+        <button type="button" class="accent-swatch" data-accent="#db2777" style="background:#db2777" title="Pink"></button>
+        <button type="button" class="accent-swatch" data-accent="#9333ea" style="background:#9333ea" title="Purple"></button>
+        <label class="accent-custom" title="Custom">
+          <input type="color" id="setting-accent-custom" value="#4f46e5" />
+        </label>
       </div>
+    </div>
 
-      <div class="dyn-local">
-        <button id="dyn-local-start" class="btn-save" data-i18n="set.dynamicLocalStart">Run local backend (free)</button>
-        <button id="dyn-local-stop" class="btn-text hidden" data-i18n="set.dynamicLocalStop">Stop local backend</button>
-        <div id="dyn-local-status" class="dynamic-status hidden"></div>
+    <div class="settings-group dynamic-settings-group" id="settings-dynamic-group">
+      <button type="button" class="panel-toggle settings-group-toggle" id="settings-dynamic-toggle" aria-expanded="false">
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        <span class="group-title" data-i18n="set.dynamicGroup">Dynamic QR (analytics)</span>
+        <span class="panel-hint" data-i18n="set.dynamicHint">backend · API key · local server</span>
+      </button>
+      <div class="panel-body hidden" id="settings-dynamic-body">
+        <p class="setting-desc" data-i18n="gen.dynamicDesc">Encode a redirect link so you can see scan analytics. Requires a backend set in Settings.</p>
+
+        <details class="dyn-help">
+          <summary data-i18n="set.dynamicHelpTitle">What is this? (Don't have a backend?)</summary>
+          <div class="dyn-help-body">
+            <p data-i18n="set.dynamicHelp1">A <b>trackable QR</b> encodes a short redirect link instead of the final destination. When someone scans it, your server logs the visit and forwards them to the real page — so you can see how many times it was scanned.</p>
+            <p data-i18n="set.dynamicHelp2"><b>Backend URL</b> is the address of that server (e.g. <code>https://qr.yourdomain.com</code>). <b>API key</b> is a secret the app sends to create codes; you set it on the server and paste the same value here.</p>
+            <p data-i18n="set.dynamicHelp3">You don't need to buy anything. Kuiqr ships with a free, self-hosted backend you can run on this Mac with one click (button below). Or point it at your own server / a compatible service.</p>
+          </div>
+        </details>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <div class="setting-label" data-i18n="set.dynamicBackend">Backend URL</div>
+            <div class="setting-desc" data-i18n="set.dynamicBackendDesc">Base URL of your redirect/analytics server (e.g. https://qr.yourdomain.com)</div>
+          </div>
+          <input type="text" id="setting-dynamic-backend" class="setting-input" placeholder="https://qr.yourdomain.com" />
+        </div>
+        <div class="setting-item">
+          <div class="setting-info">
+            <div class="setting-label" data-i18n="set.dynamicApiKey">API key</div>
+            <div class="setting-desc" data-i18n="set.dynamicApiKeyDesc">Secret used to create codes. Stored locally on this device.</div>
+          </div>
+          <input type="password" id="setting-dynamic-apikey" class="setting-input" placeholder="••••••••" />
+        </div>
+
+        <div class="dyn-local">
+          <button id="dyn-local-start" class="btn-save" data-i18n="set.dynamicLocalStart">Run local backend (free)</button>
+          <button id="dyn-local-stop" class="btn-text hidden" data-i18n="set.dynamicLocalStop">Stop local backend</button>
+          <div id="dyn-local-status" class="dynamic-status hidden"></div>
+        </div>
       </div>
     </div>
 
@@ -324,6 +353,28 @@
       <button id="gen-batch" class="btn-text" data-i18n="batch.btn">Batch from CSV…</button>
       <button id="gen-copy-qr" class="btn-text" data-i18n="gen.copyqr">Copy QR Code</button>
       <button id="gen-copy" class="btn-text" data-i18n="gen.copytext">Copy Text</button>
+    </div>
+
+    <!-- Dynamic (trackable) QR — sits right under the action buttons so it's
+         easy to reach; the chevron shows the row can be expanded. -->
+    <div class="generate-group dynamic-group" id="dynamic-group">
+      <label class="setting-item toggle-row dyn-toggle-row">
+        <div class="setting-info">
+          <div class="setting-label"><span data-i18n="gen.dynamic">Dynamic (trackable) QR</span>
+            <svg class="dyn-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+          <div class="setting-desc" data-i18n="gen.dynamicDesc">Encode a redirect link so you can see scan analytics. Requires a backend set in Settings.</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="gen-dynamic" />
+          <span class="toggle-slider"></span>
+        </label>
+      </label>
+      <div id="gen-dynamic-panel" class="dynamic-panel hidden">
+        <p class="dynamic-info dyn-panel-info" data-i18n="gen.dynamicInfo">When on, the QR encodes a short redirect link. Each scan is counted in Analytics, then the visitor is sent to your real link.</p>
+        <button id="gen-create-trackable" class="btn-save" data-i18n="gen.createTrackable">Create trackable QR</button>
+        <div id="gen-dynamic-status" class="dynamic-status hidden"></div>
+      </div>
     </div>
 
     <!-- Styling panel (Step 2) — collapsed by default; expand to customize -->
@@ -426,25 +477,6 @@
       </div>
       </div>
     </div>
-
-    <!-- Dynamic (trackable) QR — optional advanced feature -->
-    <div class="generate-group dynamic-group">
-      <label class="setting-item toggle-row">
-        <div class="setting-info">
-          <div class="setting-label" data-i18n="gen.dynamic">Dynamic (trackable) QR</div>
-          <div class="setting-desc" data-i18n="gen.dynamicDesc">Encode a redirect link so you can see scan analytics. Requires a backend set in Settings.</div>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" id="gen-dynamic" />
-          <span class="toggle-slider"></span>
-        </label>
-      </label>
-      <div id="gen-dynamic-panel" class="dynamic-panel hidden">
-        <p class="dynamic-info" data-i18n="gen.dynamicInfo">When on, the QR encodes a short redirect link. Each scan is counted in Analytics, then the visitor is sent to your real link.</p>
-        <button id="gen-create-trackable" class="btn-save" data-i18n="gen.createTrackable">Create trackable QR</button>
-        <div id="gen-dynamic-status" class="dynamic-status hidden"></div>
-      </div>
-    </div>
   </div>
 
   <!-- ===== Stats Tab ===== -->
@@ -456,7 +488,14 @@
         <p class="empty-state" id="stats-empty" data-i18n="stats.empty">No trackable QR codes yet. Create one on the Generate tab.</p>
       </div>
       <div id="stats-detail" class="stats-detail hidden">
-        <button id="stats-back" class="btn-text" data-i18n="stats.back">← Back to list</button>
+        <div class="stats-detail-top">
+          <button id="stats-back" class="btn-text" data-i18n="stats.back">← Back to list</button>
+          <div class="stats-refresh-row">
+            <button id="stats-refresh" class="btn-result btn-result-secondary btn-small" data-i18n="stats.refresh">Refresh</button>
+            <span id="stats-updated" class="stats-updated"></span>
+          </div>
+        </div>
+        <p class="setting-desc stats-hint" data-i18n="stats.hint">Phone scans are counted when the phone is on the same Wi-Fi network as this computer. Tap Refresh to update.</p>
         <div id="stats-summary" class="stats-summary"></div>
         <h3 data-i18n="stats.byDay">Scans per day</h3>
         <div id="stats-byday" class="stats-chart"></div>
@@ -635,6 +674,7 @@
   <script src="jspdf.umd.min.js"></script>
   <script src="papaparse.min.js"></script>
   <script src="i18n.js"></script>
+  <script src="qr-actions.js"></script>
   <script src="tutorial.js"></script>
   <script src="qrgen.js"></script>
   <script src="app.js"></script>

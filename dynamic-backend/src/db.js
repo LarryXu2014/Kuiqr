@@ -98,6 +98,16 @@ function logClick(codeId, geo, ua, referrer, visitorHash) {
     );
 }
 
+function formatDeviceLabel(device, os) {
+  const d = device || "Unknown";
+  const o = os || "Unknown";
+  if (d === "Unknown") return o === "Unknown" ? "Unknown" : o;
+  if (d === "phone") return o === "Unknown" ? "Phone" : `${o} phone`;
+  if (d === "tablet") return o === "Unknown" ? "Tablet" : `${o} tablet`;
+  // desktop / smarttv / wearable etc.
+  return d.charAt(0).toUpperCase() + d.slice(1);
+}
+
 function getStats(code) {
   const row = getCodeByCode(code);
   if (!row) return null;
@@ -122,10 +132,13 @@ function getStats(code) {
     .all(row.id);
   const byDevice = database
     .prepare(
-      `SELECT COALESCE(device, 'Unknown') AS device, COUNT(*) AS total
-       FROM clicks WHERE code_id = ? GROUP BY device ORDER BY total DESC`
+      `SELECT COALESCE(device, 'Unknown') AS device,
+              COALESCE(os, 'Unknown') AS os,
+              COUNT(*) AS total
+       FROM clicks WHERE code_id = ? GROUP BY device, os ORDER BY total DESC`
     )
-    .all(row.id);
+    .all(row.id)
+    .map((d) => ({ device: formatDeviceLabel(d.device, d.os), total: d.total }));
   return {
     code,
     shortUrl: `${config.BASE_URL}/${code}`,

@@ -19,14 +19,14 @@ const app = Fastify({ logger: true });
 // Shared API-key guard. Returns false (and sends 401) when the request is denied.
 function checkKey(req, reply) {
   if (!config.API_KEY) {
-    // Dev mode: no key configured on the server — allow, but warn once.
+    // Dev mode: no key configured on the server — allow any or no key, but warn once.
     if (!checkKey._warned) {
       console.warn("[kuiqr-dynamic] WARNING: API_KEY is empty — API is open. Set API_KEY in production.");
       checkKey._warned = true;
     }
     return true;
   }
-  const key = req.headers["x-api-key"] || (req.query && req.query.api_key);
+  const key = req.headers["x-api-key"] || (req.query && req.query.api_key) || "";
   if (key !== config.API_KEY) {
     reply.code(401).send({ error: "unauthorized" });
     return false;
@@ -76,17 +76,59 @@ app.get("/api/codes/:id/stats", async (req, reply) => {
   return stats;
 });
 
+// Friendly browser page for dead/expired/unknown short links. Visitors who scan
+// a QR code whose code no longer exists shouldn't be shown raw JSON.
+function friendlyPage(title, heading, message) {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${title}</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b;
+         display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 32px 36px; max-width: 420px; text-align: center; }
+  .qr { font-size: 40px; line-height: 1; margin-bottom: 12px; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  p { font-size: 14px; color: #64748b; margin: 0 0 4px; line-height: 1.5; }
+  .brand { margin-top: 16px; font-size: 12px; color: #94a3b8; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="qr">⬜&nbsp;<span style="opacity:.25">⬜</span></div>
+    <h1>${heading}</h1>
+    <p>${message}</p>
+    <div class="brand">Kuiqr dynamic QR</div>
+  </div>
+</body>
+</html>`;
+}
+
 // Catch-all redirect. Registered last so it doesn't shadow the /api/* routes.
 app.get("/:code", async (req, reply) => {
   const code = req.params.code;
   if (!/^[A-Za-z0-9_-]{3,}$/.test(code)) {
-    return reply.code(404).send({ error: "not found" });
+    return reply.code(404).type("text/html; charset=utf-8").send(
+      friendlyPage("Link not found — Kuiqr", "This link doesn't exist", "The QR code points to a short link that isn't valid. It may have been mistyped, or the QR code was not created by this service.")
+    );
   }
   const row = db.getCodeByCode(code);
-  if (!row) return reply.code(404).send({ error: "not found" });
-  if (!row.active) return reply.code(410).send({ error: "link disabled" });
+  if (!row) {
+    return reply.code(404).type("text/html; charset=utf-8").send(
+      friendlyPage("Link not found — Kuiqr", "This link doesn't exist (anymore)", "The short link was not found on this server. It may have been deleted, or the QR code was created on a different device/backend.")
+    );
+  }
+  if (!row.active) {
+    return reply.code(410).type("text/html; charset=utf-8").send(
+      friendlyPage("Link disabled — Kuiqr", "This link was turned off", "Whoever created this QR code disabled the short link. Ask them for a new one.")
+    );
+  }
   if (row.expires_at && Date.now() > row.expires_at) {
-    return reply.code(410).send({ error: "link expired" });
+    return reply.code(410).type("text/html; charset=utf-8").send(
+      friendlyPage("Link expired — Kuiqr", "This link expired", "The short link had an expiry date which has passed. Ask whoever created the QR code for a fresh one.")
+    );
   }
 
   const ip = analytics.getClientIp(req);

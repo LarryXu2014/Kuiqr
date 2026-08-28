@@ -33,6 +33,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.initI18n();
   setupLanguagePicker();
   setupUpdates();
+
+  // Accent color: apply early so the themed UI never flashes the default indigo.
+  try {
+    const s0 = await window.qrAPI.getSettings();
+    applyAccentColor((s0 && s0.accentColor) || ACCENT_DEFAULT);
+  } catch { /* default already applied */ }
   // Re-render JS-built (dynamic) strings whenever the language changes.
   window.addEventListener("kuiqr:localize", () => localize());
 
@@ -167,7 +173,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ── Settings ──
   await loadSettingsForm();
   document.getElementById("save-settings-btn").addEventListener("click", saveSettings);
+  setupAccentPicker();
   setupShortcutRecorder();
+  setupSettingsDynamicCollapse();
   setupGenerate();
   setupStats();
   setupSettingsDirtyTracking();
@@ -268,6 +276,7 @@ function getSettingsFormValues() {
     shortcut: currentShortcut,
     dynamicBackendUrl: (document.getElementById("setting-dynamic-backend").value || "").trim(),
     dynamicApiKey: document.getElementById("setting-dynamic-apikey").value || "",
+    accentColor: currentAccent,
   };
 }
 
@@ -282,7 +291,8 @@ function updateSettingsDirtyState() {
     current.maxHistory !== savedSettingsSnapshot.maxHistory ||
     current.shortcut !== savedSettingsSnapshot.shortcut ||
     current.dynamicBackendUrl !== savedSettingsSnapshot.dynamicBackendUrl ||
-    current.dynamicApiKey !== savedSettingsSnapshot.dynamicApiKey;
+    current.dynamicApiKey !== savedSettingsSnapshot.dynamicApiKey ||
+    current.accentColor !== savedSettingsSnapshot.accentColor;
 
   settingsDirty = dirty;
   const saveBtn = document.getElementById("save-settings-btn");
@@ -973,12 +983,50 @@ async function decodeBufferToText(buffer) {
 // Handle Decoded Result (in-app)
 // ============================================================
 
+// Look up a decoded string in the local trackable-QR store. Matches either
+// the exact short URL or the same host + code path (QR encodes the short URL).
+function findTrackableCode(text) {
+  let codes = [];
+  try { codes = JSON.parse(localStorage.getItem("kuiqr.dynamicCodes") || "[]"); } catch { return null; }
+  if (!Array.isArray(codes)) return null;
+  const norm = (s) => String(s || "").trim().replace(/\/+$/, "").toLowerCase();
+  const hit = codes.find((c) => c && norm(c.shortUrl) === norm(text));
+  if (hit) return hit;
+  // Host + code fallback (e.g. scheme or trailing-slash differences).
+  try {
+    const u = new URL(text);
+    const code = u.pathname.replace(/^\/+|\/+$/g, "");
+    if (!code || code.includes("/")) return null;
+    return codes.find((c) => {
+      try { const cu = new URL(c.shortUrl); return cu.host === u.host && cu.pathname.replace(/^\/+|\/+$/g, "") === code; }
+      catch { return false; }
+    }) || null;
+  } catch { return null; }
+}
+
 async function handleDecodedResult(qrResult) {
   const text = qrResult.data.trim();
-  const isUrl = /^(https?:\/\/|www\.)/i.test(text);
 
-  // Show result UI
-  if (isUrl) {
+  // Classify the payload first: WIFI / vCard / event / geo / tel / sms / mailto
+  // get real actions (join network, open Contacts…), like the iPhone camera.
+  const payload = window.QRPayload ? window.QRPayload.classify(text) : { type: /^(https?:\/\/|www\.)/i.test(text) ? "url" : "text", text };
+  const isUrl = payload.type === "url";
+
+  // A trackable short link created by THIS app: never auto-open it — show the
+  // destination + stats actions instead, so the owner understands what happened.
+  const trackable = isUrl ? findTrackableCode(text) : null;
+  if (trackable) {
+    showTrackableResult(trackable, text);
+    // Record history + show the toast, but skip the blind auto-open.
+    const response = await window.qrAPI.onDecoded(text, { noAutoOpen: true });
+    await loadHistory();
+    return;
+  }
+
+  // Show result UI (rich payloads get a dedicated card with real actions).
+  if (payload.type !== "url" && payload.type !== "text") {
+    showRichResult(payload, text);
+  } else if (isUrl) {
     showResult("url", text, null, true);
   } else {
     showResult("text", text, null, false);
@@ -987,8 +1035,12 @@ async function handleDecodedResult(qrResult) {
   // Scan success feedback is delivered as an IN-APP overlay by the main process
   // (applyDecodedResult), controlled by the "Show scan notifications" setting.
 
-  // Apply side effects via main process
-  const response = await window.qrAPI.onDecoded(text);
+  // Apply side effects via main process. Rich payloads are recorded verbatim
+  // (the raw WIFI:/vCard string stays useful in history) but NOT auto-opened —
+  // the card's action buttons decide what actually happens.
+  const response = payload.type !== "url" && payload.type !== "text"
+    ? await window.qrAPI.onDecoded(text, { noAutoOpen: true })
+    : await window.qrAPI.onDecoded(text);
 
   // Refresh history
   await loadHistory();
@@ -1045,6 +1097,165 @@ function showResult(type, data, sub, isUrl) {
 function hideResult() {
   document.getElementById("scan-result").classList.add("hidden");
 }
+
+// Dedicated result UI for a scanned trackable short link (owner preview):
+// shows where it redirects and offers Open destination / Copy link / stats.
+function showTrackableResult(rec, shortUrl) {
+  const el = document.getElementById("scan-result");
+  const badge = document.getElementById("result-badge");
+  const dataEl = document.getElementById("result-data");
+  const actionsEl = document.getElementById("result-actions");
+  if (!el || !badge || !dataEl || !actionsEl) return;
+
+  el.classList.remove("hidden");
+  badge.textContent = t("hist.type.trackable");
+  badge.className = "result-badge url";
+  dataEl.textContent = shortUrl;
+
+  actionsEl.innerHTML = "";
+
+  const sub = document.createElement("p");
+  sub.className = "result-sub";
+  sub.textContent = t("result.trackableSub", { url: rec.destination || "?" });
+  actionsEl.appendChild(sub);
+
+  const btns = document.createElement("div");
+  btns.className = "result-actions";
+  btns.style.marginTop = "6px";
+
+  const openBtn = document.createElement("button");
+  openBtn.className = "btn-result";
+  openBtn.textContent = t("result.openDest");
+  openBtn.addEventListener("click", () => {
+    const dest = rec.destination || "";
+    if (dest) window.qrAPI.openUrl(dest.startsWith("http") ? dest : `https://${dest}`);
+  });
+  btns.appendChild(openBtn);
+
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "btn-result btn-result-secondary";
+  copyBtn.textContent = t("result.copyShortLink");
+  copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(shortUrl);
+      copyBtn.textContent = t("result.copied");
+      setTimeout(() => { copyBtn.textContent = t("result.copyShortLink"); }, 1500);
+    } catch { /* clipboard unavailable */ }
+  });
+  btns.appendChild(copyBtn);
+
+  const statsBtn = document.createElement("button");
+  statsBtn.className = "btn-result btn-result-secondary";
+  statsBtn.textContent = t("gen.viewStats");
+  statsBtn.addEventListener("click", () => {
+    if (window.requestSwitchTab) window.requestSwitchTab("stats");
+  });
+  btns.appendChild(statsBtn);
+
+  actionsEl.appendChild(btns);
+}
+
+// ── Rich QR payload result card (WiFi / vCard / event / geo / tel / sms / mailto) ──
+// Like the iPhone camera: scanning a Wi-Fi QR offers to JOIN the network, a
+// vCard opens in Contacts, an event in Calendar, a geo location in Maps.
+// Each card also keeps a secondary "Copy" action for the raw payload.
+function showRichResult(p, rawText) {
+  const el = document.getElementById("scan-result");
+  const badge = document.getElementById("result-badge");
+  const dataEl = document.getElementById("result-data");
+  const actionsEl = document.getElementById("result-actions");
+  if (!el || !badge || !dataEl || !actionsEl) return;
+
+  el.classList.remove("hidden");
+  badge.textContent = t("hist.type." + p.type);
+  badge.className = "result-badge " + p.type;
+
+  // Friendly summary line first, raw payload second (small, muted, scrollable).
+  const summary = window.QRPayload ? window.QRPayload.summarize(p) : "";
+  dataEl.textContent = summary || rawText;
+
+  actionsEl.innerHTML = "";
+
+  if (summary && summary !== rawText) {
+    const raw = document.createElement("p");
+    raw.className = "result-sub";
+    raw.textContent = rawText.length > 160 ? rawText.slice(0, 160) + "…" : rawText;
+    actionsEl.appendChild(raw);
+  }
+
+  const btns = document.createElement("div");
+  btns.className = "result-actions";
+  btns.style.marginTop = "6px";
+
+  const mkBtn = (labelKey, className, onClick) => {
+    const b = document.createElement("button");
+    b.className = "btn-result " + (className || "");
+    b.textContent = t(labelKey);
+    b.addEventListener("click", onClick);
+    return b;
+  };
+  const feedback = (btn, ok) => {
+    btn.textContent = ok ? t("result.copied") : t("result.actionFailed");
+    btn.disabled = false;
+    setTimeout(() => { btn.textContent = t("result.copy"); }, 1500);
+  };
+  const copyBtn = () => mkBtn("result.copy", "btn-result-secondary", async (e) => {
+    const btn = e.currentTarget; // capture now — currentTarget is null after await
+    try { await navigator.clipboard.writeText(rawText); feedback(btn, true); }
+    catch { feedback(btn, false); }
+  });
+
+  if (p.type === "wifi") {
+    const join = mkBtn("result.joinWifi", "", async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.textContent = t("result.joiningWifi");
+      const res = await window.qrAPI.joinWifi({ ssid: p.ssid, password: p.password, security: p.security });
+      btn.textContent = res && res.ok ? t("result.joinedWifi") : t("result.joinFailed");
+      btn.disabled = false;
+    });
+    btns.appendChild(join);
+    if (p.hidden) {
+      const note = document.createElement("span");
+      note.className = "result-sub";
+      note.textContent = t("result.wifiHiddenNote");
+      btns.appendChild(note);
+    }
+  } else if (p.type === "vcard") {
+    btns.appendChild(mkBtn("result.addContact", "", (e) => {
+      window.qrAPI.openContactEvent({ kind: "vcard", content: p.raw });
+      e.currentTarget.textContent = t("result.openedContact");
+    }));
+  } else if (p.type === "event") {
+    btns.appendChild(mkBtn("result.addEvent", "", (e) => {
+      window.qrAPI.openContactEvent({ kind: "event", content: p.raw });
+      e.currentTarget.textContent = t("result.openedEvent");
+    }));
+  } else if (p.type === "geo") {
+    btns.appendChild(mkBtn("result.showInMaps", "", () => {
+      window.qrAPI.openGeo({ lat: p.lat, lon: p.lon });
+    }));
+  } else if (p.type === "tel" || p.type === "sms") {
+    btns.appendChild(mkBtn(p.type === "tel" ? "result.callNumber" : "result.sendMessage", "", (e) => {
+      const url = p.type === "tel" ? "tel:" + p.value : "sms:" + p.value + (p.body ? "?body=" + encodeURIComponent(p.body) : "");
+      window.qrAPI.openUrl(url);
+      e.currentTarget.textContent = t("result.openingApp");
+    }));
+  } else if (p.type === "mailto") {
+    btns.appendChild(mkBtn("result.sendEmail", "", (e) => {
+      const url = "mailto:" + p.value + (p.body ? "?body=" + encodeURIComponent(p.body) : "");
+      window.qrAPI.openUrl(url);
+      e.currentTarget.textContent = t("result.openingApp");
+    }));
+  }
+
+  btns.appendChild(copyBtn());
+  actionsEl.appendChild(btns);
+}
+
+// Test hook (used by tests/run-ui-smoke.mjs): lets the smoke suite drive the
+// decoded-result flow without a real capture/decode pipeline.
+window.__kuiqrTest = { handleDecodedResult, findTrackableCode };
 
 // ============================================================
 // Scan notification — now a REAL on-screen layer (a separate always-on-top
@@ -1168,6 +1379,81 @@ async function clearHistory() {
 // Settings
 // ============================================================
 
+// ── Accent color (Settings → Appearance) ──────────────────────────────────
+// The accent re-themes every UI element that used to be hardcoded indigo
+// (buttons, tabs, badges, charts…). It is derived from a single hex value:
+// --primary is the value itself; light/dark variants are computed in JS.
+let currentAccent = "#4f46e5";
+const ACCENT_DEFAULT = "#4f46e5";
+
+function normHex(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+  return m ? "#" + m[1].toLowerCase() : null;
+}
+function shadeHex(hex, pct) {
+  const h = normHex(hex) || ACCENT_DEFAULT;
+  const n = parseInt(h.slice(1), 16);
+  const f = (c) => Math.max(0, Math.min(255, Math.round(pct >= 0 ? c + (255 - c) * pct : c * (1 + pct))));
+  const r = f((n >> 16) & 255), g = f((n >> 8) & 255), b = f(n & 255);
+  return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+function applyAccentColor(hex) {
+  const h = normHex(hex) || ACCENT_DEFAULT;
+  currentAccent = h;
+  const root = document.documentElement.style;
+  root.setProperty("--primary", h);
+  root.setProperty("--primary-light", shadeHex(h, 0.14));
+  root.setProperty("--primary-dark", shadeHex(h, -0.16));
+  selectAccentSwatch(h);
+}
+function selectAccentSwatch(hex) {
+  const h = normHex(hex);
+  const row = document.getElementById("accent-row");
+  if (!row) return;
+  let isPreset = false;
+  row.querySelectorAll(".accent-swatch").forEach((b) => {
+    const sel = normHex(b.dataset.accent) === h;
+    if (sel) isPreset = true;
+    b.classList.toggle("selected", sel);
+  });
+  const custom = document.getElementById("setting-accent-custom");
+  const customLbl = custom ? custom.closest(".accent-custom") : null;
+  if (customLbl) customLbl.classList.toggle("selected", !isPreset && !!h);
+  if (custom && h && custom.value.toLowerCase() !== h) custom.value = h;
+}
+function setupAccentPicker() {
+  const row = document.getElementById("accent-row");
+  if (!row) return;
+  row.querySelectorAll(".accent-swatch").forEach((b) => {
+    b.addEventListener("click", () => {
+      applyAccentColor(b.dataset.accent);
+      updateSettingsDirtyState();
+    });
+  });
+  const custom = document.getElementById("setting-accent-custom");
+  if (custom) {
+    custom.addEventListener("input", () => {
+      applyAccentColor(custom.value);
+      updateSettingsDirtyState();
+    });
+  }
+}
+
+function setupSettingsDynamicCollapse() {
+  const toggle = document.getElementById("settings-dynamic-toggle");
+  const body = document.getElementById("settings-dynamic-body");
+  if (!toggle || !body) return;
+  toggle.addEventListener("click", () => {
+    const expanded = body.classList.toggle("hidden");
+    toggle.setAttribute("aria-expanded", String(!expanded));
+    toggle.classList.toggle("collapsed", expanded);
+  });
+  // Collapsed by default so the Settings page isn't dominated by this section.
+  body.classList.add("hidden");
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.classList.add("collapsed");
+}
+
 async function loadSettingsForm() {
   const settings = await window.qrAPI.getSettings();
 
@@ -1178,6 +1464,7 @@ async function loadSettingsForm() {
   document.getElementById("setting-maxhistory").value = settings.maxHistory || 50;
   document.getElementById("setting-dynamic-backend").value = settings.dynamicBackendUrl || "";
   document.getElementById("setting-dynamic-apikey").value = settings.dynamicApiKey || "";
+  applyAccentColor(settings.accentColor || ACCENT_DEFAULT);
 
   // Track the active shortcut and reflect it everywhere
   currentShortcut = settings.shortcut || "CommandOrControl+Shift+Y";
@@ -1195,6 +1482,39 @@ async function loadSettingsForm() {
   settingsDirty = false;
   const saveBtn = document.getElementById("save-settings-btn");
   if (saveBtn) saveBtn.textContent = t("btn.save");
+
+  // One-time migration: short links stored while the local backend ran on
+  // "localhost" are unreachable from phones, so phone scans were never counted.
+  // When the configured backend now has a LAN address, re-point stored links —
+  // QR codes regenerated from them will then work when scanned on a phone.
+  migrateLocalhostCodes(settings.dynamicBackendUrl);
+}
+
+// Re-point stored trackable short links from localhost/127.0.0.1 to the given
+// backend address (e.g. http://192.168.1.42:3000). No-op when the backend is
+// still localhost or hosted remotely.
+function migrateLocalhostCodes(backendUrl) {
+  try {
+    if (!backendUrl) return;
+    const host = new URL(backendUrl).host; // e.g. "192.168.1.42:3000"
+    if (/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(host)) return;
+    const list = loadDynamicCodes();
+    let changed = false;
+    for (const c of list) {
+      if (c && c.shortUrl && /\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(c.shortUrl)) {
+        try {
+          const u = new URL(c.shortUrl);
+          u.host = host;
+          c.shortUrl = u.toString().replace(/\/+$/, "");
+          changed = true;
+        } catch { /* keep old value */ }
+      }
+    }
+    if (changed) {
+      saveDynamicCodes(list);
+      if (window.__kuiqrRefreshStatsList) window.__kuiqrRefreshStatsList();
+    }
+  } catch { /* ignore */ }
 }
 
 // Update both the "Current:" label and the scan button's kbd to match a shortcut
@@ -1368,6 +1688,7 @@ async function saveSettings() {
     maxHistory: parseInt(document.getElementById("setting-maxhistory").value, 10) || 50,
     dynamicBackendUrl: (document.getElementById("setting-dynamic-backend").value || "").trim(),
     dynamicApiKey: document.getElementById("setting-dynamic-apikey").value || "",
+    accentColor: currentAccent,
   };
 
   await window.qrAPI.saveSettings(settings);
@@ -1411,13 +1732,29 @@ function setupStats() {
   const emptyEl = document.getElementById("stats-empty");
   const detailEl = document.getElementById("stats-detail");
   const backBtn = document.getElementById("stats-back");
+  const refreshBtn = document.getElementById("stats-refresh");
+  const updatedEl = document.getElementById("stats-updated");
   const summaryEl = document.getElementById("stats-summary");
   const byDayEl = document.getElementById("stats-byday");
   const byCountryEl = document.getElementById("stats-bycountry");
   const byDeviceEl = document.getElementById("stats-bydevice");
+  let currentCode = null;
+  let pollTimer = null;
+
+  function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+  function startPoll() {
+    stopPoll();
+    // Refresh the open stats view every 10 s while this tab is visible, so a
+    // phone scan on the same network shows up without the user doing anything.
+    pollTimer = setInterval(() => { if (currentCode && !document.hidden) showStats(currentCode, false); }, 10000);
+  }
+  function formatTime() {
+    const d = new Date();
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
 
   function renderBars(container, items, showSub) {
-    if (!items || !items.length) { container.innerHTML = `<p class="setting-desc">—</p>`; return; }
+    if (!items || !items.length) { container.innerHTML = `<p class="setting-desc stats-no-data">—</p>`; return; }
     const max = Math.max.apply(null, items.map((i) => i.value).concat([1]));
     container.innerHTML = items.map((i) => {
       const pct = Math.max(4, Math.round((i.value / max) * 100));
@@ -1431,6 +1768,9 @@ function setupStats() {
   }
 
   function renderList() {
+    stopPoll();
+    currentCode = null;
+    detailEl.classList.add("hidden");
     const codes = loadDynamicCodes();
     listEl.querySelectorAll(".stats-code-item").forEach((n) => n.remove());
     if (!codes.length) { emptyEl.classList.remove("hidden"); return; }
@@ -1442,18 +1782,26 @@ function setupStats() {
         `<div class="sci-code">${escapeHtml(c.code)}</div>` +
         `<div class="sci-dest">${escapeHtml(c.destination)}</div>` +
         `<div class="sci-meta">${escapeHtml(c.shortUrl || "")}</div>`;
-      item.addEventListener("click", () => showStats(c.code));
+      item.addEventListener("click", () => { showStats(c.code, true); startPoll(); });
       listEl.appendChild(item);
     });
   }
 
-  async function showStats(code) {
-    detailEl.classList.remove("hidden");
-    summaryEl.innerHTML = `<p class="setting-desc">${t("stats.loading")}</p>`;
-    byDayEl.innerHTML = ""; byCountryEl.innerHTML = ""; byDeviceEl.innerHTML = "";
+  async function showStats(code, showLoading = true) {
+    currentCode = code;
+    if (showLoading) {
+      detailEl.classList.remove("hidden");
+      summaryEl.innerHTML = `<p class="setting-desc">${t("stats.loading")}</p>`;
+      byDayEl.innerHTML = ""; byCountryEl.innerHTML = ""; byDeviceEl.innerHTML = "";
+    }
+    if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.textContent = t("stats.refreshing"); }
     const res = await window.qrAPI.getDynamicStats({ code });
+    if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = t("stats.refresh"); }
+    if (updatedEl) updatedEl.textContent = t("stats.updated", { time: formatTime() });
     if (!res || !res.ok) {
-      summaryEl.innerHTML = `<p class="generate-error">${escapeHtml((res && res.reason) || t("scanFailedMsg"))}</p>`;
+      const reason = (res && res.reason) || "";
+      const friendly = reason === "unauthorized" || res.status === 401 ? t("stats.unauthorized") : (reason || t("scanFailedMsg"));
+      summaryEl.innerHTML = `<p class="generate-error">${escapeHtml(friendly)}</p>`;
       return;
     }
     const s = res.data;
@@ -1463,16 +1811,17 @@ function setupStats() {
         `<div class="stat-card"><div class="stat-num">${s.unique}</div><div class="stat-lbl">${t("stats.unique")}</div></div>` +
       `</div>` +
       `<p class="setting-desc"><b>${t("stats.destination")}:</b> ${escapeHtml(s.destination || "")}</p>` +
-      `<p class="setting-desc">${escapeHtml(s.shortUrl || "")}</p>`;
+      `<p class="setting-desc stats-shorturl">${escapeHtml(s.shortUrl || "")}</p>`;
     renderBars(byDayEl, s.byDay.map((d) => ({ label: d.day, value: d.total, sub: t("stats.unique") + ": " + d.unique_scans })), true);
     renderBars(byCountryEl, s.byCountry.map((d) => ({ label: d.country, value: d.total })));
     renderBars(byDeviceEl, s.byDevice.map((d) => ({ label: d.device, value: d.total })));
   }
 
-  backBtn.addEventListener("click", () => detailEl.classList.add("hidden"));
+  if (backBtn) backBtn.addEventListener("click", () => { detailEl.classList.add("hidden"); stopPoll(); currentCode = null; });
+  if (refreshBtn) refreshBtn.addEventListener("click", () => { if (currentCode) showStats(currentCode, false); });
   window.__kuiqrRefreshStatsList = renderList;
   const statsTabBtn = document.querySelector('.tab[data-tab="stats"]');
-  if (statsTabBtn) statsTabBtn.addEventListener("click", renderList);
+  if (statsTabBtn) statsTabBtn.addEventListener("click", () => { renderList(); });
   renderList();
 }
 

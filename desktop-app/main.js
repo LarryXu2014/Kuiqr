@@ -55,7 +55,7 @@ const isWin = process.platform === "win32";
 // build.buildVersion and the GitHub tag each release) BEFORE the npm `version` field.
 // The npm `version` is only the 3-part semver ("2.4.1") and would otherwise make every
 // built app report as 2.4.1 and always think it is outdated.
-const FALLBACK_RELEASE_VERSION = "2.4.2.3.9";
+const FALLBACK_RELEASE_VERSION = "2.4.2.3.10";
 const RELEASE_VERSION = (() => {
   try {
     const pkg = require("./package.json");
@@ -101,6 +101,7 @@ const DEFAULT_SETTINGS = {
   setupDone: false,                 // whether the first-launch setup wizard has been completed
   dynamicBackendUrl: "",             // base URL of the Kuiqr dynamic-QR redirect/analytics backend
   dynamicApiKey: "",                // API key for that backend (POST /api/codes, GET .../stats)
+  accentColor: "",                   // UI accent color (hex, e.g. "#2563eb"); empty = default indigo
   qrStyle: null,                    // persisted QR styling defaults (fg/bg/ecc/dotStyle/finder colors/quiet/logo omitted)
 };
 
@@ -235,6 +236,174 @@ function parseWifiScan(out, platform) {
   return result;
 }
 
+// ── Rich QR actions (WiFi join, vCard→Contacts, event→Calendar, geo→Maps) ──
+// The scanner shouldn't just copy a WIFI:/vCard payload to the clipboard like
+// it's plain text — the iPhone camera joins the network and opens the contact.
+// These helpers give Kuiqr the same superpowers, per platform.
+
+// Run a shell command and return { code, stdout, stderr }. Never throws.
+function runShell(cmd, args) {
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(cmd, args, { windowsHide: true });
+      let out = "", err = "";
+      child.stdout.on("data", (d) => (out += d));
+      child.stderr.on("data", (d) => (err += d));
+      child.on("error", (e) => resolve({ code: -1, stdout: out, stderr: String((e && e.message) || e) }));
+      child.on("close", (code) => resolve({ code: code == null ? -1 : code, stdout: out, stderr: err }));
+    } catch (e) {
+      resolve({ code: -1, stdout: "", stderr: String((e && e.message) || e) });
+    }
+  });
+}
+
+// Write text to a temp file and return its absolute path (or null).
+function writeTempFile(name, content) {
+  try {
+    const p = path.join(app.getPath("temp"), name);
+    fs.writeFileSync(p, content, "utf-8");
+    return p;
+  } catch { return null; }
+}
+
+// Join a Wi-Fi network from a scanned WIFI: QR payload.
+//   macOS:   networksetup -setairportnetwork <iface> <ssid> <pass>
+//   Windows: create a WLAN profile XML from the payload, then `netsh wlan add
+//            profile` + `netsh wlan connect`
+//   Linux:   nmcli dev wifi connect <ssid> password <pass>
+// Returns { ok, reason? } — reason is a stable i18n-able code, not prose.
+async function joinWifiNetwork({ ssid, password, security }) {
+  if (!ssid) return { ok: false, reason: "missing-ssid" };
+  if (process.platform === "darwin") {
+    const ports = await runShell("networksetup", ["-listallhardwareports"]);
+    const m = /Hardware Port: Wi-Fi\s*\nDevice: (\w+)/.exec(ports.stdout);
+    const iface = m ? m[1] : "en0";
+    const args = password
+      ? ["-setairportnetwork", iface, ssid, password]
+      : ["-setairportnetwork", iface, ssid];
+    const res = await runShell("networksetup", args);
+    if (res.code !== 0) return { ok: false, reason: "join-failed" };
+    // networksetup exits 0 even when the join fails — verify we actually associated.
+    const check = await runShell("networksetup", ["-getairportnetwork", iface]);
+    const cur = /Current Wi-Fi Network:\s*(.+?)\s*$/m.exec(check.stdout);
+    if (cur && cur[1] === ssid) return { ok: true };
+    return { ok: false, reason: "join-failed" };
+  }
+  if (process.platform === "win32") {
+    const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const auth = security === "nopass"
+      ? "<authentication>open</authentication>"
+      : security === "WEP"
+        ? "<authentication>open</authentication><encryption>WEP</encryption><useSecurity>true</useSecurity>"
+        : "<authentication>WPA2PSK</authentication><encryption>AES</encryption><useSecurity>true</useSecurity>";
+    const hex = Buffer.from(ssid, "utf8").toString("hex").toUpperCase();
+    const xml =
+      `<?xml version="1.0"?>\n<WLANProfile xmlns="http://www.microsoft.com/networking/WLAN/profile/v1">\n` +
+      `<name>${esc(ssid)}</name>\n<SSIDConfig><SSID><hex>${hex}</hex><name>${esc(ssid)}</name></SSID></SSIDConfig>\n` +
+      `<connectionType>ESS</connectionType><connectionMode>manual</connectionMode>\n` +
+      `<MSM><security><sharedKey><keyType>passPhrase</keyType><protected>false</protected><keyMaterial>${esc(password || "")}</keyMaterial></sharedKey>${auth}</security></MSM>\n` +
+      `</WLANProfile>`;
+    const xmlPath = writeTempFile("kuiqr-wifi-profile.xml", xml);
+    if (!xmlPath) return { ok: false, reason: "temp-failed" };
+    const add = await runShell("netsh", ["wlan", "add", "profile", `filename=${xmlPath}`, "user=all"]);
+    try { fs.unlinkSync(xmlPath); } catch { /* best effort */ }
+    if (add.code !== 0) return { ok: false, reason: "join-failed" };
+    const conn = await runShell("netsh", ["wlan", "connect", `name=${ssid}`]);
+    if (conn.code !== 0) return { ok: false, reason: "join-failed" };
+    return { ok: true };
+  }
+  // Linux
+  const args = password
+    ? ["dev", "wifi", "connect", ssid, "password", password]
+    : ["dev", "wifi", "connect", ssid];
+  const res = await runShell("nmcli", args);
+  return res.code === 0 ? { ok: true } : { ok: false, reason: "join-failed" };
+}
+
+// Normalize a scanned calendar payload (VCALENDAR-wrapped or legacy bare
+// VEVENT, any line endings) into a valid RFC 5545 .ics body:
+//   - CRLF line endings (spec requirement; Calendar.app rejects LF-only files)
+//   - a VCALENDAR envelope with VERSION + PRODID
+//   - UID + DTSTAMP inside the VEVENT (Calendar.app refuses imports without them)
+function normalizeIcs(content) {
+  const raw = String(content || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  if (!raw) return "";
+  // Strip any existing envelope — it is rebuilt below so wrapped and bare
+  // scanned payloads end up identical.
+  const lines = raw
+    .replace(/^BEGIN:VCALENDAR[ \t]*$/im, "")
+    .replace(/^END:VCALENDAR[ \t]*$/im, "")
+    .split("\n").map((l) => l.replace(/[ \t]+$/, ""));
+  const out = ["BEGIN:VCALENDAR"];
+  let hasVersion = false, hasProdid = false;
+  for (const l of lines) {
+    if (/^VERSION:/i.test(l)) { hasVersion = true; out.push(l); }
+    else if (/^PRODID:/i.test(l)) { hasProdid = true; out.push(l); }
+  }
+  if (!hasVersion) out.push("VERSION:2.0");
+  if (!hasProdid) out.push("PRODID:-//Kuiqr//EN");
+  const extras = [];
+  if (!lines.some((l) => /^UID:/i.test(l))) {
+    extras.push("UID:kuiqr-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10) + "@kuiqr");
+  }
+  if (!lines.some((l) => /^DTSTAMP:/i.test(l))) {
+    const d = new Date();
+    const p = (n) => (n < 10 ? "0" : "") + n;
+    extras.push("DTSTAMP:" + d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) +
+      "T" + p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds()) + "Z");
+  }
+  let inserted = false;
+  for (const l of lines) {
+    if (/^(VERSION|PRODID):/i.test(l)) continue; // already hoisted above
+    out.push(l);
+    if (!inserted && /^BEGIN:VEVENT[ \t]*$/i.test(l)) {
+      out.push(...extras); inserted = true;
+    }
+  }
+  if (!inserted && extras.length) out.push(...extras); // no VEVENT — still emit valid props
+  out.push("END:VCALENDAR");
+  return out.filter((l) => l !== "").join("\r\n") + "\r\n";
+}
+
+// Open a contact/event file with the OS default handler:
+//   macOS: Contacts.app / Calendar.app (default for .vcf/.ics via `open`)
+//   Windows: People / Outlook / default .vcf/.ics app via `start`
+//   Linux: xdg-open (GNOME Contacts / Evolution etc.)
+function openContactOrEvent(kind, content) {
+  let body = String(content || "");
+  if (kind === "event") {
+    body = normalizeIcs(body);
+    if (!body) return { ok: false, reason: "empty" };
+  }
+  const ext = kind === "vcard" ? ".vcf" : ".ics";
+  const p = writeTempFile("kuiqr-scan-" + Date.now() + ext, body);
+  if (!p) return { ok: false, reason: "temp-failed" };
+  if (process.platform === "win32") {
+    // `start ""` because the first quoted arg of cmd's start is the window title.
+    exec(`start "" "${p.replace(/"/g, '""')}"`);
+    return { ok: true };
+  }
+  // macOS: `open` hands .vcf to Contacts, .ics to Calendar — exactly the
+  // iPhone-camera behavior. Linux: xdg-open does the equivalent.
+  shell.openPath(p);
+  return { ok: true };
+}
+
+// Show a geo: location in the platform maps app / default browser.
+function openGeoLocation(lat, lon) {
+  const q = `${lat},${lon}`;
+  let url;
+  if (process.platform === "darwin") url = `https://maps.apple.com/?q=${q}`;
+  else url = `https://www.google.com/maps?q=${q}`;
+  shell.openExternal(url);
+  return { ok: true };
+}
+
+ipcMain.handle("join-wifi", async (event, payload) => joinWifiNetwork(payload || {}));
+ipcMain.handle("open-contact-event", (event, { kind, content }) => openContactOrEvent(kind, content));
+ipcMain.handle("open-geo", (event, { lat, lon }) => openGeoLocation(lat, lon));
+
+
 // ============================================================
 // App Lifecycle
 // ============================================================
@@ -346,6 +515,23 @@ app.on("before-quit", () => {
   stopForegroundMonitor();
   globalShortcut.unregisterAll();
 });
+
+// Auto-restart the local analytics backend at launch when the user has one
+// configured as a LAN/localhost address (i.e. they used "Run local backend").
+// Without this, every app restart silently killed tracking: phone scans would
+// hit a dead URL and never be counted. Hosted (non-LAN) backends are untouched.
+setTimeout(() => {
+  try {
+    const s = loadSettings();
+    let host = "";
+    try { host = new URL(s.dynamicBackendUrl || "").hostname; } catch { host = ""; }
+    const isLocalish = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(host) ||
+      /^((10|192)\.\d{1,3}\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+    if (s.dynamicBackendUrl && isLocalish) {
+      startLocalBackend({ silent: true }).catch(() => {});
+    }
+  } catch { /* best effort */ }
+}, 8000);
 
 // ============================================================
 // Main Window
@@ -1243,7 +1429,7 @@ ipcMain.handle("copy-qr-image", (event, dataUrl) => {
 
 // Overlay / renderer decodes the QR locally and sends the decoded string (or null).
 // The main process applies the side effects: open URL / copy text / history / notification.
-ipcMain.handle("decoded", (event, data) => applyDecodedResult(data));
+ipcMain.handle("decoded", (event, data, opts) => applyDecodedResult(data, opts));
 
 // ── On-screen scan notification ───────────────────────────────────────────────
 // A REAL on-screen layer: a separate, always-on-top, transparent, borderless
@@ -1377,9 +1563,10 @@ ipcMain.on("quit-app", () => {
 // Feedback: success results are delivered as an IN-APP overlay notification
 // (not a native OS notification). Controlled by the "Show scan notifications"
 // setting (showScanPopup). For "no QR found" we stay silent to avoid spam.
-function applyDecodedResult(data) {
+function applyDecodedResult(data, opts) {
   const settings = loadSettings();
   const usePopup = settings.showScanPopup !== false;
+  const noAutoOpen = !!(opts && opts.noAutoOpen);
 
   if (!data) {
     // A real scan that came back empty (no QR in the captured area) — surface it
@@ -1392,6 +1579,20 @@ function applyDecodedResult(data) {
 
   const text = String(data).trim();
   const isUrl = /^(https?:\/\/|www\.)/i.test(text);
+
+  // The renderer recognized this URL as one of the user's OWN trackable short
+  // links: never auto-open it — copy it like text content and let the result UI
+  // (destination + View stats) explain what it is.
+  if (isUrl && noAutoOpen) {
+    if (settings.copyTextToClipboard) {
+      clipboard.writeText(text);
+    }
+    addToHistory(text, "url");
+    if (usePopup) {
+      sendScanToast("url", "Trackable QR — Link Copied", text.slice(0, 100));
+    }
+    return { result: "url", data: text, trackable: true };
+  }
 
   if (isUrl && settings.autoOpenUrl) {
     const targetUrl = text.startsWith("http") ? text : `https://${text}`;
@@ -1509,12 +1710,20 @@ function openWatchOverlay() {
   if (watchOverlayWindow) return;
   const cursor = screen.getCursorScreenPoint();
   const display = screen.getDisplayNearestPoint(cursor);
-  watchOverlayWindow = new BrowserWindow({
+  const winOpts = {
     x: display.bounds.x, y: display.bounds.y, width: display.bounds.width, height: display.bounds.height,
     transparent: true, frame: false, alwaysOnTop: true, skipTaskbar: true,
     resizable: false, movable: false, hasShadow: false, backgroundColor: "#00000000",
     webPreferences: { preload: path.join(__dirname, "watch-preload.js"), contextIsolation: true, nodeIntegration: false },
-  });
+  };
+  // On macOS a panel-style window can float above fullscreen apps and reliably
+  // receives the first mouse click without the user having to click twice.
+  if (process.platform === "darwin") {
+    winOpts.type = "panel";
+    winOpts.acceptFirstMouse = true;
+  }
+  watchOverlayWindow = new BrowserWindow(winOpts);
+  watchOverlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   watchOverlayWindow.loadFile(path.join(__dirname, "watch-overlay.html"), {
     query: { displayId: String(display.id), x: String(display.bounds.x), y: String(display.bounds.y) },
   });
@@ -1531,7 +1740,9 @@ function stopRegionWatch() {
 }
 function startWatchLoop() {
   if (regionWatch.timer) clearInterval(regionWatch.timer);
-  regionWatch.timer = setInterval(() => { regionWatchTick().catch(() => {}); }, regionWatch.intervalMs);
+  regionWatch.timer = setInterval(() => {
+    regionWatchTick().catch((e) => { console.error("[region-watch] tick error:", e); });
+  }, regionWatch.intervalMs);
   broadcastWatchStatus();
 }
 async function regionWatchTick() {
@@ -1546,13 +1757,13 @@ async function regionWatchTick() {
   if (reqW > MAX || reqH > MAX) { const r = Math.min(MAX / reqW, MAX / reqH); reqW = Math.round(reqW * r); reqH = Math.round(reqH * r); }
   let sources;
   try { sources = await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: reqW, height: reqH } }); }
-  catch { return; }
-  if (!sources || !sources.length) return;
+  catch (e) { console.error("[region-watch] capture failed:", e); return; }
+  if (!sources || !sources.length) { console.warn("[region-watch] no screen sources"); return; }
   let src = sources[0];
   const tid = String(display.id);
   for (const s of sources) { if (String(s.display_id) === tid || String(s.id) === tid) { src = s; break; } }
   const thumb = src.thumbnail;
-  if (!thumb || thumb.isEmpty()) return;
+  if (!thumb || thumb.isEmpty()) { console.warn("[region-watch] empty thumbnail"); return; }
   // The captured thumbnail is the full screen at `thumbnailSize`, which may be
   // downscaled (capped at MAX px). Map the CSS-px rect onto the *actual* thumbnail
   // resolution so we crop the correct region on Retina / high-DPI displays.
@@ -1564,12 +1775,22 @@ async function regionWatchTick() {
   const cw = Math.max(1, Math.round(w * sf * thumbScale));
   const ch = Math.max(1, Math.round(h * sf * thumbScale));
   const cropped = thumb.crop({ x: cx, y: cy, width: cw, height: ch });
-  if (cropped.isEmpty()) return;
+  if (cropped.isEmpty()) { console.warn("[region-watch] empty crop", { cx, cy, cw, ch, size }); return; }
   const csize = cropped.getSize();
   regionWatch.lastActivity = Date.now();
   let res = null;
-  try { res = jsQR(new Uint8ClampedArray(cropped.getBitmap()), csize.width, csize.height); }
-  catch { return; }
+  try {
+    // Electron's nativeImage.getBitmap() is BGRA; jsQR expects RGBA. Convert to
+    // a grayscale RGBA buffer so channel order and color QR codes don't matter.
+    const bgra = cropped.getBitmap();
+    const rgba = new Uint8ClampedArray(csize.width * csize.height * 4);
+    for (let i = 0, j = 0; i < bgra.length; i += 4, j += 4) {
+      const b = bgra[i], g = bgra[i + 1], r = bgra[i + 2];
+      const luma = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+      rgba[j] = luma; rgba[j + 1] = luma; rgba[j + 2] = luma; rgba[j + 3] = 255;
+    }
+    res = jsQR(rgba, csize.width, csize.height);
+  } catch (e) { console.error("[region-watch] decode error:", e); return; }
   if (res && res.data && res.data.trim()) {
     const payload = res.data.trim();
     regionWatch.lastSeenAt = Date.now();
@@ -1609,17 +1830,86 @@ ipcMain.handle("region-watch-stop", () => { stopRegionWatch(); return { ok: true
 // click — no purchase, no external service. We spawn `npm start` in that folder,
 // wait for its /health endpoint, and return the URL + API key to the renderer,
 // which then fills Settings automatically.
+
+// The LAN IPv4 address of this machine (e.g. 192.168.1.42), or null.
+// Used so the local backend's short links are scannable from PHONES on the same
+// Wi-Fi — a short link pointing at "localhost:3000" only works on the desktop
+// itself, so any phone scan would silently never reach the backend (and never
+// be counted).
+function getLanIp() {
+  try {
+    // Route a UDP "connection" to a public IP — no packets actually leave the
+    // machine; the OS just picks the default-route interface's local address.
+    const s = require("dgram").createSocket("udp4");
+    s.connect(1, "8.8.8.8");
+    const ip = s.address() && s.address().address;
+    try { s.close(); } catch { /* ignore */ }
+    if (ip && !ip.startsWith("127.") && !ip.includes(":")) return ip;
+  } catch { /* fall through */ }
+  try {
+    // Fallback: first non-internal IPv4 from the OS interface list.
+    const os = require("os");
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) {
+      for (const it of ifaces[name] || []) {
+        if (it.family === "IPv4" && !it.internal) return it.address;
+      }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 let localBackendProc = null;
 let localBackendInfo = null;
-async function startLocalBackend() {
+// The local backend's API key is persisted in <backend>/data/.local-api-key so
+// restarts (incl. the automatic one at app launch) reuse the SAME key — a new
+// random key every relaunch would silently invalidate the saved settings.
+function localBackendKeyPath(backendDir) {
+  return path.join(backendDir, "data", ".local-api-key");
+}
+
+// Re-read the local backend's key file and update settings.dynamicApiKey if it
+// has changed. This heals the common "unauthorized" case where the backend was
+// restarted with a fresh key (or the settings were copied from another install).
+function resyncLocalBackendKey() {
+  const backendDir = path.join(__dirname, "..", "dynamic-backend");
+  const p = localBackendKeyPath(backendDir);
+  try {
+    const fresh = fs.readFileSync(p, "utf-8").trim();
+    if (/^[0-9a-f]{16,}$/i.test(fresh)) {
+      const s = loadSettings();
+      if (s.dynamicApiKey !== fresh) {
+        s.dynamicApiKey = fresh;
+        saveSettings(s);
+        return fresh;
+      }
+    }
+  } catch { /* best effort */ }
+  return null;
+}
+function loadOrCreateLocalKey(backendDir) {
+  const p = localBackendKeyPath(backendDir);
+  try {
+    const existing = fs.readFileSync(p, "utf-8").trim();
+    if (/^[0-9a-f]{16,}$/i.test(existing)) return existing;
+  } catch { /* not there yet */ }
+  const key = crypto.randomBytes(24).toString("hex");
+  try { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, key, "utf-8"); } catch { /* best effort */ }
+  return key;
+}
+async function startLocalBackend({ silent = false } = {}) {
   if (localBackendProc && !localBackendProc.killed) {
-    return { ok: true, url: localBackendInfo && localBackendInfo.url, apiKey: localBackendInfo && localBackendInfo.apiKey, alreadyRunning: true };
+    return { ok: true, url: localBackendInfo && localBackendInfo.url, apiKey: localBackendInfo && localBackendInfo.apiKey, lanIp: localBackendInfo && localBackendInfo.lanIp, alreadyRunning: true };
   }
   const backendDir = path.join(__dirname, "..", "dynamic-backend");
   if (!fs.existsSync(path.join(backendDir, "server.js"))) return { ok: false, reason: "backend-not-found" };
   if (!fs.existsSync(path.join(backendDir, "node_modules", "fastify"))) return { ok: false, reason: "backend-not-installed" };
-  const apiKey = crypto.randomBytes(24).toString("hex");
-  const url = "http://localhost:3000";
+  const apiKey = loadOrCreateLocalKey(backendDir);
+  // Short links must be reachable from PHONES (that's the whole point of a
+  // trackable QR) — use this machine's LAN IP, not localhost. The server itself
+  // binds 0.0.0.0 (see dynamic-backend/src/config.js HOST default).
+  const lanIp = getLanIp();
+  const url = lanIp ? `http://${lanIp}:3000` : "http://localhost:3000";
   const env = Object.assign({}, process.env, {
     PORT: "3000", BASE_URL: url, API_KEY: apiKey,
     DB_PATH: path.join(backendDir, "data", "qr.db"),
@@ -1648,8 +1938,26 @@ async function startLocalBackend() {
     localBackendProc = null;
     return { ok: false, reason: "health-timeout" };
   }
-  localBackendInfo = { url, apiKey };
-  return { ok: true, url, apiKey };
+  localBackendInfo = { url, apiKey, lanIp };
+  // Silent (auto-restart) mode keeps settings in sync directly from main: if the
+  // LAN IP changed since the last run, the stored backend URL must follow —
+  // phone scans would otherwise hit a dead address and never be counted.
+  if (silent) {
+    try {
+      const s = loadSettings();
+      let host = "";
+      try { host = new URL(s.dynamicBackendUrl || "").hostname; } catch { host = ""; }
+      const isLocalHost = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(host);
+      const hostIsThisMachine = !!(lanIp && host === lanIp);
+      const hostIsPrivateLan = /^((10|192)\.\d{1,3}\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+      if (!s.dynamicBackendUrl || isLocalHost || hostIsThisMachine || hostIsPrivateLan) {
+        s.dynamicBackendUrl = url;
+        s.dynamicApiKey = apiKey;
+        saveSettings(s);
+      }
+    } catch { /* best effort */ }
+  }
+  return { ok: true, url, apiKey, lanIp };
 }
 function stopLocalBackend() {
   if (localBackendProc && !localBackendProc.killed) {
@@ -2104,29 +2412,42 @@ ipcMain.handle("restart-app", () => {
 async function callDynamicApi(apiPath, { method = "GET", body } = {}) {
   const settings = loadSettings();
   const base = (settings.dynamicBackendUrl || "").replace(/\/+$/, "");
-  const key = settings.dynamicApiKey || "";
+  let key = settings.dynamicApiKey || "";
   if (!base) return { ok: false, reason: "backend-not-configured" };
-  const headers = { "Content-Type": "application/json" };
-  if (key) headers["x-api-key"] = key;
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10000);
-    const res = await net.fetch(`${base}${apiPath}`, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    const text = await res.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-    if (!res.ok) {
-      return { ok: false, status: res.status, reason: (data && data.error) || `http-${res.status}`, data };
+
+  const tryOnce = async () => {
+    const headers = { "Content-Type": "application/json" };
+    if (key) headers["x-api-key"] = key;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      const res = await net.fetch(`${base}${apiPath}`, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+      return { ok: res.ok, status: res.status, data, reason: (data && data.error) || `http-${res.status}` };
+    } catch (e) {
+      return { ok: false, reason: "network", error: String((e && e.message) || e) };
     }
-    return { ok: true, data };
-  } catch (e) {
-    return { ok: false, reason: "network", error: String((e && e.message) || e) };
+  };
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await tryOnce();
+    if (r.ok) return { ok: true, data: r.data };
+    // 401 usually means the backend key changed under us (new backend process,
+    // settings copied from another install, etc.). Re-read the local key file
+    // once and retry.
+    if (r.status === 401 && attempt === 0) {
+      const fresh = resyncLocalBackendKey();
+      if (fresh) { key = fresh; continue; }
+    }
+    return { ok: false, status: r.status, reason: r.reason || r.error || "request-failed", data: r.data };
   }
 }
 

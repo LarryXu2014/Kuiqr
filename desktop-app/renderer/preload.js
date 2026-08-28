@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld("qrAPI", {
   // Scan
   triggerScan: () => ipcRenderer.invoke("trigger-scan"),
   readClipboardImage: () => ipcRenderer.invoke("read-clipboard-image"),
-  onDecoded: (text) => ipcRenderer.invoke("decoded", text),
+  onDecoded: (text, opts) => ipcRenderer.invoke("decoded", text, opts),
 
   // Settings
   getSettings: () => ipcRenderer.invoke("get-settings"),
@@ -121,6 +121,14 @@ contextBridge.exposeInMainWorld("qrAPI", {
 
   // ── Wi-Fi scan (nearby SSID picker in the WiFi QR template) ──
   scanWifi: () => ipcRenderer.invoke("scan-wifi"),
+
+  // ── Rich QR actions (scanned WIFI/vCard/event/geo payloads) ──
+  // Join a Wi-Fi network from a WIFI: QR payload ({ ssid, password, security }).
+  joinWifi: (payload) => ipcRenderer.invoke("join-wifi", payload),
+  // Open a vCard (.vcf → Contacts/People) or event (.ics → Calendar) payload.
+  openContactEvent: (payload) => ipcRenderer.invoke("open-contact-event", payload),
+  // Show a geo: payload in Maps (Apple Maps on macOS, Google Maps elsewhere).
+  openGeo: (payload) => ipcRenderer.invoke("open-geo", payload),
 
   // Restart the app
   restartApp: () => ipcRenderer.invoke("restart-app"),
