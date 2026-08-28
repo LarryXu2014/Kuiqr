@@ -1113,11 +1113,34 @@ function showResult(type, data, sub, isUrl) {
     subEl.textContent = sub;
     actionsEl.appendChild(subEl);
   }
+
+  // Reciprocity: after a real (non-error) scan, acknowledge the free/instant
+  // value the user just received (shown once).
+  if (type === "url" || type === "text") {
+    window.kuiqrGiftHint(el, "gift.scan", "kuiqr.giftScanSeen");
+  }
 }
 
 function hideResult() {
   document.getElementById("scan-result").classList.add("hidden");
 }
+
+// Reciprocity (UX Peak): surface a one-time "gift" acknowledgement after the user
+// receives real value for free/instant/offline, so the value is FELT before any
+// ask. Shown once per surface, then remembered in localStorage. Re-localizable:
+// the <span> carries data-i18n so a later language switch re-translates it.
+window.kuiqrGiftHint = function (parentEl, i18nKey, storageKey) {
+  try { if (localStorage.getItem(storageKey) === "1") return; localStorage.setItem(storageKey, "1"); } catch {}
+  if (!parentEl) return;
+  parentEl.querySelectorAll(".gift-hint").forEach((n) => n.remove());
+  const banner = document.createElement("div");
+  banner.className = "gift-hint";
+  const span = document.createElement("span");
+  span.dataset.i18n = i18nKey;
+  span.textContent = t(i18nKey);
+  banner.appendChild(span);
+  parentEl.insertBefore(banner, parentEl.firstChild);
+};
 
 // Dedicated result UI for a scanned trackable short link (owner preview):
 // shows where it redirects and offers Open destination / Copy link / stats.

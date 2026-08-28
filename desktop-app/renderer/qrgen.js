@@ -279,6 +279,8 @@
       lastDataUrl = await blobToDataURL(blob);
       if (img) { img.src = lastDataUrl; img.style.display = "block"; }
       if (errEl) errEl.classList.add("hidden");
+      // Reciprocity: acknowledge the free/instant QR the user just got (once).
+      if (window.kuiqrGiftHint) window.kuiqrGiftHint($("gen-preview"), "gift.gen", "kuiqr.giftGenSeen");
       scheduleSelfCheck();
     } catch (e) {
       if (errEl) {
@@ -1160,9 +1162,13 @@
     const svg = parseInt(($("svg-edge") || {}).value || "1024", 10);
     const pdf = ($("pdf-preset") || {}).value || "30mm";
     const pdfLabels = { "30mm": "30×30mm", "50mm": "50×50mm", "80mm": "80×80mm", "card": "90×50mm" };
-    setBtnMeta("gen-download-meta", png + "×" + png);
-    setBtnMeta("gen-export-svg-meta", svg + "px");
-    setBtnMeta("gen-export-pdf-meta", pdfLabels[pdf] || pdf);
+    // Contrast effect (UX Peak): never show a size in isolation — anchor it to the
+    // maximum so the chosen size reads as the reasonable, modest option (after
+    // seeing 2048, 1024 feels like "less than half", not "small").
+    const PNG_MAX = 2048, SVG_MAX = 2048, PDF_MAX = "90×50mm";
+    setBtnMeta("gen-download-meta", png + "×" + png + " · max " + PNG_MAX);
+    setBtnMeta("gen-export-svg-meta", svg + "px · max " + SVG_MAX);
+    setBtnMeta("gen-export-pdf-meta", (pdfLabels[pdf] || pdf) + " · max " + PDF_MAX);
   }
 
   // ── Public init ────────────────────────────────────────────────────────────
