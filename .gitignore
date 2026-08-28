@@ -31,3 +31,4 @@ qr-scan-firefox.zip
 
 # Release binaries (uploaded to GitHub Releases, not committed)
 releases/
+scripts/__pycache__/
