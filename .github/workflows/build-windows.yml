@@ -57,10 +57,12 @@ jobs:
         shell: bash
         run: |
           VERSION=$(node -p "require('./desktop-app/package.json').build.buildVersion")
-          # Create the release (as a draft) if it does not already exist, so the
-          # upload never fails because the release is missing.
+          # Create the release as PUBLISHED (not draft) if it does not already exist.
+          # Drafts are invisible to `GET /releases/tags/{tag}`, which the local macOS
+          # publisher uses — a draft here caused split releases (v2.4.2.3.7 lost its
+          # Windows/Linux assets that way). A published release is found and reused.
           if ! gh release view "v${VERSION}" >/dev/null 2>&1; then
-            gh release create "v${VERSION}" --draft --title "v${VERSION}" --notes "Kuiqr v${VERSION}" || true
+            gh release create "v${VERSION}" --title "Kuiqr ${VERSION}" --notes "Kuiqr v${VERSION}" --latest || true
           fi
           # Upload every Windows artifact we produced (setup installer, portable exe, zip).
           for f in desktop-app/dist/Kuiqr-${VERSION}-windows-x64-setup.exe \
