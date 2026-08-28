@@ -159,20 +159,42 @@ function addToHistory(data, type) {
 function scanWifiNetworks() {
   return new Promise((resolve, reject) => {
     if (process.platform === "darwin") {
-      // Find the actual Wi-Fi interface (usually en0, but not always), then query
-      // it plus system_profiler in parallel and merge.
-      runCmd("networksetup", ["-listallhardwareports"]).then((ports) => {
-        const m = ports.match(/Hardware Port: Wi-Fi\s*\nDevice: (\w+)/);
-        const iface = m ? m[1] : "en0";
-        const jobs = [runCmd("networksetup", ["-getairportnetwork", iface]), runCmd("/usr/sbin/system_profiler", ["SPAirPortDataType"])];
-        Promise.all(jobs.map((p) => p.catch(() => ""))).then(([cur, prof]) => {
-          try {
-            const networks = parseWifiScan(cur + "\n" + prof, "darwin");
+      // The currently-connected Wi-Fi network can always be read via networksetup
+      // (-getairportnetwork); modern macOS (10.15+) redacts nearby SSIDs in
+      // system_profiler, so the connected network is what we can reliably offer.
+      // We iterate the common interfaces (en0..en3) and match on the colon
+      // character (both ":" and the localized "：" ) so a Chinese-locale system
+      // still resolves the current SSID instead of reporting "no networks".
+      const ifaces = ["en0", "en1", "en2", "en3"];
+      const jobs = ifaces.map((iface) =>
+        runCmd("networksetup", ["-getairportnetwork", iface]).then((out) => out).catch(() => "")
+      );
+      Promise.all(jobs).then((outs) => {
+        try {
+          const networks = [];
+          const seen = new Set();
+          const push = (ssid) => {
+            ssid = String(ssid || "").trim();
+            if (!ssid || /^<.*redacted.*>$/i.test(ssid) || ssid === "--") return;
+            if (seen.has(ssid)) return;
+            seen.add(ssid);
+            networks.push({ ssid, signal: null });
+          };
+          for (const out of outs) {
+            if (!out) continue;
+            const m = out.match(/[:：]\s*(.+?)\s*$/m);
+            if (m) push(m[1]);
+          }
+          // Best-effort: any non-redacted nearby SSIDs from system_profiler.
+          runCmd("/usr/sbin/system_profiler", ["SPAirPortDataType"]).then((prof) => {
+            const re = /^[ \t]+SSID[:：]\s*(.+?)\s*$/gm;
+            let mm;
+            while ((mm = re.exec(prof || ""))) push(mm[1]);
             if (!networks.length) reject(new Error("no-networks"));
             else resolve(networks);
-          } catch (e) { reject(e); }
-        });
-      }, () => reject(new Error("networksetup failed")));
+          }, () => { if (!networks.length) reject(new Error("no-networks")); else resolve(networks); });
+        } catch (e) { reject(e); }
+      });
       return;
     }
     let cmd, args;
@@ -1557,13 +1579,67 @@ ipcMain.on("quit-app", () => {
   app.quit();
 });
 
+// Minimal payload classifier (mirrors the renderer's QRPayload.classify) used by
+// the native screen-scan / region-watch path so a scanned WIFI / vCard / event /
+// geo / tel / sms / mailto QR performs a REAL action instead of being copied as
+// plain text. Returns null for url/text (those are handled separately below).
+function classifyPayload(text) {
+  const t = String(text || "").trim();
+  if (!t) return null;
+  if (/^WIFI:/i.test(t)) {
+    const body = t.replace(/^WIFI:/i, "");
+    const fields = {};
+    for (const part of body.split(/(?<!\\);/)) {
+      const i = part.indexOf(":");
+      if (i <= 0) continue;
+      const k = part.slice(0, i).trim().toUpperCase();
+      const v = part.slice(i + 1).replace(/\\(.)/g, "$1");
+      if (!fields[k]) fields[k] = v;
+    }
+    if (!fields.S) return null;
+    let security = (fields.T || "nopass").toUpperCase();
+    if (!["WPA", "WEP", "NOPASS", "SAE", "WPA2-EAP"].includes(security)) security = "WPA";
+    return { type: "wifi", ssid: fields.S, password: fields.P || "", security: security === "SAE" ? "WPA" : security, hidden: /^true$/i.test(fields.H || "") };
+  }
+  if (/^BEGIN:VCARD/i.test(t)) {
+    const m = t.match(/^FN:(.*)$/im);
+    return { type: "vcard", name: m ? m[1].trim() : "Contact" };
+  }
+  if (/^BEGIN:(VEVENT|VCALENDAR)/i.test(t)) {
+    const m = t.match(/^SUMMARY:(.*)$/im);
+    return { type: "event", title: m ? m[1].trim() : "Event" };
+  }
+  if (/^geo:/i.test(t)) {
+    const m = /^geo:([+-]?\d+(?:\.\d+)?),([+-]?\d+(?:\.\d+)?)/i.exec(t);
+    if (!m) return null;
+    return { type: "geo", lat: parseFloat(m[1]), lon: parseFloat(m[2]) };
+  }
+  if (/^tel:/i.test(t)) return { type: "tel", value: t.replace(/^tel:/i, "").replace(/\s+/g, "") };
+  if (/^smsto:/i.test(t)) { const r = t.replace(/^smsto:/i, ""); const i = r.indexOf(":"); return i >= 0 ? { type: "sms", value: r.slice(0, i), body: r.slice(i + 1) } : { type: "sms", value: r, body: "" }; }
+  if (/^sms:/i.test(t)) { const r = t.replace(/^sms:/i, ""); const i = r.indexOf(":"); return i >= 0 ? { type: "sms", value: r.slice(0, i).replace(/\s+/g, ""), body: r.slice(i + 1) } : { type: "sms", value: r.replace(/\s+/g, ""), body: "" }; }
+  if (/^mailto:/i.test(t)) {
+    const r = t.replace(/^mailto:/i, "");
+    const i = r.indexOf("?");
+    let value = i >= 0 ? r.slice(0, i) : r;
+    let body = "";
+    if (i >= 0) {
+      const q = new URLSearchParams(r.slice(i + 1));
+      body = q.get("body") || "";
+      const s = q.get("subject");
+      if (s) body = s + (body ? "\n\n" + body : "");
+    }
+    return { type: "mailto", value: decodeURIComponent(value), body };
+  }
+  return null;
+}
+
 // Single source of truth for what happens after a QR code is decoded (or not):
 // open the URL / copy the text / record history / notify. Used by BOTH the
 // in-app scan path and the native macOS scan path.
 // Feedback: success results are delivered as an IN-APP overlay notification
 // (not a native OS notification). Controlled by the "Show scan notifications"
 // setting (showScanPopup). For "no QR found" we stay silent to avoid spam.
-function applyDecodedResult(data, opts) {
+async function applyDecodedResult(data, opts) {
   const settings = loadSettings();
   const usePopup = settings.showScanPopup !== false;
   const noAutoOpen = !!(opts && opts.noAutoOpen);
@@ -1604,6 +1680,56 @@ function applyDecodedResult(data, opts) {
       sendScanToast("url", "QR Found — Opening URL", text.slice(0, 100));
     }
     return { result: "url", data: text };
+  }
+
+  // Rich payloads (WIFI / vCard / event / geo / tel / sms / mailto): perform the
+  // REAL OS action like the iPhone camera — join the network, open Contacts /
+  // Calendar / Maps — instead of dumping the raw string on the clipboard.
+  // `noAutoOpen` (set by the in-app renderer path, which shows action buttons the
+  // user taps) suppresses the auto-action; the native screen-scan path always acts.
+  const rich = classifyPayload(text);
+  if (rich) {
+    if (rich.type === "wifi") {
+      let acted = false, toastTitle, toastBody;
+      if (noAutoOpen) {
+        toastTitle = "QR Found — Wi-Fi network"; toastBody = rich.ssid || "Tap Join to connect";
+      } else {
+        const r = await joinWifiNetwork({ ssid: rich.ssid, password: rich.password, security: rich.security });
+        acted = !!(r && r.ok);
+        toastTitle = acted ? "QR Found — Joining Wi-Fi" : "QR Found — Wi-Fi join failed";
+        toastBody = rich.ssid || "";
+      }
+      addToHistory(text, "wifi");
+      if (usePopup) sendScanToast("wifi", toastTitle, toastBody);
+      return { result: "wifi", data: text, acted };
+    }
+    if (rich.type === "vcard") {
+      if (!noAutoOpen) openContactOrEvent("vcard", text);
+      addToHistory(text, "vcard");
+      if (usePopup) sendScanToast("vcard", "QR Found — Contact", (rich.name || "Contact") + " · opening in Contacts");
+      return { result: "vcard", data: text };
+    }
+    if (rich.type === "event") {
+      if (!noAutoOpen) openContactOrEvent("event", text);
+      addToHistory(text, "event");
+      if (usePopup) sendScanToast("event", "QR Found — Calendar Event", (rich.title || "Event") + " · opening in Calendar");
+      return { result: "event", data: text };
+    }
+    if (rich.type === "geo") {
+      if (!noAutoOpen) openGeoLocation(rich.lat, rich.lon);
+      addToHistory(text, "geo");
+      if (usePopup) sendScanToast("geo", "QR Found — Location", `${rich.lat}, ${rich.lon} · opening in Maps`);
+      return { result: "geo", data: text };
+    }
+    if (rich.type === "tel" || rich.type === "sms" || rich.type === "mailto") {
+      const url = rich.type === "tel" ? "tel:" + rich.value
+        : rich.type === "sms" ? "sms:" + rich.value + (rich.body ? "?body=" + encodeURIComponent(rich.body) : "")
+        : "mailto:" + rich.value + (rich.body ? "?body=" + encodeURIComponent(rich.body) : "");
+      if (!noAutoOpen) shell.openExternal(url);
+      addToHistory(text, rich.type);
+      if (usePopup) sendScanToast(rich.type, "QR Found — " + (rich.type === "tel" ? "Call" : rich.type === "sms" ? "Message" : "Email"), rich.value);
+      return { result: rich.type, data: text };
+    }
   }
 
   if (settings.copyTextToClipboard) {

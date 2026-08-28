@@ -324,21 +324,26 @@
   <!-- ===== Generate Tab ===== -->
   <div id="tab-generate" class="tab-content">
     <h2 class="settings-title" data-i18n="gen.title">Generate QR Code</h2>
-    <p class="setting-desc" data-i18n="gen.desc">Pick a template, fill the fields, and style your code. Everything is rendered live.</p>
+    <p class="setting-desc" data-i18n="gen.desc">Pick a template, fill the fields, style your code, then export it.</p>
 
-    <div class="generate-group">
+    <!-- Step 1: Template -->
+    <div class="generate-group gen-step">
+      <div class="step-header"><span class="step-num">1</span><span class="step-title" data-i18n="gen.stepTemplate">Choose template</span></div>
       <label class="setting-label" for="gen-template" data-i18n="tpl.label">Template</label>
       <select id="gen-template" class="setting-input"></select>
     </div>
 
-    <div class="generate-group" id="gen-text-wrap">
-      <label class="setting-label" for="gen-input" data-i18n="gen.content">Content</label>
-      <textarea id="gen-input" class="generate-input" data-i18n-ph="gen.placeholder" placeholder="https://example.com or any text…" rows="4"></textarea>
+    <!-- Step 2: Content -->
+    <div class="generate-group gen-step" id="gen-content-step">
+      <div class="step-header"><span class="step-num">2</span><span class="step-title" data-i18n="gen.stepContent">Enter content</span></div>
+      <div id="gen-text-wrap">
+        <label class="setting-label" for="gen-input" data-i18n="gen.content">Content</label>
+        <textarea id="gen-input" class="generate-input" data-i18n-ph="gen.placeholder" placeholder="https://example.com or any text…" rows="4"></textarea>
+      </div>
+      <div id="tpl-form" class="tpl-form"></div>
     </div>
 
-    <div id="tpl-form" class="tpl-form"></div>
-
-    <!-- QR preview sits right after the content so it's visible immediately -->
+    <!-- Live preview -->
     <div id="gen-preview" class="generate-preview">
       <img id="gen-img" alt="QR code preview" />
       <div id="gen-preview-placeholder" class="generate-preview-placeholder">
@@ -348,42 +353,10 @@
     </div>
     <p id="gen-error" class="generate-error hidden"></p>
 
-    <div class="generate-buttons">
-      <button id="gen-download" class="btn-save"><span data-i18n="gen.download">Download PNG</span><span class="btn-meta" id="gen-download-meta"></span></button>
-      <button id="gen-export-svg" class="btn-save btn-secondary"><span data-i18n="gen.exportSVG">Export SVG</span><span class="btn-meta" id="gen-export-svg-meta"></span></button>
-      <button id="gen-export-pdf" class="btn-save btn-secondary"><span data-i18n="gen.exportPDF">Export PDF</span><span class="btn-meta" id="gen-export-pdf-meta"></span></button>
-      <button id="gen-batch" class="btn-text" data-i18n="batch.btn">Batch from CSV…</button>
-      <button id="gen-copy-qr" class="btn-text" data-i18n="gen.copyqr">Copy QR Code</button>
-      <button id="gen-copy" class="btn-text" data-i18n="gen.copytext">Copy Text</button>
-    </div>
-
-    <!-- Dynamic (trackable) QR — sits right under the action buttons so it's
-         easy to reach; the chevron shows the row can be expanded. -->
-    <div class="generate-group dynamic-group" id="dynamic-group">
-      <label class="setting-item toggle-row dyn-toggle-row">
-        <div class="setting-info">
-          <div class="setting-label"><span data-i18n="gen.dynamic">Dynamic (trackable) QR</span>
-            <svg class="dyn-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
-          <div class="setting-desc" data-i18n="gen.dynamicDesc">Encode a redirect link so you can see scan analytics. Requires a backend set in Settings.</div>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" id="gen-dynamic" />
-          <span class="toggle-slider"></span>
-        </label>
-      </label>
-      <div id="gen-dynamic-panel" class="dynamic-panel hidden">
-        <p class="dynamic-info dyn-panel-info" data-i18n="gen.dynamicInfo">When on, the QR encodes a short redirect link. Each scan is counted in Analytics, then the visitor is sent to your real link.</p>
-        <button id="gen-create-trackable" class="btn-save" data-i18n="gen.createTrackable">Create trackable QR</button>
-        <div id="gen-dynamic-status" class="dynamic-status hidden"></div>
-      </div>
-    </div>
-
-    <!-- Styling panel (Step 2) — collapsed by default; expand to customize -->
-    <div class="generate-group style-panel" id="style-panel">
+    <!-- Step 3: Style & Colors -->
+    <div class="generate-group style-panel gen-step" id="style-panel">
       <button type="button" class="panel-toggle" id="style-toggle" aria-expanded="false">
-        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        <span class="group-title" data-i18n="gen.style">Style &amp; Colors</span>
+        <span class="step-header"><span class="step-num">3</span><span class="step-title" data-i18n="gen.style">Style &amp; Colors</span></span>
         <span class="panel-hint" data-i18n="gen.styleHint">colors · logo · dots · quiet zone</span>
       </button>
       <div class="panel-body" id="style-body">
@@ -441,43 +414,83 @@
       </div>
     </div>
 
-    <!-- Export options (Step 3) — collapsed by default -->
-    <div class="generate-group export-panel" id="export-panel">
-      <button type="button" class="panel-toggle" id="export-toggle" aria-expanded="false">
-        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        <span class="group-title" data-i18n="gen.export">Export options</span>
-        <span class="panel-hint" data-i18n="gen.exportHint">sizes · DPI · caption</span>
-      </button>
-      <div class="panel-body" id="export-body">
-      <div class="style-row">
-        <label class="style-lbl" for="png-preset" data-i18n="gen.pngPreset">PNG size</label>
-        <select id="png-preset" class="setting-input style-select">
-          <option value="256">256 px</option>
-          <option value="512">512 px</option>
-          <option value="1024" selected>1024 px</option>
-          <option value="2048">2048 px</option>
-        </select>
-        <label class="style-lbl" for="svg-edge" data-i18n="gen.svgEdge">SVG size</label>
-        <select id="svg-edge" class="setting-input style-select">
-          <option value="512">512 px</option>
-          <option value="1024" selected>1024 px</option>
-          <option value="2048">2048 px</option>
-        </select>
+    <!-- Step 4: Dynamic (trackable) QR -->
+    <div class="generate-group dynamic-group gen-step" id="dynamic-group">
+      <div class="step-header"><span class="step-num">4</span><span class="step-title" data-i18n="gen.dynamic">Dynamic (trackable) QR</span></div>
+      <label class="setting-item toggle-row dyn-toggle-row">
+        <div class="setting-info">
+          <div class="setting-label" data-i18n="gen.dynamic">Dynamic (trackable) QR</div>
+          <div class="setting-desc" data-i18n="gen.dynamicDesc">Encode a redirect link so you can see scan analytics. Requires a backend set in Settings.</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="gen-dynamic" />
+          <span class="toggle-slider"></span>
+        </label>
+      </label>
+      <div id="gen-dynamic-panel" class="dynamic-panel hidden">
+        <p class="dynamic-info dyn-panel-info" data-i18n="gen.dynamicInfo">When on, the QR encodes a short redirect link. Each scan is counted in Analytics, then the visitor is sent to your real link.</p>
+        <button id="gen-create-trackable" class="btn-save" data-i18n="gen.createTrackable">Create trackable QR</button>
+        <div id="gen-dynamic-status" class="dynamic-status hidden"></div>
       </div>
-      <div class="style-row">
-        <label class="style-lbl" for="pdf-preset" data-i18n="gen.pdfSize">PDF size</label>
-        <select id="pdf-preset" class="setting-input style-select">
-          <option value="30mm" data-i18n="gen.pdf.30mm">30 mm sticker</option>
-          <option value="50mm" data-i18n="gen.pdf.50mm">50 mm sticker</option>
-          <option value="80mm" data-i18n="gen.pdf.80mm">80 mm sticker</option>
-          <option value="card" data-i18n="gen.pdf.card">Business card (90×50 mm)</option>
-        </select>
+    </div>
+
+    <!-- Step 5: Export options -->
+    <div class="generate-group export-panel gen-step" id="export-panel">
+      <div class="step-header"><span class="step-num">5</span><span class="step-title" data-i18n="gen.export">Export</span></div>
+      <p class="setting-desc" data-i18n="gen.exportDesc">Pick a format — its options appear below.</p>
+      <div class="style-row export-format-row">
+        <label class="style-lbl" data-i18n="gen.exportFormat">Format</label>
+        <div class="segmented" id="export-format">
+          <button type="button" class="seg-btn active" data-format="png">PNG</button>
+          <button type="button" class="seg-btn" data-format="svg">SVG</button>
+          <button type="button" class="seg-btn" data-format="pdf">PDF</button>
+        </div>
       </div>
-      <div class="style-row">
-        <label class="style-lbl" for="pdf-caption" data-i18n="gen.pdfCaption">Caption</label>
-        <input type="text" id="pdf-caption" class="setting-input" placeholder="Scan me" />
+      <div id="png-options" class="export-options">
+        <div class="style-row">
+          <label class="style-lbl" for="png-preset" data-i18n="gen.pngPreset">PNG size</label>
+          <select id="png-preset" class="setting-input style-select">
+            <option value="256">256 px</option>
+            <option value="512">512 px</option>
+            <option value="1024" selected>1024 px</option>
+            <option value="2048">2048 px</option>
+          </select>
+        </div>
       </div>
+      <div id="svg-options" class="export-options hidden">
+        <div class="style-row">
+          <label class="style-lbl" for="svg-edge" data-i18n="gen.svgEdge">SVG size</label>
+          <select id="svg-edge" class="setting-input style-select">
+            <option value="512">512 px</option>
+            <option value="1024" selected>1024 px</option>
+            <option value="2048">2048 px</option>
+          </select>
+        </div>
       </div>
+      <div id="pdf-options" class="export-options hidden">
+        <div class="style-row">
+          <label class="style-lbl" for="pdf-preset" data-i18n="gen.pdfSize">PDF size</label>
+          <select id="pdf-preset" class="setting-input style-select">
+            <option value="30mm" data-i18n="gen.pdf.30mm">30 mm sticker</option>
+            <option value="50mm" data-i18n="gen.pdf.50mm">50 mm sticker</option>
+            <option value="80mm" data-i18n="gen.pdf.80mm">80 mm sticker</option>
+            <option value="card" data-i18n="gen.pdf.card">Business card (90×50 mm)</option>
+          </select>
+        </div>
+        <div class="style-row">
+          <label class="style-lbl" for="pdf-caption" data-i18n="gen.pdfCaption">PDF caption (printed under the code)</label>
+          <input type="text" id="pdf-caption" class="setting-input" placeholder="Scan me" />
+        </div>
+      </div>
+    </div>
+
+    <div class="generate-buttons">
+      <button id="gen-download" class="btn-save"><span data-i18n="gen.download">Download PNG</span><span class="btn-meta" id="gen-download-meta"></span></button>
+      <button id="gen-export-svg" class="btn-save btn-secondary"><span data-i18n="gen.exportSVG">Export SVG</span><span class="btn-meta" id="gen-export-svg-meta"></span></button>
+      <button id="gen-export-pdf" class="btn-save btn-secondary"><span data-i18n="gen.exportPDF">Export PDF</span><span class="btn-meta" id="gen-export-pdf-meta"></span></button>
+      <button id="gen-batch" class="btn-text" data-i18n="batch.btn">Batch from CSV…</button>
+      <button id="gen-copy-qr" class="btn-text" data-i18n="gen.copyqr">Copy QR Code</button>
+      <button id="gen-copy" class="btn-text" data-i18n="gen.copytext">Copy Text</button>
     </div>
   </div>
 

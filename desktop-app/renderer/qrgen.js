@@ -345,6 +345,13 @@
     if (!host) return;
     const tpl = state.template;
     if (tpl === "text") { host.innerHTML = ""; return; }
+    // Geolocation: an interactive world map replaces the raw lat/lon text inputs.
+    if (tpl === "geo") {
+      host.innerHTML = '<div class="geo-placeholder" id="tpl-geo-picker"></div>';
+      const ph = $("tpl-geo-picker");
+      if (ph) ph.appendChild(buildGeoPicker("geo"));
+      return;
+    }
     const def = TEMPLATES[tpl];
     const vals = state.values[tpl] || (state.values[tpl] = {});
     let html = "";
@@ -366,8 +373,15 @@
         html += `<div class="tpl-field tpl-check"><label class="tpl-check-label">` +
           `<input type="checkbox" id="tpl-${tpl}-${f.id}" ${val ? "checked" : ""}/> ${escapeHtml(t(f.key))}</label></div>`;
       } else if (f.type === "datetime") {
-        html += `<div class="tpl-field"><div class="tpl-label">${escapeHtml(t(f.key))}</div>` +
-          `<input type="datetime-local" id="tpl-${tpl}-${f.id}" class="tpl-input" value="${escapeHtml(val)}" placeholder="${f.ph ? escapeHtml(t(f.ph)) : ""}"/></div>`;
+        // Event dates use a custom scrollable picker (year/month/day/hour/minute
+        // selects + Today/Tomorrow quick buttons) instead of the native spinner.
+        if (tpl === "event") {
+          html += `<div class="tpl-field"><div class="tpl-label">${escapeHtml(t(f.key))}</div>` +
+            `<div class="dt-placeholder" id="tpl-${tpl}-${f.id}" data-dtfield="${f.id}"></div></div>`;
+        } else {
+          html += `<div class="tpl-field"><div class="tpl-label">${escapeHtml(t(f.key))}</div>` +
+            `<input type="datetime-local" id="tpl-${tpl}-${f.id}" class="tpl-input" value="${escapeHtml(val)}" placeholder="${f.ph ? escapeHtml(t(f.ph)) : ""}"/></div>`;
+        }
       } else {
         html += `<div class="tpl-field"><div class="tpl-label">${escapeHtml(t(f.key))}</div>` +
           `<input type="text" id="tpl-${tpl}-${f.id}" class="tpl-input" value="${escapeHtml(val)}" placeholder="${f.ph ? escapeHtml(t(f.ph)) : ""}"/></div>`;
@@ -386,8 +400,252 @@
         render();
       });
     }
+    // Event: replace the datetime placeholders with the scrollable date/time picker.
+    if (tpl === "event") {
+      for (const f of def.fields) {
+        if (f.type !== "datetime") continue;
+        const ph = $("tpl-event-" + f.id);
+        if (!ph) continue;
+        ph.appendChild(buildDateTimePicker("event", f.id, vals[f.id] != null ? vals[f.id] : ""));
+      }
+    }
     // Wi-Fi: nearby-network picker so users can pick the SSID instead of typing it.
     if (tpl === "wifi") wireWifiScan(host);
+  }
+
+  // ── Scrollable date/time picker (calendar events) ───────────────────────────
+  // Five scrollable <select> columns (Year / Month / Day / Hour / Minute) plus
+  // "Today" / "Tomorrow" quick buttons. Stored value stays in datetime-local
+  // format (YYYY-MM-DDTHH:MM) so buildContent() is unchanged.
+  function buildDateTimePicker(tpl, fieldId, currentValue) {
+    const vals = state.values[tpl] || (state.values[tpl] = {});
+    const wrap = document.createElement("div");
+    wrap.className = "dt-picker";
+
+    const parse = (s) => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(s || "");
+      if (!m) return null;
+      return { y: +m[1], mo: +m[2], d: +m[3], h: +m[4], mi: +m[5] };
+    };
+    const pad = (n) => String(n).padStart(2, "0");
+    const compose = (p) => `${p.y}-${pad(p.mo)}-${pad(p.d)}T${pad(p.h)}:${pad(p.mi)}`;
+    const nowParts = () => { const n = new Date(); return { y: n.getFullYear(), mo: n.getMonth() + 1, d: n.getDate(), h: n.getHours(), mi: n.getMinutes() }; };
+    let cur = parse(currentValue) || nowParts();
+
+    const quick = document.createElement("div");
+    quick.className = "dt-quick";
+    const mkQuick = (label, addDays) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "seg-btn"; b.textContent = label;
+      b.addEventListener("click", () => {
+        const n = new Date(); n.setDate(n.getDate() + addDays);
+        setAll({ y: n.getFullYear(), mo: n.getMonth() + 1, d: n.getDate(), h: n.getHours(), mi: n.getMinutes() });
+      });
+      return b;
+    };
+    quick.appendChild(mkQuick(t("tpl.event.today"), 0));
+    quick.appendChild(mkQuick(t("tpl.event.tomorrow"), 1));
+    wrap.appendChild(quick);
+
+    function setAll(p) { cur = p; syncSelects(); commit(); }
+    function commit() { vals[fieldId] = compose(cur); render(); }
+
+    const grid = document.createElement("div");
+    grid.className = "dt-grid";
+    const mkSel = (opts, key, label) => {
+      const sel = document.createElement("select");
+      sel.className = "tpl-input dt-sel";
+      for (const o of opts) { const op = document.createElement("option"); op.value = String(o.v); op.textContent = o.t; sel.appendChild(op); }
+      sel.addEventListener("change", () => { cur[key] = parseInt(sel.value, 10); commit(); });
+      const cell = document.createElement("div"); cell.className = "dt-cell";
+      const lbl = document.createElement("span"); lbl.className = "dt-sel-lbl"; lbl.textContent = label;
+      cell.appendChild(lbl); cell.appendChild(sel);
+      return sel;
+    };
+    const yearOpts = []; for (let y = 2020; y <= 2060; y++) yearOpts.push({ v: y, t: String(y) });
+    const monOpts = []; for (let m = 1; m <= 12; m++) monOpts.push({ v: m, t: String(m) });
+    const dayOpts = []; for (let d = 1; d <= 31; d++) dayOpts.push({ v: d, t: String(d) });
+    const hrOpts = []; for (let h = 0; h < 24; h++) hrOpts.push({ v: h, t: pad(h) });
+    const miOpts = []; for (let m = 0; m < 60; m++) miOpts.push({ v: m, t: pad(m) });
+
+    const yS = mkSel(yearOpts, "y", t("tpl.event.year"));
+    const mS = mkSel(monOpts, "mo", t("tpl.event.month"));
+    const dS = mkSel(dayOpts, "d", t("tpl.event.day"));
+    const hS = mkSel(hrOpts, "h", t("tpl.event.hour"));
+    const miS = mkSel(miOpts, "mi", t("tpl.event.minute"));
+    grid.appendChild(yS.parentElement); grid.appendChild(mS.parentElement); grid.appendChild(dS.parentElement);
+    grid.appendChild(hS.parentElement); grid.appendChild(miS.parentElement);
+    wrap.appendChild(grid);
+
+    function syncSelects() {
+      yS.value = String(cur.y); mS.value = String(cur.mo); dS.value = String(cur.d);
+      hS.value = String(cur.h); miS.value = String(cur.mi);
+    }
+    syncSelects();
+    return wrap;
+  }
+
+  // ── Interactive world-map geolocation picker ─────────────────────────────────
+  // Equirectangular projection (1px = 1°): x = lon+180, y = 90−lat, in a 360×180
+  // viewBox. Clicking/dragging the map sets lat/lon; a search box (OpenStreetMap
+  // Nominatim, graceful fallback) and quick-pick city chips make exact placement
+  // easy. Replaces the raw latitude/longitude text fields.
+  const GEO_W = 360, GEO_H = 180;
+  const CONTINENTS = [
+    [[-168,65],[-160,70],[-140,70],[-120,73],[-95,72],[-80,68],[-60,60],[-55,52],[-65,45],[-70,42],[-75,35],[-80,30],[-82,25],[-90,30],[-97,26],[-105,22],[-110,30],[-120,35],[-125,42],[-130,55],[-140,60],[-168,65]],
+    [[-80,8],[-75,5],[-60,5],[-50,0],[-40,-5],[-35,-10],[-40,-22],[-50,-30],[-58,-38],[-65,-45],[-72,-52],[-75,-50],[-72,-40],[-70,-30],[-72,-20],[-78,-10],[-80,0],[-80,8]],
+    [[-10,36],[-10,44],[-5,48],[0,51],[2,58],[10,58],[20,55],[28,52],[30,45],[28,40],[20,38],[12,38],[0,36],[-10,36]],
+    [[-17,20],[-10,30],[0,36],[10,37],[20,33],[32,31],[35,24],[43,12],[51,12],[42,0],[40,-10],[35,-22],[25,-34],[18,-34],[12,-18],[8,4],[-5,5],[-15,12],[-17,20]],
+    [[30,45],[40,48],[50,55],[60,62],[80,72],[100,75],[140,72],[160,68],[180,65],[170,60],[150,52],[140,45],[130,35],[122,30],[120,22],[110,20],[105,10],[100,5],[95,15],[90,22],[80,8],[75,8],[70,20],[60,25],[55,38],[45,40],[35,42],[30,45]],
+    [[113,-22],[122,-18],[132,-12],[142,-12],[150,-20],[153,-28],[147,-38],[138,-35],[130,-32],[118,-35],[113,-28],[113,-22]],
+  ];
+  const GEO_CITIES = [
+    { n: "San Francisco", lat: 37.7749, lon: -122.4194 },
+    { n: "New York", lat: 40.7128, lon: -74.0060 },
+    { n: "London", lat: 51.5074, lon: -0.1278 },
+    { n: "Paris", lat: 48.8566, lon: 2.3522 },
+    { n: "Tokyo", lat: 35.6762, lon: 139.6503 },
+    { n: "Beijing", lat: 39.9042, lon: 116.4074 },
+    { n: "Sydney", lat: -33.8688, lon: 151.2093 },
+    { n: "São Paulo", lat: -23.5505, lon: -46.6333 },
+  ];
+  function buildGeoPicker(tpl) {
+    const vals = state.values[tpl] || (state.values[tpl] = {});
+    const wrap = document.createElement("div");
+    wrap.className = "geo-picker";
+    const toXY = (lat, lon) => ({ x: lon + 180, y: 90 - lat });
+
+    // Map container
+    const mapBox = document.createElement("div");
+    mapBox.className = "geo-map";
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${GEO_W} ${GEO_H}`);
+    svg.setAttribute("class", "geo-svg");
+    svg.setAttribute("preserveAspectRatio", "none");
+    // ocean
+    const ocean = document.createElementNS(svgNS, "rect");
+    ocean.setAttribute("width", GEO_W); ocean.setAttribute("height", GEO_H);
+    ocean.setAttribute("fill", "#dbeafe");
+    svg.appendChild(ocean);
+    // graticule
+    for (let lon = -180; lon <= 180; lon += 30) {
+      const l = document.createElementNS(svgNS, "line");
+      l.setAttribute("x1", lon + 180); l.setAttribute("x2", lon + 180);
+      l.setAttribute("y1", 0); l.setAttribute("y2", GEO_H);
+      l.setAttribute("stroke", "#cdd9ec"); l.setAttribute("stroke-width", "0.4");
+      svg.appendChild(l);
+    }
+    for (let lat = -60; lat <= 60; lat += 30) {
+      const l = document.createElementNS(svgNS, "line");
+      l.setAttribute("x1", 0); l.setAttribute("x2", GEO_W);
+      l.setAttribute("y1", 90 - lat); l.setAttribute("y2", 90 - lat);
+      l.setAttribute("stroke", "#cdd9ec"); l.setAttribute("stroke-width", "0.4");
+      svg.appendChild(l);
+    }
+    // continents
+    for (const c of CONTINENTS) {
+      let d = "";
+      for (let i = 0; i < c.length; i++) {
+        const p = toXY(c[i][0], c[i][1]);
+        d += (i === 0 ? "M" : "L") + p.x.toFixed(1) + " " + p.y.toFixed(1) + " ";
+      }
+      d += "Z";
+      const path = document.createElementNS(svgNS, "path");
+      path.setAttribute("d", d);
+      path.setAttribute("fill", "#a7c4a0");
+      path.setAttribute("stroke", "#7fa874");
+      path.setAttribute("stroke-width", "0.5");
+      svg.appendChild(path);
+    }
+    // marker
+    const marker = document.createElementNS(svgNS, "g");
+    marker.setAttribute("class", "geo-marker");
+    const mdot = document.createElementNS(svgNS, "circle");
+    mdot.setAttribute("r", "3.2"); mdot.setAttribute("fill", "#e11d48"); mdot.setAttribute("stroke", "#fff"); mdot.setAttribute("stroke-width", "1");
+    marker.appendChild(mdot);
+    svg.appendChild(marker);
+    mapBox.appendChild(svg);
+    const hint = document.createElement("div");
+    hint.className = "geo-hint"; hint.textContent = t("tpl.geo.map");
+    mapBox.appendChild(hint);
+    wrap.appendChild(mapBox);
+
+    // readout + manual
+    const readout = document.createElement("div");
+    readout.className = "geo-readout";
+    readout.innerHTML = `<span class="geo-readout-lbl">${t("tpl.geo.current")}:</span> <span id="geo-coords">—</span>`;
+    wrap.appendChild(readout);
+
+    const setCoord = (lat, lon, fromMap) => {
+      lat = Math.max(-85, Math.min(85, lat));
+      lon = Math.max(-180, Math.min(180, lon));
+      vals.lat = String(lat); vals.lng = String(lon);
+      const p = toXY(lat, lon);
+      marker.setAttribute("transform", `translate(${p.x.toFixed(2)},${p.y.toFixed(2)})`);
+      const c = $("geo-coords");
+      if (c) c.textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+      if (!fromMap) render();
+    };
+    // initial marker
+    const initLat = parseFloat(vals.lat), initLon = parseFloat(vals.lng);
+    if (!isNaN(initLat) && !isNaN(initLon)) setCoord(initLat, initLon, true);
+
+    // click / drag
+    const pick = (e) => {
+      const r = svg.getBoundingClientRect();
+      const cx = (e.touches ? e.touches[0].clientX : e.clientX);
+      const cy = (e.touches ? e.touches[0].clientY : e.clientY);
+      const x = (cx - r.left) / r.width * GEO_W;
+      const y = (cy - r.top) / r.height * GEO_H;
+      setCoord(90 - y, x - 180, false);
+    };
+    let dragging = false;
+    svg.addEventListener("mousedown", (e) => { dragging = true; pick(e); });
+    window.addEventListener("mouseup", () => { dragging = false; });
+    window.addEventListener("mousemove", (e) => { if (dragging) pick(e); });
+    svg.addEventListener("touchstart", (e) => { pick(e); e.preventDefault(); }, { passive: false });
+    svg.addEventListener("touchmove", (e) => { pick(e); e.preventDefault(); }, { passive: false });
+
+    // search
+    const searchRow = document.createElement("div");
+    searchRow.className = "geo-search";
+    const searchInput = document.createElement("input");
+    searchInput.type = "text"; searchInput.className = "tpl-input";
+    searchInput.placeholder = t("tpl.geo.searchPh");
+    const searchBtn = document.createElement("button");
+    searchBtn.type = "button"; searchBtn.className = "btn-text"; searchBtn.textContent = t("tpl.geo.search");
+    const searchStatus = document.createElement("div");
+    searchStatus.className = "geo-search-status hidden";
+    searchRow.appendChild(searchInput); searchRow.appendChild(searchBtn);
+    wrap.appendChild(searchRow); wrap.appendChild(searchStatus);
+    searchBtn.addEventListener("click", async () => {
+      const q = searchInput.value.trim();
+      if (!q) return;
+      searchStatus.textContent = t("tpl.geo.searching");
+      searchStatus.className = "geo-search-status";
+      try {
+        const res = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(q), { headers: { "Accept": "application/json" } });
+        const j = await res.json();
+        if (j && j.length) { setCoord(parseFloat(j[0].lat), parseFloat(j[0].lon), false); searchStatus.className = "geo-search-status hidden"; }
+        else { searchStatus.textContent = t("tpl.geo.notFound"); }
+      } catch { searchStatus.textContent = t("tpl.geo.notFound"); }
+    });
+    searchInput.addEventListener("keydown", (e) => { if (e.key === "Enter") searchBtn.click(); });
+
+    // quick picks
+    const quickWrap = document.createElement("div");
+    quickWrap.className = "geo-quick";
+    const qlbl = document.createElement("span"); qlbl.className = "geo-quick-lbl"; qlbl.textContent = t("tpl.geo.quick") + ":";
+    quickWrap.appendChild(qlbl);
+    for (const c of GEO_CITIES) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "geo-chip"; b.textContent = c.n;
+      b.addEventListener("click", () => setCoord(c.lat, c.lon, false));
+      quickWrap.appendChild(b);
+    }
+    wrap.appendChild(quickWrap);
+    return wrap;
   }
 
   // ── Wi-Fi nearby SSID picker ─────────────────────────────────────────────
@@ -404,9 +662,33 @@
     btn.className = "btn-text wifi-scan-btn";
     btn.textContent = t("tpl.wifi.scan");
     wrap.appendChild(btn);
+    // Persistent manual-entry affordance: the SSID field is always editable, but
+    // this makes it explicit that typing your own network is a first-class option
+    // (macOS privacy redacts nearby SSIDs, so a scan may only return the one you
+    // are already on).
+    const manual = document.createElement("button");
+    manual.type = "button";
+    manual.className = "btn-text wifi-scan-manual";
+    manual.textContent = t("tpl.wifi.typeMyself");
+    manual.addEventListener("click", () => {
+      list.classList.add("hidden");
+      input.focus();
+    });
+    wrap.appendChild(manual);
     const list = document.createElement("div");
     list.className = "wifi-scan-list hidden";
     wrap.appendChild(list);
+
+    // Append a "type it myself" row so the manual path is always one tap away,
+    // even after a scan returns results.
+    const appendManualRow = () => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "wifi-scan-item wifi-scan-item-manual";
+      row.textContent = t("tpl.wifi.typeMyself");
+      row.addEventListener("click", () => { list.classList.add("hidden"); input.focus(); });
+      list.appendChild(row);
+    };
 
     btn.addEventListener("click", async () => {
       if (btn.disabled) return;
@@ -420,6 +702,7 @@
       if (!res || !res.ok || !res.networks || !res.networks.length) {
         const why = res && res.reason === "no-networks" ? t("tpl.wifi.none") : t("tpl.wifi.fail");
         list.innerHTML = `<div class="wifi-scan-empty">${why}</div>`;
+        appendManualRow();
         return;
       }
       list.innerHTML = "";
@@ -437,6 +720,7 @@
         });
         list.appendChild(item);
       }
+      appendManualRow();
     });
     // Hide the list when clicking outside (one live document listener at a time).
     if (wifiScanOutsideHandler) document.removeEventListener("click", wifiScanOutsideHandler);
@@ -1096,13 +1380,30 @@
     return o;
   }
 
+  // ── Export format segmented control (PNG / SVG / PDF) ──────────────────────
+  // Show only the options for the selected format. PNG/SVG/PDF each reveal their
+  // own settings; the PDF caption lives only inside the PDF block so it can never
+  // be confused with a global caption.
+  function setupExportFormat() {
+    const seg = $("export-format");
+    if (!seg) return;
+    const opts = { png: $("png-options"), svg: $("svg-options"), pdf: $("pdf-options") };
+    const btns = Array.from(seg.querySelectorAll(".seg-btn"));
+    function setFmt(fmt) {
+      btns.forEach((b) => b.classList.toggle("active", b.dataset.format === fmt));
+      Object.keys(opts).forEach((k) => { if (opts[k]) opts[k].classList.toggle("hidden", k !== fmt); });
+      updateExportMeta();
+    }
+    btns.forEach((b) => b.addEventListener("click", () => setFmt(b.dataset.format)));
+    setFmt("png");
+  }
+
   // ── Collapsible panels (Style / Export) ────────────────────────────────────
   // Both panels start collapsed; the collapsed state itself is remembered so a
   // user who always expands Style doesn't have to re-expand every launch.
   function setupCollapsiblePanels() {
     const panels = [
       { toggle: "style-toggle", body: "style-body", panel: "style-panel", store: "kuiqr.genpanel.style" },
-      { toggle: "export-toggle", body: "export-body", panel: "export-panel", store: "kuiqr.genpanel.export" },
     ];
     for (const p of panels) {
       const toggle = $(p.toggle), body = $(p.body);
@@ -1257,6 +1558,7 @@
 
     maybeSeedDefault();
     renderTemplateForm();
+    setupExportFormat();
     setupDynamic();
     setupBatch();
     setupRegionWatch();

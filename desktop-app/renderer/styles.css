@@ -1334,8 +1334,10 @@ body {
 .dynamic-settings-group { margin-top: 8px; }
 
 /* Dynamic (trackable) QR row — sits under the action buttons; the chevron
-   rotates when the detail panel is expanded so it reads as expandable. */
-.dynamic-group { margin-top: 16px; padding: 10px 12px 12px; border: 1px solid var(--border, #e2e8f0); border-radius: 12px; background: var(--card, #fff); }
+   rotates when the detail panel is expanded so it reads as expandable.
+   No visible border when collapsed — only when expanded. */
+.dynamic-group { margin-top: 16px; padding: 10px 16px 12px; border: 1px solid transparent; border-radius: 12px; background: transparent; }
+.dynamic-group.expanded { border-color: var(--border, #e2e8f0); background: var(--card, #fff); }
 .dyn-toggle-row { align-items: flex-start; }
 .dyn-toggle-row .setting-label { font-weight: 600; }
 .dyn-chev {
@@ -1345,6 +1347,32 @@ body {
 }
 .dynamic-group.expanded .dyn-chev { transform: rotate(90deg); }
 .dyn-panel-info { margin: 8px 0 10px; }
+
+/* ===== Generate tab: step-by-step flow ===== */
+.gen-step { padding: 14px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; }
+/* The Dynamic (trackable) step must NOT show a divider line while its feature
+   is off — only when it is toggled open (.expanded). The two-class selector
+   has higher specificity than .gen-step alone, so it overrides the default border. */
+.dynamic-group.gen-step { background: transparent; border-color: transparent; }
+.dynamic-group.gen-step.expanded { background: var(--card); border-color: var(--border, #e2e8f0); }
+.step-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.gen-step .step-header .step-num {
+  width: 24px; height: 24px; flex-shrink: 0;
+  background: var(--primary); color: #fff; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+}
+.step-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.gen-step .setting-label { margin-top: 2px; }
+.gen-step .tpl-form { margin-top: 8px; }
+
+/* Segmented control for export format */
+.segmented { display: flex; gap: 4px; padding: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
+.seg-btn { flex: 1; padding: 6px 10px; border: none; border-radius: 7px; background: transparent; color: var(--text-light); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.seg-btn:hover { color: var(--text); }
+.seg-btn.active { background: var(--primary); color: #fff; }
+.export-options { margin-top: 10px; }
+.export-format-row { margin-bottom: 0; }
 
 /* ===== QR Generator: templates, styling, export, batch, region watch ===== */
 .tpl-form { margin: 4px 0 8px; }
@@ -1442,9 +1470,10 @@ input[type="range"] { flex: 1; }
 .panel-toggle .panel-hint { font-size: 11.5px; color: var(--text-light, #64748b); margin-left: auto; white-space: nowrap; }
 .generate-group.collapsed .panel-body { display: none; }
 .generate-group .panel-body { padding: 8px 0 0; }
-.settings-group-toggle { padding: 12px 0; }
+.settings-group-toggle { padding: 12px 16px; }
 .settings-group-toggle .group-title { font-size: 14px; }
-.settings-group .panel-body { padding: 4px 0 0; }
+.settings-group .panel-body { padding: 4px 16px 0; }
+.settings-group .panel-body .setting-item { padding-left: 0; padding-right: 0; }
 .panel-body .style-row:first-child { margin-top: 8px; }
 .style-panel .style-row:last-of-type { margin-bottom: 0; }
 #style-reset { color: #b91c1c; }
@@ -1469,3 +1498,31 @@ input[type="range"] { flex: 1; }
 .wifi-scan-ssid { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wifi-scan-sig { flex: 0 0 auto; font-size: 11px; color: var(--text-light, #6b7280); }
 .wifi-scan-empty { padding: 8px 10px; font-size: 12px; color: var(--text-light, #6b7280); line-height: 1.45; }
+.wifi-scan-manual { margin-top: 6px; margin-left: 4px; }
+
+/* Date/time picker for calendar events */
+.dt-picker { display: flex; flex-direction: column; gap: 8px; }
+.dt-quick { display: flex; gap: 6px; }
+.dt-quick .seg-btn { padding: 6px 14px; font-size: 12.5px; }
+.dt-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.dt-cell { display: flex; flex-direction: column; gap: 3px; }
+.dt-sel-lbl { font-size: 10.5px; color: var(--text-light, #6b7280); font-weight: 600; text-align: center; }
+.dt-sel { width: 100%; padding: 7px 4px; text-align: center; text-align-last: center; font-size: 13px; }
+/* Scrollable years/months/days on desktop; the native popup is scrollable too. */
+.dt-sel { max-height: 120px; }
+
+/* World-map geolocation picker */
+.geo-picker { display: flex; flex-direction: column; gap: 10px; }
+.geo-map { position: relative; border: 1px solid var(--border, #e3e6ea); border-radius: 12px; overflow: hidden; background: #dbeafe; }
+.geo-svg { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; cursor: crosshair; }
+.geo-marker { pointer-events: none; }
+.geo-hint { position: absolute; left: 8px; bottom: 6px; right: 8px; font-size: 11px; color: #1e3a5f; background: rgba(255,255,255,0.7); border-radius: 6px; padding: 2px 6px; pointer-events: none; }
+.geo-readout { font-size: 12.5px; color: var(--text, #111); }
+.geo-readout-lbl { font-weight: 600; }
+.geo-search { display: flex; gap: 6px; }
+.geo-search .tpl-input { flex: 1; }
+.geo-search-status { font-size: 12px; color: var(--text-light, #6b7280); }
+.geo-quick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.geo-quick-lbl { font-size: 11.5px; color: var(--text-light, #6b7280); font-weight: 600; }
+.geo-chip { padding: 4px 10px; border: 1px solid var(--border, #e3e6ea); border-radius: 999px; background: var(--card, #fff); color: var(--text, #111); font-size: 12px; cursor: pointer; }
+.geo-chip:hover { border-color: var(--primary, #6366f1); color: var(--primary, #6366f1); }

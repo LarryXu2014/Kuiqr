@@ -2115,6 +2115,10 @@ async function checkForUpdates(silent) {
         if (laterInlineBtn) laterInlineBtn.classList.remove("hidden");
         // Prompt the user in-app (no GitHub link needed).
         showUpdateModal(res);
+      } else if (dlBtn) {
+        // User tapped "Later" before: keep a persistent path to update from
+        // Settings so they're never stuck without a way to install it.
+        dlBtn.classList.remove("hidden");
       }
     } else {
       // Up-to-date: any prior dismissal is now stale.
