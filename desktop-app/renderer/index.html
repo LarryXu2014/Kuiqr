@@ -49,7 +49,7 @@
     <!-- In-app scan: Paste / Drop zone -->
     <div id="drop-zone" class="drop-zone">
       <div class="drop-zone-content">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
         <p class="drop-zone-text" data-i18n="drop.text">Drop an image here or click to paste from clipboard</p>
         <p class="drop-zone-hint" data-i18n="drop.hint">Supports PNG, JPG, GIF, BMP — scans instantly in this window</p>
       </div>
@@ -71,11 +71,11 @@
     </div>
 
     <div class="region-watch">
-      <button id="region-watch-btn" class="btn-action btn-action-primary">
+      <button id="region-watch-btn" class="btn-action btn-action-secondary">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
         <span class="btn-label" data-i18n="watch.btn">Region Watch…</span>
       </button>
-      <button id="region-watch-stop" class="btn-action btn-secondary hidden">
+      <button id="region-watch-stop" class="btn-action btn-action-secondary hidden">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
         <span class="btn-label" data-i18n="watch.stop">Stop Region Watch</span>
       </button>
@@ -157,9 +157,6 @@
           <button id="shortcut-record-btn" class="btn-record" type="button">
             <span id="shortcut-record-label">Press keys to record…</span>
           </button>
-          <div id="shortcut-current" class="shortcut-current">
-            Current: <kbd id="shortcut-current-value">Cmd+Shift+Y</kbd>
-          </div>
         </div>
       </label>
 
@@ -301,6 +298,7 @@
       <div class="update-row">
         <button id="check-updates-btn" class="btn-save" type="button" data-i18n="updates.check">Check for Updates</button>
         <button id="update-download-btn" class="btn-save btn-secondary hidden" type="button" data-i18n="updates.download">Download Update</button>
+        <button id="update-later-inline-btn" class="btn-text update-later-inline hidden" type="button" data-i18n="updates.later">Update Later</button>
       </div>
       <p id="update-status" class="update-status"></p>
       <div id="update-progress-wrap" class="update-progress-wrap hidden">
@@ -343,13 +341,17 @@
     <!-- QR preview sits right after the content so it's visible immediately -->
     <div id="gen-preview" class="generate-preview">
       <img id="gen-img" alt="QR code preview" />
+      <div id="gen-preview-placeholder" class="generate-preview-placeholder">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M7 14h.01M7 17h.01M10 14v4M17 7h.01"/></svg>
+        <span data-i18n="gen.previewPlaceholder">Your QR code will appear here</span>
+      </div>
     </div>
     <p id="gen-error" class="generate-error hidden"></p>
 
     <div class="generate-buttons">
-      <button id="gen-download" class="btn-save" data-i18n="gen.download">Download PNG</button>
-      <button id="gen-export-svg" class="btn-save btn-secondary" data-i18n="gen.exportSVG">Export SVG</button>
-      <button id="gen-export-pdf" class="btn-save btn-secondary" data-i18n="gen.exportPDF">Export PDF</button>
+      <button id="gen-download" class="btn-save"><span data-i18n="gen.download">Download PNG</span><span class="btn-meta" id="gen-download-meta"></span></button>
+      <button id="gen-export-svg" class="btn-save btn-secondary"><span data-i18n="gen.exportSVG">Export SVG</span><span class="btn-meta" id="gen-export-svg-meta"></span></button>
+      <button id="gen-export-pdf" class="btn-save btn-secondary"><span data-i18n="gen.exportPDF">Export PDF</span><span class="btn-meta" id="gen-export-pdf-meta"></span></button>
       <button id="gen-batch" class="btn-text" data-i18n="batch.btn">Batch from CSV…</button>
       <button id="gen-copy-qr" class="btn-text" data-i18n="gen.copyqr">Copy QR Code</button>
       <button id="gen-copy" class="btn-text" data-i18n="gen.copytext">Copy Text</button>
@@ -518,6 +520,8 @@
         <span class="setup-dot"></span>
         <span class="setup-dot"></span>
       </div>
+      <div class="setup-progress-bar-wrap"><div id="setup-progress-bar" class="setup-progress-bar"></div></div>
+      <div id="setup-step-count" class="setup-step-count"></div>
 
       <!-- Step 0: Welcome -->
       <div class="setup-step" data-step="0">

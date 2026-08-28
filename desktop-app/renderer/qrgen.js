@@ -17,6 +17,7 @@
   const PREVIEW_EDGE = 360;          // px edge of the on-screen preview
   const STYLE_KEY = "kuiqr.qrstyle"; // persisted styling defaults
   const DYNAMIC_STORE_KEY = "kuiqr.dynamicCodes";
+  const SAMPLE_DEFAULT = "https://kuiqr.app"; // smart default seeded into the text field on first open
 
   // ── i18n helper (falls back to English, then the raw key) ──
   function t(key, vars) {
@@ -1135,6 +1136,35 @@
     render();
   }
 
+  // ── Smart default (psychology: reduce decision fatigue) ────────────────────
+  // Seed the empty text field with a sensible sample on first open so the user
+  // immediately sees a working QR instead of a blank form. We auto-seed only
+  // until the user has explicitly cleared it once (then we respect the blank).
+  function maybeSeedDefault() {
+    const cleared = (() => { try { return localStorage.getItem("kuiqr.genSampleCleared") === "1"; } catch { return false; } })();
+    const cur = state.values.text && state.values.text.text;
+    if (cleared || cur) return;
+    state.values.text = { text: SAMPLE_DEFAULT };
+    const inp = $("gen-input");
+    if (inp) inp.value = SAMPLE_DEFAULT;
+  }
+
+  // ── Outcome info on primary actions (psychology: show the result before the act) ──
+  // "Download PNG · 1024×1024" turns "what do I do?" into "does this look right?".
+  function setBtnMeta(id, txt) {
+    const el = $(id);
+    if (el) el.textContent = txt ? " · " + txt : "";
+  }
+  function updateExportMeta() {
+    const png = parseInt(($("png-preset") || {}).value || "1024", 10);
+    const svg = parseInt(($("svg-edge") || {}).value || "1024", 10);
+    const pdf = ($("pdf-preset") || {}).value || "30mm";
+    const pdfLabels = { "30mm": "30×30mm", "50mm": "50×50mm", "80mm": "80×80mm", "card": "90×50mm" };
+    setBtnMeta("gen-download-meta", png + "×" + png);
+    setBtnMeta("gen-export-svg-meta", svg + "px");
+    setBtnMeta("gen-export-pdf-meta", pdfLabels[pdf] || pdf);
+  }
+
   // ── Public init ────────────────────────────────────────────────────────────
   function init() {
     loadStyling();
@@ -1154,7 +1184,13 @@
       sel.addEventListener("change", () => switchTemplate(sel.value));
     }
     // Plain-text input
-    if ($("gen-input")) $("gen-input").addEventListener("input", () => { state.values.text = { text: $("gen-input").value }; state.external = null; render(); });
+    if ($("gen-input")) $("gen-input").addEventListener("input", () => {
+      const v = $("gen-input").value;
+      state.values.text = { text: v };
+      // Remember an explicit clear so we don't re-seed the sample next launch.
+      try { if (!v.trim()) localStorage.setItem("kuiqr.genSampleCleared", "1"); else localStorage.removeItem("kuiqr.genSampleCleared"); } catch {}
+      state.external = null; render();
+    });
 
     applyStylingControls();
     // Styling controls
@@ -1204,6 +1240,16 @@
       flashBtn($("gen-copy"), t("result.copied"));
     });
 
+    // Outcome info on primary export actions: show the resolved size before the
+    // user acts (psychology: "Download PNG · 1024×1024" removes decision anxiety).
+    // Recompute on preset change and on language switch.
+    if ($("png-preset")) $("png-preset").addEventListener("change", updateExportMeta);
+    if ($("svg-edge")) $("svg-edge").addEventListener("change", updateExportMeta);
+    if ($("pdf-preset")) $("pdf-preset").addEventListener("change", updateExportMeta);
+    window.addEventListener("kuiqr:localize", updateExportMeta);
+    updateExportMeta();
+
+    maybeSeedDefault();
     renderTemplateForm();
     setupDynamic();
     setupBatch();

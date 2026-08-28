@@ -23,6 +23,19 @@ let pendingUpdateUrl = null;
 let pendingUpdateName = null;
 let pendingUpdateLatest = null;
 let updateModalDismissedVersion = null; // hide the modal again this session once "Later" is tapped
+// Persisted dismissal: once the user taps "Update Later" we record the latest
+// version they skipped, so the modal + inline status don't nag again on next
+// launch. Cleared on a manual "Check for Updates" click or once up-to-date.
+const UPDATE_DISMISS_KEY = "kuiqr.dismissedUpdateVersion";
+function getDismissedUpdateVersion() {
+  try { return localStorage.getItem(UPDATE_DISMISS_KEY) || null; } catch { return null; }
+}
+function setDismissedUpdateVersion(v) {
+  try {
+    if (v) localStorage.setItem(UPDATE_DISMISS_KEY, v);
+    else localStorage.removeItem(UPDATE_DISMISS_KEY);
+  } catch {}
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
   // Detect platform
@@ -458,6 +471,14 @@ function runSetupWizard() {
   function render() {
     steps.forEach((el, i) => el.classList.toggle("hidden", i !== current));
     dots.forEach((d, i) => d.classList.toggle("active", i <= current));
+    // Goal-gradient: count the current step as already begun so the bar never
+    // reads 0% — onboarding feels like momentum, not a blank slate (the video's
+    // "never start at 0%" lesson). Also shows an explicit Step X of Y counter.
+    const pct = Math.round(((current + 1) / TOTAL) * 100);
+    const bar = document.getElementById("setup-progress-bar");
+    if (bar) bar.style.width = pct + "%";
+    const sc = document.getElementById("setup-step-count");
+    if (sc) sc.textContent = t("setup.stepCount", { current: current + 1, total: TOTAL });
     // Footer button visibility.
     backBtn.classList.toggle("hidden", current === 0);
     skipTourBtn.classList.toggle("hidden", current !== 3); // guide step only
@@ -1371,6 +1392,13 @@ function renderHistory(history) {
 }
 
 async function clearHistory() {
+  // Loss-aversion: state the exact number of scans the user is about to lose
+  // BEFORE they commit (the video's "communicate the consequence of inaction"
+  // lesson). A blank confirm would hide the cost of the action.
+  const n = (lastHistory || []).length;
+  if (!n) return; // nothing to delete
+  const ok = window.confirm(t("history.clearConfirm", { count: n }));
+  if (!ok) return;
   await window.qrAPI.clearHistory();
   renderHistory([]);
 }
@@ -1517,11 +1545,9 @@ function migrateLocalhostCodes(backendUrl) {
   } catch { /* ignore */ }
 }
 
-// Update both the "Current:" label and the scan button's kbd to match a shortcut
+// Update the scan button's kbd hint to match the active shortcut.
 function updateShortcutDisplay(accelerator) {
   const displayKbd = formatShortcutForDisplay(accelerator);
-  const curVal = document.getElementById("shortcut-current-value");
-  if (curVal) curVal.textContent = displayKbd;
   const scDisplay = document.getElementById("shortcut-display");
   if (scDisplay) scDisplay.textContent = displayKbd;
   updateSettingsDirtyState();
@@ -1877,9 +1903,22 @@ function setScanButtonLabel() {
 // Updates — check for + download the latest GitHub release
 // ============================================================
 
+// Hide the inline "Update available" status + the inline "Update Later"
+// button for the given version. Used by both the inline button and the
+// modal's "Later" action so they stay in sync.
+function dismissUpdateNotice(version) {
+  if (version) setDismissedUpdateVersion(version);
+  const statusEl = document.getElementById("update-status");
+  const laterInlineBtn = document.getElementById("update-later-inline-btn");
+  if (statusEl) { statusEl.textContent = ""; statusEl.className = "update-status"; }
+  if (laterInlineBtn) laterInlineBtn.classList.add("hidden");
+  hideUpdateModal();
+}
+
 function setupUpdates() {
   const checkBtn = document.getElementById("check-updates-btn");
   const dlBtn = document.getElementById("update-download-btn");
+  const laterInlineBtn = document.getElementById("update-later-inline-btn");
   const statusEl = document.getElementById("update-status");
   const currentEl = document.getElementById("update-current");
   const modalLater = document.getElementById("update-later-btn");
@@ -1889,6 +1928,10 @@ function setupUpdates() {
   const progressText = document.getElementById("update-progress-text");
   const progressSize = document.getElementById("update-progress-size");
   const progressHint = document.getElementById("update-progress-hint");
+
+  // Seed the in-memory dismissal from localStorage so the modal stays
+  // suppressed across restarts for any version the user previously skipped.
+  updateModalDismissedVersion = getDismissedUpdateVersion();
 
   function setProgress(info) {
     const pct = info && typeof info.percent === "number" ? info.percent : 0;
@@ -1935,15 +1978,27 @@ function setupUpdates() {
   if (checkBtn) checkBtn.addEventListener("click", () => {
     showProgress(false);
     resetProgress();
+    // Manual check = user explicitly wants to see updates; clear any prior
+    // dismissal so the green status + modal reappear if an update is found.
+    setDismissedUpdateVersion(null);
+    updateModalDismissedVersion = null;
     checkForUpdates(false);
+  });
+  // The inline "Update Later" button: dismisses the inline status for the
+  // current latest version. Persisted to localStorage so it sticks across
+  // app restarts; cleared on a manual check or once the user is up-to-date.
+  if (laterInlineBtn) laterInlineBtn.addEventListener("click", () => {
+    if (pendingUpdateLatest) dismissUpdateNotice(pendingUpdateLatest);
   });
   // The inline "Download Update" button is a secondary path; the primary prompt
   // is the in-app update modal (see showUpdateModal).
   if (dlBtn) dlBtn.addEventListener("click", () => { if (pendingUpdateUrl) installUpdate(pendingUpdateUrl, pendingUpdateName, pendingUpdateLatest); });
 
   if (modalLater) modalLater.addEventListener("click", () => {
-    updateModalDismissedVersion = pendingUpdateLatest || null;
-    hideUpdateModal();
+    const v = pendingUpdateLatest || null;
+    updateModalDismissedVersion = v;
+    setDismissedUpdateVersion(v);
+    dismissUpdateNotice(v);
   });
   if (modalNow) modalNow.addEventListener("click", () => {
     const url = pendingUpdateUrl, name = pendingUpdateName, latest = pendingUpdateLatest;
@@ -2007,7 +2062,9 @@ function hideUpdateModal() {
 async function checkForUpdates(silent) {
   const statusEl = document.getElementById("update-status");
   const dlBtn = document.getElementById("update-download-btn");
+  const laterInlineBtn = document.getElementById("update-later-inline-btn");
   if (dlBtn) dlBtn.classList.add("hidden");
+  if (laterInlineBtn) laterInlineBtn.classList.add("hidden");
   // Only show the "Checking…" spinner on a manual press, not on the silent
   // background startup check (which would otherwise flash text briefly).
   if (!silent && statusEl) { statusEl.textContent = t("updates.status.checking"); statusEl.className = "update-status"; }
@@ -2020,10 +2077,26 @@ async function checkForUpdates(silent) {
     pendingUpdateLatest = res.latest || null;
 
     if (res.updateAvailable) {
-      if (statusEl) { statusEl.textContent = t("updates.status.available", { latest: res.latest }); statusEl.className = "update-status success"; }
-      // Prompt the user in-app (no GitHub link needed).
-      showUpdateModal(res);
+      // If the user already tapped "Update Later" for this exact version,
+      // respect that on the silent startup check and stay quiet. A manual
+      // "Check for Updates" press (the checkBtn handler) explicitly clears
+      // the dismissal before calling us, so the user always sees it then.
+      const dismissed = silent && getDismissedUpdateVersion() === res.latest;
+      if (statusEl) {
+        statusEl.textContent = dismissed
+          ? ""
+          : t("updates.status.available", { latest: res.latest });
+        statusEl.className = dismissed ? "update-status" : "update-status success";
+      }
+      if (!dismissed) {
+        if (laterInlineBtn) laterInlineBtn.classList.remove("hidden");
+        // Prompt the user in-app (no GitHub link needed).
+        showUpdateModal(res);
+      }
     } else {
+      // Up-to-date: any prior dismissal is now stale.
+      setDismissedUpdateVersion(null);
+      updateModalDismissedVersion = null;
       if (statusEl) {
         statusEl.textContent = silent ? "" : t("updates.status.uptodate", { cur: res.currentVersion || "?" });
         statusEl.className = "update-status" + (silent ? "" : " success");
