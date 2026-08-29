@@ -17,7 +17,7 @@
 //      provides a Settings button to jump to System Settings → Privacy & Security → Automation
 // ============================================================
 
-const { app, BrowserWindow, globalShortcut, screen, desktopCapturer, ipcMain, Tray, Menu, nativeImage, shell, clipboard, Notification, net, dialog } = require("electron");
+const { app, BrowserWindow, globalShortcut, screen, desktopCapturer, ipcMain, Tray, Menu, nativeImage, shell, clipboard, Notification, net, dialog, protocol } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { execSync, spawn, exec } = require("child_process");
@@ -48,14 +48,14 @@ let trayUpdateState = false;    // false = normal (white), true = update availab
 const isMac = process.platform === "darwin";
 const isWin = process.platform === "win32";
 
-// Release version — the 4-part build version (e.g. "2.4.2.3.10") that matches the
+// Release version — the 4-part build version (e.g. "2.4.2.5.1") that matches the
 // GitHub release tag and the extension zip filenames. In the PACKAGED app,
 // electron-builder strips `build.buildVersion` out of package.json, so we must fall
 // back to the hard-coded FALLBACK_RELEASE_VERSION (kept in sync with package.json
 // build.buildVersion and the GitHub tag each release) BEFORE the npm `version` field.
 // The npm `version` is only the 3-part semver ("2.4.1") and would otherwise make every
 // built app report as 2.4.1 and always think it is outdated.
-const FALLBACK_RELEASE_VERSION = "2.4.2.3.10";
+const FALLBACK_RELEASE_VERSION = "2.4.2.5.1";
 const RELEASE_VERSION = (() => {
   try {
     const pkg = require("./package.json");
@@ -66,7 +66,7 @@ const RELEASE_VERSION = (() => {
 })();
 
 // App version for display — use the REAL 4-part release version so the UI shows the
-// exact build the user is running (e.g. "2.4.2.3.10"), not the npm 3-part semver.
+// exact build the user is running (e.g. "2.4.2.5.1"), not the npm 3-part semver.
 const APP_VERSION = RELEASE_VERSION;
 
 // ── macOS native Vision QR helper path ──
@@ -156,61 +156,180 @@ function addToHistory(data, type) {
 // macOS: modern versions redact nearby SSIDs without Location permission, so we
 // merge the *connected* network (networksetup, always visible) with any unredacted
 // entries from system_profiler. Windows (netsh) and Linux (nmcli) list everything.
+// True when macOS replaced every SSID with "<redacted>" because the calling app
+// (or the system) has not granted Location Services access. Since 10.15 macOS
+// hides nearby Wi-Fi names from any process without that permission, so a scan
+// that returns nothing is usually a permission problem, not an empty airspace.
+// Detecting it lets the UI point at the right System Settings pane instead of
+// showing a dead end.
+function isWifiRedacted(...chunks) {
+  const all = chunks.filter(Boolean).join("\n");
+  return /<\s*redacted\s*>/i.test(all);
+}
+
+// `networksetup -getairportnetwork <iface>` prints an error instead of a network
+// for interfaces that are not Wi-Fi (en1/en2/en3 on most Macs):
+//     "en1 is not a Wi-Fi interface."
+//     "** Error: Error obtaining wireless information."
+// The loose colon-matching below would otherwise read that error text as an SSID
+// and offer "Error obtaining wireless information." as a network to join.
+const NETWORKSETUP_NOISE = /(is not a Wi-Fi interface|not associated|error obtaining|^\s*\*+\s*error)/i;
+
+// Wi-Fi scan for the WiFi QR template's SSID picker.
+//
+// Returns { networks: [{ ssid, signal, group }], locationRestricted } where
+// group is "current" (the network you are on), "saved" (networks this Mac has
+// joined before) or "nearby" (networks in range right now).
+//
+// Why three sources: since macOS 10.15 the OS replaces every *nearby* SSID with
+// "<redacted>" for any process without Location Services. That is a hard privacy
+// gate — no flag or entitlement gets around it — so a scan that only read
+// "Other Local Wi-Fi Networks" would always come back empty. The saved-networks
+// list (`networksetup -listpreferredwirelessnetworks`) needs no permission and
+// covers what people actually want to share (home / office / café Wi-Fi), so we
+// always list it and treat nearby as a bonus that appears once permission is on.
 function scanWifiNetworks() {
   return new Promise((resolve, reject) => {
-    if (process.platform === "darwin") {
-      // The currently-connected Wi-Fi network can always be read via networksetup
-      // (-getairportnetwork); modern macOS (10.15+) redacts nearby SSIDs in
-      // system_profiler, so the connected network is what we can reliably offer.
-      // We iterate the common interfaces (en0..en3) and match on the colon
-      // character (both ":" and the localized "：" ) so a Chinese-locale system
-      // still resolves the current SSID instead of reporting "no networks".
-      const ifaces = ["en0", "en1", "en2", "en3"];
-      const jobs = ifaces.map((iface) =>
-        runCmd("networksetup", ["-getairportnetwork", iface]).then((out) => out).catch(() => "")
-      );
-      Promise.all(jobs).then((outs) => {
+    if (process.platform !== "darwin") {
+      let cmd, args;
+      if (process.platform === "win32") {
+        cmd = "netsh"; args = ["wlan", "show", "networks", "mode=bssid"];
+      } else {
+        cmd = "nmcli"; args = ["-f", "SSID,SIGNAL", "dev", "wifi", "list"];
+      }
+      runCmd(cmd, args).then((out) => {
         try {
-          const networks = [];
-          const seen = new Set();
-          const push = (ssid) => {
-            ssid = String(ssid || "").trim();
-            if (!ssid || /^<.*redacted.*>$/i.test(ssid) || ssid === "--") return;
-            if (seen.has(ssid)) return;
-            seen.add(ssid);
-            networks.push({ ssid, signal: null });
-          };
-          for (const out of outs) {
-            if (!out) continue;
-            const m = out.match(/[:：]\s*(.+?)\s*$/m);
-            if (m) push(m[1]);
-          }
-          // Best-effort: any non-redacted nearby SSIDs from system_profiler.
-          runCmd("/usr/sbin/system_profiler", ["SPAirPortDataType"]).then((prof) => {
-            const re = /^[ \t]+SSID[:：]\s*(.+?)\s*$/gm;
-            let mm;
-            while ((mm = re.exec(prof || ""))) push(mm[1]);
-            if (!networks.length) reject(new Error("no-networks"));
-            else resolve(networks);
-          }, () => { if (!networks.length) reject(new Error("no-networks")); else resolve(networks); });
+          const networks = parseWifiScan(out, process.platform).map((n) => ({ ...n, group: "nearby" }));
+          // Windows/Linux list nearby networks without a Location-style gate.
+          if (!networks.length) reject(new Error("no-networks"));
+          else resolve({ networks, locationRestricted: false });
         } catch (e) { reject(e); }
-      });
+      }, reject);
       return;
     }
-    let cmd, args;
-    if (process.platform === "win32") {
-      cmd = "netsh"; args = ["wlan", "show", "networks", "mode=bssid"];
-    } else {
-      cmd = "nmcli"; args = ["-f", "SSID,SIGNAL", "dev", "wifi", "list"];
-    }
-    runCmd(cmd, args).then((out) => {
+
+    (async () => {
+      const seen = new Set();
+      const out = { current: [], saved: [], nearby: [] };
+      let sawRedacted = false;
+      const add = (group, ssid, signal) => {
+        ssid = String(ssid || "").trim();
+        if (!ssid || ssid === "--" || /^<.*redacted.*>$/i.test(ssid)) return;
+        // macOS error strings sometimes leak through as SSIDs; reject them.
+        const lower = ssid.toLowerCase();
+        if (/error obtaining|is not a wi-fi|not associated|no networks|^\*+\s*error/.test(lower)) return;
+        if (seen.has(lower)) return;
+        seen.add(lower);
+        out[group].push({ ssid, signal: signal == null ? null : signal, group });
+      };
+
+      // Which interfaces are actually Wi-Fi? Asking networksetup about en1/en2
+      // on a Mac prints "… is not a Wi-Fi interface." noise, so resolve the
+      // real device names first and fall back to en0 if detection fails.
+      let ifaces = [];
       try {
-        const networks = parseWifiScan(out, process.platform);
-        if (!networks.length) reject(new Error("no-networks"));
-        else resolve(networks);
-      } catch (e) { reject(e); }
-    }, reject);
+        const hw = await runCmd("networksetup", ["-listallhardwareports"]);
+        let isWifi = false;
+        for (const line of hw.split("\n")) {
+          const t = line.trim();
+          if (/^Hardware Port:/i.test(t)) isWifi = /wi-?fi|airport/i.test(t);
+          else if (/^Device:/i.test(t) && isWifi) {
+            const dev = t.split(":").slice(1).join(":").trim();
+            if (dev) ifaces.push(dev);
+            isWifi = false;
+          }
+        }
+      } catch { /* ignore */ }
+      if (!ifaces.length) ifaces = ["en0"];
+
+      // 1 ── Current network. Two independent readers because either can be
+      //     blocked by Location Services on recent macOS releases.
+      for (const iface of ifaces) {
+        const res = await runCmd("networksetup", ["-getairportnetwork", iface]).catch(() => "");
+        for (const line of String(res || "").split("\n")) {
+          if (NETWORKSETUP_NOISE.test(line)) continue;
+          const m = line.match(/[:：]\s*(.+?)\s*$/);
+          if (m) add("current", m[1], null);
+        }
+      }
+      for (const iface of ifaces) {
+        // ipconfig prints "  SSID : MyNet"; read it only when networksetup
+        // could not tell us (it also redacts, but the field is a different path
+        // and sometimes survives when the other does not).
+        if (out.current.length) break;
+        const sum = await runCmd("ipconfig", ["getsummary", iface]).catch(() => "");
+        const m = String(sum || "").match(/^\s*SSID\s*:\s*(.+?)\s*$/m);
+        if (m && !/^<.*redacted.*>$/i.test(m[1])) add("current", m[1], null);
+      }
+
+      // 2 ── Saved / preferred networks. Always readable, no permission needed,
+      //     and it is the list people actually want to make a QR code for.
+      for (const iface of ifaces) {
+        const res = await runCmd("networksetup", ["-listpreferredwirelessnetworks", iface]).catch(() => "");
+        let started = false;
+        for (const raw of String(res || "").split("\n")) {
+          if (!started) { if (/preferred networks on/i.test(raw)) started = true; continue; }
+          const ssid = raw.replace(/^\t+/, "").trim();
+          if (ssid) add("saved", ssid, null);
+        }
+      }
+
+      // 3 ── Nearby networks (usually redacted without Location Services).
+      const prof = await runCmd("/usr/sbin/system_profiler", ["SPAirPortDataType"]).catch(() => "");
+      const profText = String(prof || "");
+      sawRedacted = isWifiRedacted(profText);
+      parseAirPortNearby(profText, add);
+
+      const networks = [...out.current, ...out.saved, ...out.nearby];
+      if (!networks.length) {
+        const err = new Error(sawRedacted ? "location-permission" : "no-networks");
+        err.locationRestricted = sawRedacted;
+        reject(err);
+      } else {
+        // Only flag the permission problem when nearby networks specifically
+        // were hidden — saved networks working is normal, not a partial failure.
+        resolve({ networks, locationRestricted: sawRedacted && !out.nearby.length });
+      }
+    })().catch(reject);
   });
+}
+
+// Pull SSIDs (and signal strength) out of `system_profiler SPAirPortDataType`.
+// Entries look like:
+//     Current Network Information:
+//       MyNet:
+//         PHY Mode: 802.11ax
+//         Signal / Noise: -60 dBm / -96 dBm
+//     Other Local Wi-Fi Networks:
+//       NeighbourNet:
+//         PHY Mode: ...
+// So any indented line ending in ":" that is not a known attribute key is an
+// SSID. "Current Network Information" entries are also collected as nearby so
+// the merged list never loses the network we are on.
+const AIRPORT_ATTR = /^(PHY Mode|Channel|Country Code|Network Type|Security|Signal\s*\/\s*Noise|Transmit Rate|Last TX Rate|MCS Index|BSSID|SSID|Status|Card Type|Firmware Version|MAC Address|Locale|Supported PHY Modes|Supported Channels|Wake On Wireless|AirDrop|Auto Unlock|Interfaces|Software Versions|CoreWLAN|CoreWLANKit|Menu Extra|System Information|IO80211 Family|Diagnostics|AirPort Utility|Other Local Wi-Fi Networks|Current Network Information|Versions)/i;
+// The "Interfaces:" block lists device names (en0, awdl0…) using the same
+// "key:" shape as an SSID, so they have to be filtered out explicitly.
+const AIRPORT_IFACE = /^(en|awdl|llw|bridge|utun|lo|pdp_ip|stf)\d+$/i;
+
+function parseAirPortNearby(text, add) {
+  const found = [];
+  let cur = null;
+  for (const line of text.split("\n")) {
+    const head = line.match(/^\s+(.+?):\s*$/);
+    if (head) {
+      const key = head[1].trim();
+      cur = key && !AIRPORT_ATTR.test(key) && !AIRPORT_IFACE.test(key) ? { ssid: key, signal: null } : null;
+      if (cur) found.push(cur);
+      continue;
+    }
+    if (!cur) continue;
+    const sig = line.match(/Signal\s*\/\s*Noise:\s*(-?\d+)\s*dBm/i);
+    if (!sig) continue;
+    const dbm = parseInt(sig[1], 10);
+    if (isFinite(dbm)) cur.signal = Math.max(0, Math.min(100, (dbm + 100) * 2));
+  }
+  // Add only after the whole block is read, so each SSID carries its signal.
+  for (const n of found) add("nearby", n.ssid, n.signal);
 }
 function runCmd(cmd, args) {
   return new Promise((resolve, reject) => {
@@ -425,6 +544,321 @@ ipcMain.handle("join-wifi", async (event, payload) => joinWifiNetwork(payload ||
 ipcMain.handle("open-contact-event", (event, { kind, content }) => openContactOrEvent(kind, content));
 ipcMain.handle("open-geo", (event, { lat, lon }) => openGeoLocation(lat, lon));
 
+// ============================================================
+// Offline map tile cache + geocoding proxy (Geo QR template)
+//
+// The map in the generator loads tiles through a custom `kuiqr-map://` scheme
+// instead of hitting the tile server directly. That buys three things:
+//   1. Every tile we ever show is cached under userData/map-tiles, so the same
+//      area (and anything explicitly downloaded) still renders with no network.
+//   2. We can send a proper User-Agent — tile providers block the default
+//      Electron/Chromium UA.
+//   3. Offline tile requests resolve to a 1×1 transparent PNG instead of
+//      hanging, so the bundled vector world underneath stays visible.
+// Geocoding is proxied for the same reason (CORS + User-Agent + a fallback
+// provider), and results are memoised per query.
+// ============================================================
+
+const MAP_TILE_HOST = "tile.openstreetmap.org";
+const MAP_TILE_UA = `Kuiqr/${RELEASE_VERSION} (https://github.com/LarryXu2014/Kuiqr)`;
+const MAP_TILE_ROOT = path.join(app.getPath("userData"), "map-tiles");
+const GEOCODE_UA = MAP_TILE_UA;
+// 1×1 fully transparent PNG served when a tile is neither cached nor reachable.
+const MAP_BLANK_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=",
+  "base64"
+);
+
+// Registered before app.ready so the scheme is treated as a normal, secure,
+// fetch-capable origin (otherwise a file:// page cannot load it at all).
+protocol.registerSchemesAsPrivileged([
+  { scheme: "kuiqr-map", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+]);
+
+function mapTilePath(host, z, x, y) {
+  return path.join(MAP_TILE_ROOT, String(host), String(z), String(x), `${y}.png`);
+}
+function mapReadTile(p) {
+  try { return fs.existsSync(p) ? fs.readFileSync(p) : null; } catch { return null; }
+}
+function mapWriteTile(p, buf) {
+  try {
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(`${p}.tmp`, buf);
+    fs.renameSync(`${p}.tmp`, p);
+    return true;
+  } catch { return false; }
+}
+
+// ── Polite fetch queue ────────────────────────────────────────────────────────
+// Leaflet asks for dozens of tiles at once when you pan. Cap concurrency and
+// dedupe in-flight requests so we never hammer the tile server or fetch twice.
+const MAP_FETCH_LIMIT = 6;
+let mapActive = 0;
+const mapQueue = [];
+const mapInflight = new Map();
+
+function mapPump() {
+  while (mapActive < MAP_FETCH_LIMIT && mapQueue.length) {
+    const job = mapQueue.shift();
+    mapActive++;
+    Promise.resolve()
+      .then(job.task)
+      .then(job.resolve, job.reject)
+      .finally(() => { mapActive--; mapPump(); });
+  }
+}
+function mapEnqueue(task) {
+  return new Promise((resolve, reject) => { mapQueue.push({ task, resolve, reject }); mapPump(); });
+}
+
+function mapFetchTile(host, z, x, y) {
+  const dest = mapTilePath(host, z, x, y);
+  const cached = mapReadTile(dest);
+  if (cached) return Promise.resolve(cached);
+  const key = `${host}/${z}/${x}/${y}`;
+  if (!mapInflight.has(key)) {
+    mapInflight.set(key, mapEnqueue(async () => {
+      try {
+        const res = await net.fetch(`https://${host}/${z}/${x}/${y}.png`, {
+          headers: { "User-Agent": MAP_TILE_UA, Accept: "image/png,image/*" },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (!buf.length) throw new Error("empty tile");
+        mapWriteTile(dest, buf);
+        return buf;
+      } finally {
+        mapInflight.delete(key);
+      }
+    }));
+  }
+  return mapInflight.get(key);
+}
+
+function mapProtocolHandler(request) {
+  let u;
+  try { u = new URL(request.url); } catch { return new Response("", { status: 400 }); }
+  const m = String(u.pathname || "").match(/^\/(\d{1,2})\/(\d{1,7})\/(\d{1,7})(?:\.png)?$/);
+  if (!m) return new Response("", { status: 400 });
+  const host = u.hostname || MAP_TILE_HOST;
+  const [, z, x, y] = m;
+  return mapFetchTile(host, z, x, y).then(
+    (buf) =>
+      new Response(buf, {
+        status: 200,
+        headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=31536000" },
+      }),
+    // Offline and never cached → serve a transparent pixel so Leaflet stops
+    // spinning and the bundled vector basemap shows through instead.
+    () => new Response(MAP_BLANK_PNG, { status: 200, headers: { "Content-Type": "image/png" } })
+  );
+}
+
+// ── Offline download ──────────────────────────────────────────────────────────
+let mapDownloadCancel = false;
+
+function lonToTileX(lon, z) { return Math.floor(((lon + 180) / 360) * 2 ** z); }
+function latToTileY(lat, z) {
+  const rad = (lat * Math.PI) / 180;
+  return Math.floor(((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * 2 ** z);
+}
+function mapTileListWorld(minZ, maxZ) {
+  const out = [];
+  for (let z = minZ; z <= maxZ; z++) {
+    const n = 2 ** z;
+    for (let x = 0; x < n; x++) for (let y = 0; y < n; y++) out.push({ z, x, y });
+  }
+  return out;
+}
+function mapTileListBounds(bounds, minZ, maxZ) {
+  const out = [];
+  for (let z = minZ; z <= maxZ; z++) {
+    let x0 = lonToTileX(bounds.west, z), x1 = lonToTileX(bounds.east, z);
+    let y0 = latToTileY(bounds.north, z), y1 = latToTileY(bounds.south, z);
+    if (x1 < x0) [x0, x1] = [x1, x0];
+    if (y1 < y0) [y0, y1] = [y1, y0];
+    const n = 2 ** z;
+    for (let x = Math.max(0, x0); x <= Math.min(n - 1, x1); x++) {
+      for (let y = Math.max(0, y0); y <= Math.min(n - 1, y1); y++) out.push({ z, x, y });
+    }
+  }
+  return out;
+}
+function mapSendProgress(info) {
+  for (const w of BrowserWindow.getAllWindows()) {
+    try { w.webContents.send("map-download-progress", info); } catch { /* window gone */ }
+  }
+}
+async function mapRunDownload(list) {
+  mapDownloadCancel = false;
+  const total = list.length;
+  let done = 0, failed = 0;
+  mapSendProgress({ done: 0, total, failed: 0, finished: false });
+  const worker = async () => {
+    while (list.length && !mapDownloadCancel) {
+      const t = list.shift();
+      try { await mapFetchTile(MAP_TILE_HOST, t.z, t.x, t.y); } catch { failed++; }
+      done++;
+      if (done % 25 === 0 || done === total) mapSendProgress({ done, total, failed, finished: false });
+    }
+  };
+  await Promise.all(Array.from({ length: MAP_FETCH_LIMIT }, worker));
+  mapSendProgress({ done, total, failed, finished: true, cancelled: mapDownloadCancel });
+}
+
+// ── Cache accounting ──────────────────────────────────────────────────────────
+let mapCacheInfoCache = { at: 0, value: { tiles: 0, bytes: 0 } };
+function mapCacheInfo(force) {
+  if (!force && Date.now() - mapCacheInfoCache.at < 5000) return mapCacheInfoCache.value;
+  let tiles = 0, bytes = 0;
+  const walk = (dir) => {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith(".png")) {
+        try { bytes += fs.statSync(p).size; tiles++; } catch { /* ignore */ }
+      }
+    }
+  };
+  walk(MAP_TILE_ROOT);
+  mapCacheInfoCache = { at: Date.now(), value: { tiles, bytes } };
+  return mapCacheInfoCache.value;
+}
+
+// ── Geocoding proxy ───────────────────────────────────────────────────────────
+const GEOCODE_MEMO = new Map();
+
+function mapFormatNominatim(items) {
+  return items.map((r) => {
+    const a = r.address || {};
+    const primary =
+      r.name || a.name || a.attraction || a.building || a.amenity || a.shop ||
+      a.school || a.university || a.college || a.hospital || a.station ||
+      a.road || a.neighbourhood || a.suburb || a.village || a.town || a.city ||
+      a.county || a.state || a.country || (r.display_name || "").split(",")[0];
+    const secondary = r.display_name || "";
+    return {
+      primary: String(primary || "").trim() || secondary.split(",")[0] || "",
+      secondary,
+      type: String(r.addresstype || r.type || r.category || ""),
+      lat: parseFloat(r.lat),
+      lon: parseFloat(r.lon),
+    };
+  }).filter((r) => isFinite(r.lat) && isFinite(r.lon) && r.primary);
+}
+
+async function mapGeocode(q, opts) {
+  q = String(q || "").trim();
+  if (q.length < 2) return [];
+  const o = opts || {};
+  const memoKey = `${q}|${o.lat}|${o.lon}|${o.lang}`;
+  if (GEOCODE_MEMO.has(memoKey)) return GEOCODE_MEMO.get(memoKey);
+  const lang = o.lang || "en";
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 6000);
+  const headers = { "User-Agent": GEOCODE_UA, Accept: "application/json", "Accept-Language": lang };
+  let out = [];
+  try {
+    // Nominatim (OpenStreetMap) — authoritative, and `viewbox` biases ranking
+    // toward the user's area so "Shanghai High" surfaces the local school first.
+    let url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=8&q=${encodeURIComponent(q)}`;
+    if (isFinite(o.lat) && isFinite(o.lon)) {
+      const d = 2.5;
+      url += `&viewbox=${o.lon - d},${o.lat + d},${o.lon + d},${o.lat - d}&bounded=0`;
+    }
+    if (lang) url += `&accept-language=${encodeURIComponent(lang)}`;
+    const res = await net.fetch(url, { headers, signal: ac.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    out = mapFormatNominatim(await res.json());
+  } catch {
+    try {
+      // Photon (komoot) — quicker prefix matching, a solid autocomplete fallback.
+      let url = `https://photon.komoot.io/api/?limit=8&q=${encodeURIComponent(q)}`;
+      if (isFinite(o.lat) && isFinite(o.lon)) url += `&lat=${o.lat}&lon=${o.lon}`;
+      if (lang) url += `&lang=${encodeURIComponent(lang)}`;
+      const res = await net.fetch(url, { headers, signal: ac.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const j = await res.json();
+      out = (j.features || []).map((f) => {
+        const p = f.properties || {};
+        const c = (f.geometry && f.geometry.coordinates) || [];
+        return {
+          primary: p.name || `${p.street || ""} ${p.housenumber || ""}`.trim() || p.city || p.country || "",
+          secondary: [p.name, p.street, p.city, p.district, p.state, p.country].filter(Boolean).join(", "),
+          type: p.type || p.osm_value || "",
+          lat: c[1],
+          lon: c[0],
+        };
+      }).filter((r) => isFinite(r.lat) && isFinite(r.lon) && r.primary);
+    } catch { out = []; }
+  } finally {
+    clearTimeout(timer);
+  }
+  if (GEOCODE_MEMO.size > 200) GEOCODE_MEMO.clear();
+  GEOCODE_MEMO.set(memoKey, out);
+  return out;
+}
+
+// Coarse "where am I", used to bias search results locally. Chromium's
+// geolocation service needs a Google API key that Electron does not ship, so we
+// ask the OS-level location first and fall back to IP geolocation — city-level
+// accuracy is exactly what's needed to rank Shanghai results while in Shanghai.
+async function mapLocate() {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 6000);
+  try {
+    const res = await net.fetch("https://ipapi.co/json/", {
+      headers: { "User-Agent": GEOCODE_UA, Accept: "application/json" },
+      signal: ac.signal,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const j = await res.json();
+    const lat = parseFloat(j.latitude), lon = parseFloat(j.longitude);
+    if (isFinite(lat) && isFinite(lon)) {
+      return {
+        ok: true, lat, lon, source: "ip",
+        label: [j.city, j.region, j.country_name].filter(Boolean).join(", "),
+      };
+    }
+    throw new Error("no coordinates");
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+ipcMain.handle("map-geocode", (event, { q, lat, lon, lang }) => mapGeocode(q, { lat, lon, lang }));
+ipcMain.handle("map-locate", () => mapLocate());
+ipcMain.handle("map-cache-info", (event, force) => mapCacheInfo(force));
+ipcMain.handle("map-download-world", async (event, { minZ, maxZ }) => {
+  const list = mapTileListWorld(
+    Math.max(0, Math.min(18, minZ == null ? 0 : minZ)),
+    Math.max(0, Math.min(18, maxZ == null ? 4 : maxZ))
+  );
+  mapRunDownload(list);
+  return { started: true, total: list.length };
+});
+ipcMain.handle("map-download-area", async (event, { bounds, minZ, maxZ }) => {
+  const b = bounds || { north: 85, south: -85, east: 180, west: -180 };
+  const list = mapTileListBounds(
+    b,
+    Math.max(0, Math.min(18, minZ == null ? 6 : minZ)),
+    Math.max(0, Math.min(18, maxZ == null ? 14 : maxZ))
+  );
+  mapRunDownload(list);
+  return { started: true, total: list.length };
+});
+ipcMain.handle("map-download-cancel", () => { mapDownloadCancel = true; return { ok: true }; });
+ipcMain.handle("map-cache-clear", () => {
+  try { fs.rmSync(MAP_TILE_ROOT, { recursive: true, force: true }); } catch { /* ignore */ }
+  mapCacheInfo(true);
+  return { ok: true };
+});
+
 
 // ============================================================
 // App Lifecycle
@@ -442,6 +876,10 @@ if (!gotSingleInstanceLock) {
   });
 
   app.whenReady().then(async () => {
+    // Serve map tiles through our caching proxy. Must be registered before the
+    // window loads so the first tile request is already routed.
+    try { protocol.handle("kuiqr-map", mapProtocolHandler); } catch { /* already registered */ }
+
     createMainWindow();
 
     // Hide the default Electron menu bar on Windows/Linux — the app UI is
@@ -1785,10 +2223,38 @@ ipcMain.handle("set-qr-style", (event, style) => {
 });
 ipcMain.handle("scan-wifi", async () => {
   try {
-    const list = await scanWifiNetworks();
-    return { ok: true, networks: list };
+    const { networks, locationRestricted } = await scanWifiNetworks();
+    return { ok: true, networks, locationRestricted: !!locationRestricted };
   } catch (err) {
-    return { ok: false, reason: err.message || String(err), networks: [] };
+    return {
+      ok: false,
+      reason: err.message || String(err),
+      networks: [],
+      locationRestricted: !!(err && err.locationRestricted),
+    };
+  }
+});
+
+// Opens System Settings → Privacy & Security → Location Services (macOS).
+// Without Location Services, macOS hands back "<redacted>" instead of real SSIDs,
+// so "Scan nearby" can never list networks — the user has to allow it here.
+// Electron has no API for this pane, so we use the documented
+// x-apple.systempreferences: deep link (same approach as the Automation pane).
+ipcMain.handle("open-location-settings", async () => {
+  if (!isMac) return { ok: false, reason: "unsupported-platform" };
+  const url = "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices";
+  try {
+    await shell.openExternal(url);
+    return { ok: true };
+  } catch (err) {
+    // Fallback: ask the OS to open the URL directly (older macOS / sandbox edge
+    // cases where openExternal reports a failure).
+    try {
+      exec(`open "${url}"`);
+      return { ok: true };
+    } catch (e2) {
+      return { ok: false, reason: String((e2 && e2.message) || e2) };
+    }
   }
 });
 ipcMain.handle("zip-folder", (event, { folder, outName }) => {
@@ -1987,19 +2453,39 @@ function getLanIp() {
 
 let localBackendProc = null;
 let localBackendInfo = null;
-// The local backend's API key is persisted in <backend>/data/.local-api-key so
-// restarts (incl. the automatic one at app launch) reuse the SAME key — a new
-// random key every relaunch would silently invalidate the saved settings.
-function localBackendKeyPath(backendDir) {
-  return path.join(backendDir, "data", ".local-api-key");
+// Writable home for the local backend's runtime files (SQLite DB + API key).
+// This MUST live outside the app bundle: .app / install directories are often
+// read-only (and writing inside them breaks codesigning and Gatekeeper), so the
+// backend keeps its data under the app's userData folder instead.
+function backendDataDir() {
+  const dir = path.join(app.getPath("userData"), "dynamic-backend");
+  try { fs.mkdirSync(dir, { recursive: true }); } catch { /* best effort */ }
+  return dir;
+}
+
+// The local backend's API key is persisted next to the DB so restarts (incl. the
+// automatic one at app launch) reuse the SAME key — a new random key every
+// relaunch would silently invalidate the saved settings.
+function localBackendKeyPath() {
+  return path.join(backendDataDir(), ".local-api-key");
+}
+
+// Resolve the dynamic-backend directory. In packaged builds electron-builder
+// copies it to process.resourcesPath/dynamic-backend; in dev it lives next to
+// the desktop-app folder (qr-scanner/dynamic-backend).
+function resolveBackendDir() {
+  const packaged = path.join(process.resourcesPath, "dynamic-backend");
+  if (fs.existsSync(path.join(packaged, "server.js"))) return packaged;
+  const dev = path.join(__dirname, "..", "dynamic-backend");
+  if (fs.existsSync(path.join(dev, "server.js"))) return dev;
+  return null;
 }
 
 // Re-read the local backend's key file and update settings.dynamicApiKey if it
 // has changed. This heals the common "unauthorized" case where the backend was
 // restarted with a fresh key (or the settings were copied from another install).
 function resyncLocalBackendKey() {
-  const backendDir = path.join(__dirname, "..", "dynamic-backend");
-  const p = localBackendKeyPath(backendDir);
+  const p = localBackendKeyPath();
   try {
     const fresh = fs.readFileSync(p, "utf-8").trim();
     if (/^[0-9a-f]{16,}$/i.test(fresh)) {
@@ -2013,8 +2499,8 @@ function resyncLocalBackendKey() {
   } catch { /* best effort */ }
   return null;
 }
-function loadOrCreateLocalKey(backendDir) {
-  const p = localBackendKeyPath(backendDir);
+function loadOrCreateLocalKey() {
+  const p = localBackendKeyPath();
   try {
     const existing = fs.readFileSync(p, "utf-8").trim();
     if (/^[0-9a-f]{16,}$/i.test(existing)) return existing;
@@ -2027,10 +2513,10 @@ async function startLocalBackend({ silent = false } = {}) {
   if (localBackendProc && !localBackendProc.killed) {
     return { ok: true, url: localBackendInfo && localBackendInfo.url, apiKey: localBackendInfo && localBackendInfo.apiKey, lanIp: localBackendInfo && localBackendInfo.lanIp, alreadyRunning: true };
   }
-  const backendDir = path.join(__dirname, "..", "dynamic-backend");
-  if (!fs.existsSync(path.join(backendDir, "server.js"))) return { ok: false, reason: "backend-not-found" };
+  const backendDir = resolveBackendDir();
+  if (!backendDir) return { ok: false, reason: "backend-not-found" };
   if (!fs.existsSync(path.join(backendDir, "node_modules", "fastify"))) return { ok: false, reason: "backend-not-installed" };
-  const apiKey = loadOrCreateLocalKey(backendDir);
+  const apiKey = loadOrCreateLocalKey();
   // Short links must be reachable from PHONES (that's the whole point of a
   // trackable QR) — use this machine's LAN IP, not localhost. The server itself
   // binds 0.0.0.0 (see dynamic-backend/src/config.js HOST default).
@@ -2038,11 +2524,43 @@ async function startLocalBackend({ silent = false } = {}) {
   const url = lanIp ? `http://${lanIp}:3000` : "http://localhost:3000";
   const env = Object.assign({}, process.env, {
     PORT: "3000", BASE_URL: url, API_KEY: apiKey,
-    DB_PATH: path.join(backendDir, "data", "qr.db"),
+    DB_PATH: path.join(backendDataDir(), "qr.db"),
   });
   try {
-    localBackendProc = spawn("npm", ["start"], { cwd: backendDir, env, detached: true, stdio: "ignore" });
-    localBackendProc.unref();
+    // Run the server directly with Node. `npm start` works in dev but npm isn't
+    // bundled in a packaged build, and electron-builder copies the backend in as
+    // a plain resource.
+    //
+    // Prefer a real system `node` / `node.exe`. If it isn't installed (very
+    // common on end-user machines, and the backend needs native modules we can't
+    // load from inside the Electron renderer anyway), fall back to this very
+    // Electron binary started in NODE-mode, which behaves exactly like Node.
+    const nodeEnv = Object.assign({}, env, { ELECTRON_RUN_AS_NODE: "1" });
+    const isWin = process.platform === "win32";
+    const candidates = isWin
+      ? [["node.exe", env], [process.execPath, nodeEnv]]
+      : [["node", env], [process.execPath, nodeEnv]];
+    let lastErr = null;
+    for (const [bin, binEnv] of candidates) {
+      try {
+        const proc = spawn(bin, ["server.js"], { cwd: backendDir, env: binEnv, detached: true, stdio: "ignore" });
+        proc.unref();
+        // A missing binary reports ENOENT asynchronously; catch it and try the
+        // next candidate instead of leaving the user with a dead backend.
+        proc.once("error", (err) => {
+          if (localBackendProc === proc) localBackendProc = null;
+          console.warn("[kuiqr] local backend spawn failed:", (err && err.code) || err);
+        });
+        localBackendProc = proc;
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (lastErr) {
+      return { ok: false, reason: "spawn-failed:" + String((lastErr && lastErr.message) || lastErr) };
+    }
   } catch (e) {
     return { ok: false, reason: "spawn-failed:" + String((e && e.message) || e) };
   }
@@ -2577,14 +3095,18 @@ async function callDynamicApi(apiPath, { method = "GET", body } = {}) {
   }
 }
 
-ipcMain.handle("dynamic-create", async (event, { destination, note, expiresAt } = {}) => {
+ipcMain.handle("dynamic-create", async (event, { destination, type, note, expiresAt } = {}) => {
   if (!destination) return { ok: false, reason: "destination-required" };
-  return callDynamicApi("/api/codes", { method: "POST", body: { destination, note, expiresAt } });
+  return callDynamicApi("/api/codes", { method: "POST", body: { destination, type, note, expiresAt } });
 });
 
 ipcMain.handle("dynamic-stats", async (event, { code } = {}) => {
   if (!code) return { ok: false, reason: "code-required" };
   return callDynamicApi(`/api/codes/${encodeURIComponent(code)}/stats`);
+});
+ipcMain.handle("dynamic-lookup", async (event, { code } = {}) => {
+  if (!code) return { ok: false, reason: "code-required" };
+  return callDynamicApi(`/api/codes/${encodeURIComponent(code)}/lookup`);
 });
 
 // Downloads the chosen update asset into the user's Downloads folder and opens

@@ -7,6 +7,8 @@
   <title>Kuiqr</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="tutorial.css" />
+  <!-- Leaflet (MIT) — vendored locally so the Geo-location map never needs a CDN. -->
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 </head>
 <body>
   <!-- Title bar drag region (macOS) -->
@@ -415,6 +417,7 @@
     </div>
 
     <!-- Step 4: Dynamic (trackable) QR -->
+    <div class="step-separator" aria-hidden="true"></div>
     <div class="generate-group dynamic-group gen-step" id="dynamic-group">
       <div class="step-header"><span class="step-num">4</span><span class="step-title" data-i18n="gen.dynamic">Dynamic (trackable) QR</span></div>
       <label class="setting-item toggle-row dyn-toggle-row">
@@ -439,12 +442,12 @@
       <div class="step-header"><span class="step-num">5</span><span class="step-title" data-i18n="gen.export">Export</span></div>
       <p class="setting-desc" data-i18n="gen.exportDesc">Pick a format — its options appear below.</p>
       <div class="style-row export-format-row">
-        <label class="style-lbl" data-i18n="gen.exportFormat">Format</label>
-        <div class="segmented" id="export-format">
-          <button type="button" class="seg-btn active" data-format="png">PNG</button>
-          <button type="button" class="seg-btn" data-format="svg">SVG</button>
-          <button type="button" class="seg-btn" data-format="pdf">PDF</button>
-        </div>
+        <label class="style-lbl" for="export-format" data-i18n="gen.exportFormat">Format</label>
+        <select id="export-format" class="setting-input style-select export-format-select">
+          <option value="png" data-i18n="gen.exportPNG">PNG image</option>
+          <option value="svg" data-i18n="gen.exportSVG">SVG vector</option>
+          <option value="pdf" data-i18n="gen.exportPDF">PDF document</option>
+        </select>
       </div>
       <div id="png-options" class="export-options">
         <div class="style-row">
@@ -485,9 +488,9 @@
     </div>
 
     <div class="generate-buttons">
-      <button id="gen-download" class="btn-save"><span data-i18n="gen.download">Download PNG</span><span class="btn-meta" id="gen-download-meta"></span></button>
-      <button id="gen-export-svg" class="btn-save btn-secondary"><span data-i18n="gen.exportSVG">Export SVG</span><span class="btn-meta" id="gen-export-svg-meta"></span></button>
-      <button id="gen-export-pdf" class="btn-save btn-secondary"><span data-i18n="gen.exportPDF">Export PDF</span><span class="btn-meta" id="gen-export-pdf-meta"></span></button>
+      <!-- One primary export action. Its label tracks the format picked in the
+           segmented control above ("Download PNG" / "Export SVG" / "Export PDF"). -->
+      <button id="gen-export" class="btn-save"><span id="gen-export-label">Download PNG</span><span class="btn-meta" id="gen-export-meta"></span></button>
       <button id="gen-batch" class="btn-text" data-i18n="batch.btn">Batch from CSV…</button>
       <button id="gen-copy-qr" class="btn-text" data-i18n="gen.copyqr">Copy QR Code</button>
       <button id="gen-copy" class="btn-text" data-i18n="gen.copytext">Copy Text</button>
@@ -683,6 +686,12 @@
       </div>
     </div>
   </div>
+
+  <!-- Leaflet (MIT) for the interactive Geo-location map, plus Natural Earth
+       country outlines (public domain) as an always-available offline basemap.
+       The 50m detail file is loaded lazily when the map is zoomed in. -->
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/world-110m.js"></script>
 
   <!-- jsQR library for in-app decoding; qrcode-generator for sizing; stylized QR + PDF + CSV libs -->
   <script src="../jsQR.js"></script>

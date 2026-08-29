@@ -162,7 +162,7 @@ body {
   text-align: center;
   cursor: pointer;
   transition: all 0.2s;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   background: #fdfdfd;
 }
 
@@ -826,7 +826,7 @@ body {
 
 /* ---- About ---- */
 .about-section {
-  margin-top: 20px;
+  margin-top: 16px;
   padding: 16px;
   background: var(--card);
   border: 1px solid var(--border);
@@ -1042,21 +1042,35 @@ body {
   text-align: center;
 }
 .generate-buttons {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
   gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
 }
 
 .generate-buttons .btn-save,
 .generate-buttons .btn-text {
-  flex: 1 1 auto;
-  min-width: 110px;
+  min-width: 0;
+  margin-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
 }
+/* 420px window: one primary export button on its own full row, then the
+   secondary text actions paired underneath. */
+.generate-buttons #gen-export { grid-column: span 6; }
+.generate-buttons #gen-batch,
+.generate-buttons #gen-copy-qr { grid-column: span 3; }
+.generate-buttons #gen-copy { grid-column: span 6; }
+
+/* Breathing room between the tab intro text and the first step card */
+#tab-generate > .setting-desc { margin: 0 0 16px; }
+/* Match the 16px group rhythm under the save button (kills .btn-save's 8px) */
+#save-settings-btn { margin-bottom: 16px; }
 /* Outcome-info suffix on the export buttons (e.g. "Download PNG · 1024×1024") */
 .btn-meta { font-weight: 500; font-variant-numeric: tabular-nums; }
 .generate-buttons .btn-save .btn-meta { color: rgba(255, 255, 255, 0.92); }
-.generate-buttons .btn-secondary .btn-meta { color: var(--primary-dark, #4338ca); opacity: 0.92; }
 
 /* ---- In-app right-click context menu ---- */
 .app-context-menu {
@@ -1336,7 +1350,7 @@ body {
 /* Dynamic (trackable) QR row — sits under the action buttons; the chevron
    rotates when the detail panel is expanded so it reads as expandable.
    No visible border when collapsed — only when expanded. */
-.dynamic-group { margin-top: 16px; padding: 10px 16px 12px; border: 1px solid transparent; border-radius: 12px; background: transparent; }
+.dynamic-group { padding: 10px 16px 12px; border: 1px solid transparent; border-radius: 12px; background: transparent; }
 .dynamic-group.expanded { border-color: var(--border, #e2e8f0); background: var(--card, #fff); }
 .dyn-toggle-row { align-items: flex-start; }
 .dyn-toggle-row .setting-label { font-weight: 600; }
@@ -1350,11 +1364,27 @@ body {
 
 /* ===== Generate tab: step-by-step flow ===== */
 .gen-step { padding: 14px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; }
-/* The Dynamic (trackable) step must NOT show a divider line while its feature
-   is off — only when it is toggled open (.expanded). The two-class selector
-   has higher specificity than .gen-step alone, so it overrides the default border. */
-.dynamic-group.gen-step { background: transparent; border-color: transparent; }
-.dynamic-group.gen-step.expanded { background: var(--card); border-color: var(--border, #e2e8f0); }
+/* The Dynamic (trackable) step must NOT show any divider line while its feature
+   is off — only when it is toggled open (.expanded). The dedicated .step-separator
+   above it provides the separator with the Style & Colors panel, so the collapsed
+   dynamic group stays completely clean. */
+.dynamic-group.gen-step {
+  background: transparent;
+  border-color: transparent;
+  border-radius: 0;
+}
+.dynamic-group.gen-step.expanded {
+  background: var(--card);
+  border-color: var(--border, #e2e8f0);
+  border-radius: 12px;
+}
+/* The toggle row is a .setting-item, which carries a bottom hairline for the
+   Settings tab. Inside the Dynamic group that hairline renders as a stray rule
+   above Export, so suppress it and let the group border be the only divider. */
+.dynamic-group.gen-step .setting-item { border-bottom: none; }
+/* Dedicated separator between the Style & Colors panel and the Dynamic QR panel.
+   It is always visible so the two sections are clearly divided. */
+.step-separator { height: 1px; background: var(--border, #e2e8f0); margin: 16px 0; border: none; }
 .step-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .gen-step .step-header .step-num {
   width: 24px; height: 24px; flex-shrink: 0;
@@ -1366,11 +1396,8 @@ body {
 .gen-step .setting-label { margin-top: 2px; }
 .gen-step .tpl-form { margin-top: 8px; }
 
-/* Segmented control for export format */
-.segmented { display: flex; gap: 4px; padding: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
-.seg-btn { flex: 1; padding: 6px 10px; border: none; border-radius: 7px; background: transparent; color: var(--text-light); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-.seg-btn:hover { color: var(--text); }
-.seg-btn.active { background: var(--primary); color: #fff; }
+/* Export format selector — a single dropdown so only one action button is visible. */
+.export-format-select { flex: 1; min-width: 120px; }
 .export-options { margin-top: 10px; }
 .export-format-row { margin-bottom: 0; }
 
@@ -1403,7 +1430,7 @@ input[type="range"] { flex: 1; }
 .style-status.ok { color: #047857; background: #ecfdf5; border: 1px solid #a7f3d0; }
 .style-status.warn { color: #b45309; background: #fff7ed; border: 1px solid #fed7aa; }
 
-.generate-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.generate-buttons { margin-top: 16px; }
 .btn-secondary { background: color-mix(in srgb, var(--primary, #4f46e5) 10%, white); color: var(--primary-dark, #4338ca); }
 .btn-secondary:hover { background: color-mix(in srgb, var(--primary, #4f46e5) 18%, white); }
 
@@ -1471,7 +1498,7 @@ input[type="range"] { flex: 1; }
 .generate-group.collapsed .panel-body { display: none; }
 .generate-group .panel-body { padding: 8px 0 0; }
 .settings-group-toggle { padding: 12px 16px; }
-.settings-group-toggle .group-title { font-size: 14px; }
+.settings-group-toggle .group-title { font-size: 13px; }
 .settings-group .panel-body { padding: 4px 16px 0; }
 .settings-group .panel-body .setting-item { padding-left: 0; padding-right: 0; }
 .panel-body .style-row:first-child { margin-top: 8px; }
@@ -1484,7 +1511,7 @@ input[type="range"] { flex: 1; }
 .wifi-scan-btn { margin-top: 6px; }
 .wifi-scan-list {
   position: absolute; top: calc(100% - 26px); left: 0; right: 0; z-index: 30;
-  max-height: 200px; overflow-y: auto;
+  max-height: 300px; overflow-y: auto;
   background: var(--card, #fff); border: 1px solid var(--border, #e3e6ea);
   border-radius: 10px; box-shadow: 0 8px 24px rgba(17, 24, 39, 0.14);
   padding: 4px;
@@ -1499,30 +1526,119 @@ input[type="range"] { flex: 1; }
 .wifi-scan-sig { flex: 0 0 auto; font-size: 11px; color: var(--text-light, #6b7280); }
 .wifi-scan-empty { padding: 8px 10px; font-size: 12px; color: var(--text-light, #6b7280); line-height: 1.45; }
 .wifi-scan-manual { margin-top: 6px; margin-left: 4px; }
+/* Location-permission notice shown inside the Wi-Fi scan dropdown. The message
+   explains why the list is empty and the button jumps straight to the
+   Privacy & Security → Location Services pane that unblocks it. */
+.wifi-scan-perm { padding: 6px 4px 8px; }
+.wifi-scan-perm .wifi-scan-empty { margin: 0 0 8px; }
+.wifi-scan-perm-btn { display: block; width: 100%; padding: 8px 12px; font-size: 12.5px; font-weight: 600; }
 
-/* Date/time picker for calendar events */
-.dt-picker { display: flex; flex-direction: column; gap: 8px; }
-.dt-quick { display: flex; gap: 6px; }
-.dt-quick .seg-btn { padding: 6px 14px; font-size: 12.5px; }
-.dt-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-.dt-cell { display: flex; flex-direction: column; gap: 3px; }
-.dt-sel-lbl { font-size: 10.5px; color: var(--text-light, #6b7280); font-weight: 600; text-align: center; }
-.dt-sel { width: 100%; padding: 7px 4px; text-align: center; text-align-last: center; font-size: 13px; }
-/* Scrollable years/months/days on desktop; the native popup is scrollable too. */
-.dt-sel { max-height: 120px; }
+/* Date/time picker for calendar events — native datetime-local input so the
+   browser/OS provides a real calendar popup instead of a thin row of dropdowns. */
+.dt-native {
+  min-height: 42px;
+  padding: 9px 10px;
+  font-size: 14px;
+  font-family: inherit;
+}
+/* Make the native calendar icon easier to hit. */
+.dt-native::-webkit-calendar-picker-indicator {
+  width: 18px; height: 18px;
+  cursor: pointer; opacity: 0.55;
+}
+.dt-native::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
-/* World-map geolocation picker */
+/* ── Map-based geolocation picker (Leaflet) ── */
 .geo-picker { display: flex; flex-direction: column; gap: 10px; }
-.geo-map { position: relative; border: 1px solid var(--border, #e3e6ea); border-radius: 12px; overflow: hidden; background: #dbeafe; }
-.geo-svg { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; cursor: crosshair; }
-.geo-marker { pointer-events: none; }
-.geo-hint { position: absolute; left: 8px; bottom: 6px; right: 8px; font-size: 11px; color: #1e3a5f; background: rgba(255,255,255,0.7); border-radius: 6px; padding: 2px 6px; pointer-events: none; }
-.geo-readout { font-size: 12.5px; color: var(--text, #111); }
+
+.geo-search { position: relative; display: flex; gap: 6px; align-items: stretch; }
+.geo-search .geo-search-input { flex: 1; min-width: 0; }
+.geo-locate {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; flex: 0 0 38px;
+  border: 1px solid var(--border, #e3e6ea); border-radius: 10px;
+  background: var(--card, #fff); color: var(--text, #111); cursor: pointer;
+  transition: border-color .15s ease, color .15s ease;
+}
+.geo-locate svg { width: 17px; height: 17px; }
+.geo-locate:hover { border-color: var(--primary, #6366f1); color: var(--primary, #6366f1); }
+.geo-locate.is-busy { opacity: .55; pointer-events: none; }
+
+/* Autocomplete dropdown — floats over the map, so it needs its own stacking. */
+.geo-suggest {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 900;
+  max-height: 232px; overflow-y: auto;
+  background: var(--card, #fff);
+  border: 1px solid var(--border, #e3e6ea); border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
+  padding: 4px;
+}
+.geo-suggest.hidden { display: none; }
+.geo-suggest-item {
+  display: flex; flex-direction: column; gap: 1px; width: 100%;
+  padding: 7px 9px; border: 0; border-radius: 7px;
+  background: transparent; color: var(--text, #111);
+  font-size: 13px; text-align: left; cursor: pointer;
+}
+.geo-suggest-item:hover,
+.geo-suggest-item.is-active { background: color-mix(in srgb, var(--primary, #6366f1) 12%, transparent); }
+.geo-suggest-primary { font-weight: 600; line-height: 1.25; }
+.geo-suggest-secondary {
+  font-size: 11.5px; color: var(--text-light, #6b7280); line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.geo-map {
+  position: relative; height: 320px;
+  border: 1px solid var(--border, #e3e6ea); border-radius: 12px;
+  overflow: hidden; background: #9ebcda;
+}
+.geo-map .leaflet-container { height: 100%; width: 100%; background: #9ebcda; font: inherit; }
+.geo-map .leaflet-control-attribution { font-size: 10px; }
+/* Custom pin: a div-icon so it needs no image files. */
+.geo-pin { display: flex; align-items: center; justify-content: center; }
+.geo-pin-dot {
+  width: 16px; height: 16px; border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--primary, #6366f1);
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, .35);
+}
+
+.geo-readout { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; font-size: 12.5px; color: var(--text, #111); }
 .geo-readout-lbl { font-weight: 600; }
-.geo-search { display: flex; gap: 6px; }
-.geo-search .tpl-input { flex: 1; }
-.geo-search-status { font-size: 12px; color: var(--text-light, #6b7280); }
-.geo-quick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.geo-quick-lbl { font-size: 11.5px; color: var(--text-light, #6b7280); font-weight: 600; }
-.geo-chip { padding: 4px 10px; border: 1px solid var(--border, #e3e6ea); border-radius: 999px; background: var(--card, #fff); color: var(--text, #111); font-size: 12px; cursor: pointer; }
-.geo-chip:hover { border-color: var(--primary, #6366f1); color: var(--primary, #6366f1); }
+.geo-coords { font-variant-numeric: tabular-nums; }
+.geo-place {
+  color: var(--text-light, #6b7280); font-size: 11.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+}
+
+.geo-offline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.geo-cache { flex: 1 1 auto; font-size: 11.5px; color: var(--text-light, #6b7280); margin-right: 4px; }
+.geo-btn { padding: 4px 10px; font-size: 12px; }
+.geo-btn:disabled { opacity: .45; pointer-events: none; }
+
+.geo-progress { display: flex; gap: 8px; align-items: center; }
+.geo-progress.hidden { display: none; }
+.geo-progress-bar {
+  flex: 1 1 auto; height: 6px; min-width: 90px;
+  background: var(--border, #e3e6ea); border-radius: 999px; overflow: hidden;
+}
+.geo-progress-fill {
+  height: 100%; width: 0;
+  background: var(--primary, #6366f1); border-radius: 999px;
+  transition: width .18s ease;
+}
+.geo-progress-text { font-size: 11.5px; color: var(--text-light, #6b7280); font-variant-numeric: tabular-nums; }
+
+.geo-status { font-size: 12px; color: var(--text-light, #6b7280); }
+.geo-status.hidden { display: none; }
+.geo-status.is-error { color: #dc2626; }
+
+/* Wi-Fi scan results are grouped (connected / in range / saved). */
+.wifi-scan-group {
+  padding: 6px 10px 3px; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-light, #6b7280);
+  background: color-mix(in srgb, var(--text, #111) 4%, transparent);
+}

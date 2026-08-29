@@ -4,11 +4,25 @@
 > Scan QR codes instantly — right-click any image, press a keyboard shortcut, or paste a screenshot. Works on your desktop, in your browser, and on the web.
 
 ![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)
-![Version](https://img.shields.io/badge/Version-2.4.2.3.10-green.svg)
+![Version](https://img.shields.io/badge/Version-2.4.2.5.1-green.svg)
 
 All QR decoding happens **locally on your device**. On macOS the desktop app uses the native **Apple Vision** framework for instant detection, with a fast bounded jsQR fallback for hard or artistic QR codes. No images, URLs, or scan data are ever sent to any server.
 
-> **New in this version:** full **QR generator** (Wi-Fi / contact / event / location templates, styling, logos, print-ready export, batch from CSV), **trackable QR codes** with scan analytics, **Region Watch** (live-scan a screen region), and **phone-like scan actions** — scan a Wi-Fi code and join the network, scan a contact and save it to Contacts, scan an event and add it to Calendar. See the **[User Guide](./USER_GUIDE.md)** for how everything works.
+> **New in this version:** trackable QR codes now work for **plain text** too — scan one and the app copies the text while recording the scan. The local backend is also bundled so "Run local backend" works in packaged builds. Plus a full **web QR Studio** landing page ([kuiqr.app](https://kuiqr.app)), real map search for location QR codes, improved Wi-Fi scan permissions, a cleaner **Style → Dynamic → Export** flow, and **calendar-style date pickers** for events. See the **[User Guide](./USER_GUIDE.md)** for how everything works.
+
+---
+
+## Web QR Studio (no install)
+
+Open **[kuiqr.app](https://kuiqr.app)** in any modern browser to build and download QR codes instantly — 66 types, full styling, PNG/SVG/PDF/JPG export, and a working in-page scanner. Nothing is uploaded; everything runs in your tab.
+
+- **66 QR types** — URL, text, email, SMS, phone, Wi-Fi, vCard, calendar event, location, social platforms, crypto, and more
+- **Live preview** — see the QR code update as you type
+- **Full styling** — colors, gradients, dot style, corner style, logo, caption
+- **Real location picker** — pan/zoom a world map and drop a pin instead of typing latitude/longitude
+- **In-page scanner** — drag a box over the generated QR on the next slide; decoded results offer contextual actions (open link, copy text, connect to Wi-Fi, save contact, add to calendar)
+- **Direct downloads** — choose the right installer for your OS; the page auto-detects Mac, Windows, or Linux and highlights the recommended download
+- **Open source** — "Read the source" links straight to GitHub
 
 ---
 
@@ -34,7 +48,7 @@ xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
 ### macOS (Apple Silicon / M1, M2, M3, M4)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-mac-arm64.zip -o ~/Downloads/Kuiqr.zip && unzip -o ~/Downloads/Kuiqr.zip -d /Applications && xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-arm64.zip -o ~/Downloads/Kuiqr.zip && unzip -o ~/Downloads/Kuiqr.zip -d /Applications && xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
 ```
 
 > **No Homebrew?** You can also download the `.zip`, unzip it, and open `Kuiqr.app` directly (optionally drag it to Applications). The `.dmg` is also provided if you prefer a disk image.
@@ -42,7 +56,7 @@ curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.
 ### macOS (Intel)
 
 ```bash
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-mac-x64.zip -o ~/Downloads/Kuiqr.zip && unzip -o ~/Downloads/Kuiqr.zip -d /Applications && xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-x64.zip -o ~/Downloads/Kuiqr.zip && unzip -o ~/Downloads/Kuiqr.zip -d /Applications && xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
 ```
 
 > **Not sure which Mac you have?** Click   → About This Mac. If the chip says "Apple M-series" use Apple Silicon; if it says "Intel" use Intel.
@@ -50,7 +64,7 @@ curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.
 ### Windows (x64)
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-windows-x64-setup.exe" -OutFile "$env:USERPROFILE\Downloads\Kuiqr-setup.exe"; Start-Process "$env:USERPROFILE\Downloads\Kuiqr-setup.exe"
+Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-windows-x64-setup.exe" -OutFile "$env:USERPROFILE\Downloads\Kuiqr-setup.exe"; Start-Process "$env:USERPROFILE\Downloads\Kuiqr-setup.exe"
 ```
 
 > A **portable** `.exe` and a `.zip` are also provided if you'd rather not run an installer.
@@ -59,18 +73,18 @@ Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Kuiqr/releases/latest/dow
 
 ```bash
 # x64
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-linux-x86_64.AppImage -o ~/Downloads/Kuiqr.AppImage && chmod +x ~/Downloads/Kuiqr.AppImage && ~/Downloads/Kuiqr.AppImage
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-linux-x86_64.AppImage -o ~/Downloads/Kuiqr.AppImage && chmod +x ~/Downloads/Kuiqr.AppImage && ~/Downloads/Kuiqr.AppImage
 # arm64
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-linux-arm64.AppImage -o ~/Downloads/Kuiqr.AppImage && chmod +x ~/Downloads/Kuiqr.AppImage && ~/Downloads/Kuiqr.AppImage
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-linux-arm64.AppImage -o ~/Downloads/Kuiqr.AppImage && chmod +x ~/Downloads/Kuiqr.AppImage && ~/Downloads/Kuiqr.AppImage
 ```
 
-> **Note:** Kuiqr runs in the background and lives in your system tray. On GNOME you may need the [AppIndicator](https://extensions.gnome.org/extension/615/appindicator-support/) extension for the tray icon to appear. A `.deb` package is also provided for Debian/Ubuntu-based distros (`Kuiqr-2.4.2.3.10-linux-{x64,arm64}.deb`).
+> **Note:** Kuiqr runs in the background and lives in your system tray. On GNOME you may need the [AppIndicator](https://extensions.gnome.org/extension/615/appindicator-support/) extension for the tray icon to appear. A `.deb` package is also provided for Debian/Ubuntu-based distros (`Kuiqr-2.4.2.5.1-linux-{x64,arm64}.deb`).
 
 ### Chrome / Edge / Brave Extension
 
 ```bash
 # Download and extract
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension-2.4.2.3.10.zip -o /tmp/kuiqr-extension-2.4.2.3.10.zip && unzip -q /tmp/kuiqr-extension-2.4.2.3.10.zip -d ~/kuiqr-extension && echo "Extension extracted to ~/kuiqr-extension — load it from chrome://extensions > Load unpacked"
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension-2.4.2.5.1.zip -o /tmp/kuiqr-extension-2.4.2.5.1.zip && unzip -q /tmp/kuiqr-extension-2.4.2.5.1.zip -d ~/kuiqr-extension && echo "Extension extracted to ~/kuiqr-extension — load it from chrome://extensions > Load unpacked"
 ```
 
 > **After installing:** Open the extension popup, click **Record**, and press your shortcut (default **Cmd+Shift+Y** on Mac, **Ctrl+Shift+Y** on Windows). The shortcut is captured right in the popup — no need to touch `chrome://extensions/shortcuts`.
@@ -93,14 +107,14 @@ Then double-click the app normally. You only need to do this once.
 
 ### macOS `.pkg` installer is blocked by Gatekeeper
 
-The `.pkg` installers are **not signed or notarized** (no Apple Developer certificate), so macOS refuses to open them: *"Kuiqr-2.4.2.3.10-mac-arm64.pkg can't be opened because Apple cannot check it for malicious software."*
+The `.pkg` installers are **not signed or notarized** (no Apple Developer certificate), so macOS refuses to open them: *"Kuiqr-2.4.2.5.1-mac-arm64.pkg can't be opened because Apple cannot check it for malicious software."*
 
 **Recommended:** skip the `.pkg` and use the **`.zip`** or **`.dmg`** above — they only need a one-time right-click → "Open" on first launch.
 
 **If you must use the `.pkg`:**
 1. Click **Done** on the warning (do **not** "Move to Trash").
 2. Open **System Settings → Privacy & Security**.
-3. Scroll to the bottom — you'll see *"Kuiqr-2.4.2.3.10-mac-arm64.pkg" was blocked from use because it is not from an identified developer* with an **Open Anyway** button.
+3. Scroll to the bottom — you'll see *"Kuiqr-2.4.2.5.1-mac-arm64.pkg" was blocked from use because it is not from an identified developer* with an **Open Anyway** button.
 4. Click **Open Anyway**, enter your password, then re-run the installer.
 
 Once Apple code-signing is set up, the `.pkg` will open without this warning.
@@ -111,7 +125,7 @@ GitHub's release server (`objects.githubusercontent.com`) is throttled in some r
 
 ```bash
 # Replace any GitHub releases URL prefix with ghproxy.com
-curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-mac-arm64.zip" -o ~/Downloads/Kuiqr.zip && unzip -o ~/Downloads/Kuiqr.zip -d /Applications && open /Applications/Kuiqr.app
+curl -L "https://ghproxy.com/https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-arm64.zip" -o ~/Downloads/Kuiqr.zip && unzip -o ~/Downloads/Kuiqr.zip -d /Applications && open /Applications/Kuiqr.app
 ```
 If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 
@@ -121,25 +135,25 @@ If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 
 | Platform                   | File                                                                                                                                           | Size  | Status |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
-| Chrome / Edge / Brave      | [kuiqr-extension-2.4.2.3.10.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension-2.4.2.3.10.zip)                           | 84 KB | Verified |
-| Firefox (109+)             | [kuiqr-firefox-2.4.2.3.10.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-firefox-2.4.2.3.10.zip)                               | 84 KB | Verified |
-| macOS (Apple Silicon)      | [Kuiqr-2.4.2.3.10-mac-arm64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-mac-arm64.zip)     | ~92 MB | Verified |
-| macOS (Apple Silicon, .dmg)| [Kuiqr-2.4.2.3.10-mac-arm64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-mac-arm64.dmg)     | ~95 MB | Verified |
-| macOS (Intel)              | [Kuiqr-2.4.2.3.10-mac-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-mac-x64.zip)         | ~97 MB | Verified |
-| macOS (Intel, .dmg)        | [Kuiqr-2.4.2.3.10-mac-x64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-mac-x64.dmg)         | ~100 MB | Verified |
-| macOS (Apple Silicon, .pkg)| [Kuiqr-2.4.2.3.10-mac-arm64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-mac-arm64.pkg)     | ~95 MB | ⚠ Unsigned — needs bypass |
-| macOS (Intel, .pkg)        | [Kuiqr-2.4.2.3.10-mac-x64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-mac-x64.pkg)         | ~95 MB | ⚠ Unsigned — needs bypass |
-| Windows (x64) — Setup      | [Kuiqr-2.4.2.3.10-windows-x64-setup.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-windows-x64-setup.exe) | ~70 MB | Verified |
-| Windows (x64) — Portable   | [Kuiqr-2.4.2.3.10-windows-x64-portable.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-windows-x64-portable.exe) | ~70 MB | Verified |
-| Windows (x64) — Zip       | [Kuiqr-2.4.2.3.10-windows-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-windows-x64.zip) | ~70 MB | Verified |
-| Linux (x64, AppImage)      | [Kuiqr-2.4.2.3.10-linux-x86_64.AppImage](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-linux-x86_64.AppImage) | ~90 MB | Verified |
-| Linux (arm64, AppImage)    | [Kuiqr-2.4.2.3.10-linux-arm64.AppImage](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-linux-arm64.AppImage) | ~90 MB | Verified |
-| Linux (x64, .deb)          | [Kuiqr-2.4.2.3.10-linux-amd64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-linux-amd64.deb) | ~90 MB | Verified |
-| Linux (arm64, .deb)        | [Kuiqr-2.4.2.3.10-linux-arm64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.3.10-linux-arm64.deb) | ~90 MB | Verified |
+| Chrome / Edge / Brave      | [kuiqr-extension-2.4.2.5.1.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension-2.4.2.5.1.zip)                           | 84 KB | Verified |
+| Firefox (109+)             | [kuiqr-firefox-2.4.2.5.1.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-firefox-2.4.2.5.1.zip)                               | 84 KB | Verified |
+| macOS (Apple Silicon)      | [Kuiqr-2.4.2.5.1-mac-arm64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-arm64.zip)     | ~92 MB | Verified |
+| macOS (Apple Silicon, .dmg)| [Kuiqr-2.4.2.5.1-mac-arm64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-arm64.dmg)     | ~95 MB | Verified |
+| macOS (Intel)              | [Kuiqr-2.4.2.5.1-mac-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-x64.zip)         | ~97 MB | Verified |
+| macOS (Intel, .dmg)        | [Kuiqr-2.4.2.5.1-mac-x64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-x64.dmg)         | ~100 MB | Verified |
+| macOS (Apple Silicon, .pkg)| [Kuiqr-2.4.2.5.1-mac-arm64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-arm64.pkg)     | ~95 MB | ⚠ Unsigned — needs bypass |
+| macOS (Intel, .pkg)        | [Kuiqr-2.4.2.5.1-mac-x64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-x64.pkg)         | ~95 MB | ⚠ Unsigned — needs bypass |
+| Windows (x64) — Setup      | [Kuiqr-2.4.2.5.1-windows-x64-setup.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-windows-x64-setup.exe) | ~70 MB | Verified |
+| Windows (x64) — Portable   | [Kuiqr-2.4.2.5.1-windows-x64-portable.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-windows-x64-portable.exe) | ~70 MB | Verified |
+| Windows (x64) — Zip       | [Kuiqr-2.4.2.5.1-windows-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-windows-x64.zip) | ~70 MB | Verified |
+| Linux (x64, AppImage)      | [Kuiqr-2.4.2.5.1-linux-x86_64.AppImage](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-linux-x86_64.AppImage) | ~90 MB | Verified |
+| Linux (arm64, AppImage)    | [Kuiqr-2.4.2.5.1-linux-arm64.AppImage](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-linux-arm64.AppImage) | ~90 MB | Verified |
+| Linux (x64, .deb)          | [Kuiqr-2.4.2.5.1-linux-amd64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-linux-amd64.deb) | ~90 MB | Verified |
+| Linux (arm64, .deb)        | [Kuiqr-2.4.2.5.1-linux-arm64.deb](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-linux-arm64.deb) | ~90 MB | Verified |
 
 All binaries verified: ZIPs no errors, EXE valid PE32, AppImage runs headless. (The macOS `.zip` is the recommended download — just unzip and open `Kuiqr.app`.)
 
-> **macOS `.pkg` installers are unsigned.** macOS Gatekeeper will block them with *"Kuiqr-2.4.2.3.10-mac-arm64.pkg can't be opened because Apple cannot check it for malicious software."* Use the **`.zip`** or **`.dmg`** instead (right-click → Open on first launch) — or see the "`.pkg` blocked by Gatekeeper" note in Troubleshooting to bypass it.
+> **macOS `.pkg` installers are unsigned.** macOS Gatekeeper will block them with *"Kuiqr-2.4.2.5.1-mac-arm64.pkg can't be opened because Apple cannot check it for malicious software."* Use the **`.zip`** or **`.dmg`** instead (right-click → Open on first launch) — or see the "`.pkg` blocked by Gatekeeper" note in Troubleshooting to bypass it.
 
 ---
 
@@ -164,10 +178,12 @@ All binaries verified: ZIPs no errors, EXE valid PE32, AppImage runs headless. (
 - **Auto-detect shortcut recorder** — Click "Press keys to record" in Settings to set any hotkey combo (Cmd+Shift+A, etc.)
 - **Generate QR codes** — New **Generate** tab: enter text/URL, pick error-correction level, and copy or download the QR image
 - **QR templates** — Generate Wi-Fi, Contact (vCard), Event (calendar), Email, SMS, Phone, and Location QR codes with phone-standard payloads — scanned codes behave exactly like they do on a phone (join network, save contact, add event, open Maps, pre-filled email/SMS)
+- **Location QR with real map search** — Pan/zoom a full slippy map, search places with autocomplete, and download map tiles for offline use
 - **QR styling** — Dot styles (classic square / rounded / dots), custom colors, margin, and a center **logo embed** with automatic scannability self-check
-- **Print-ready export** — PNG size presets, vector **SVG**, and 300-DPI **PDF**
+- **Print-ready export** — PNG size presets, vector **SVG**, and 300-DPI **PDF**. The export panel shows only the format you have selected
+- **Calendar-style date picker** — Event dates use a native calendar popup instead of a row of small dropdowns
 - **Batch generation** — Import a CSV, map columns to template fields, generate + zip hundreds of codes at once
-- **Trackable QR codes** — Wrap any URL in a scan-counting short link: every scan is logged (device, OS, country, per-day) with stats in Settings → Dynamic QR. Local backend, fully private; deployable to any host
+- **Trackable QR codes** — Wrap any URL or plain text in a scan-counting short link: every scan is logged (device, OS, country, per-day) with stats in Settings → Dynamic QR. Local backend, fully private; deployable to any host
 - **Region Watch** — Drag a rectangle on screen; Kuiqr live-decodes that region in the background and reacts when new codes appear (kiosks, payment screens). Pause/resume from the tray
 - **Accent color themes** — Eight accent colors for the whole UI (Settings → Appearance)
 - **Browser-extension priority** — When enabled (Settings; macOS only), the app **releases its global shortcut whenever a browser is the foreground app**, so the browser extension's own `Cmd/Ctrl+Shift+Y` fires instead — no double-trigger and no app window popping up. Outside browsers the app keeps the shortcut and scans as normal. Requires macOS **Automation** permission (System Settings → Privacy & Security → Automation → Kuiqr) so the app can detect the frontmost app.
@@ -190,7 +206,7 @@ All binaries verified: ZIPs no errors, EXE valid PE32, AppImage runs headless. (
 
 ### Chrome / Edge / Brave / Opera
 
-1. Download `kuiqr-extension-2.4.2.3.10.zip` and unzip it
+1. Download `kuiqr-extension-2.4.2.5.1.zip` and unzip it
 2. Open `chrome://extensions` (or `edge://extensions`)
 3. Turn on **Developer mode** (top-right corner)
 4. Click **Load unpacked**
@@ -200,7 +216,7 @@ All binaries verified: ZIPs no errors, EXE valid PE32, AppImage runs headless. (
 
 ### Firefox
 
-1. Download `kuiqr-firefox-2.4.2.3.10.zip` and unzip it
+1. Download `kuiqr-firefox-2.4.2.5.1.zip` and unzip it
 2. Open `about:debugging#/runtime/this-firefox`
 3. Click **Load Temporary Add-on**
 4. Select `manifest.json` inside the unzipped folder
@@ -255,9 +271,21 @@ Full walkthrough of every feature: **[USER_GUIDE.md](./USER_GUIDE.md)**
 
 ## What's New
 
+### v2.4.2.5.1
+- **Trackable QR for text** — Trackable QR codes are no longer limited to URLs. Create a trackable code for any text (e.g. "I am Larry"); when someone scans it with Kuiqr, the text is copied to their clipboard and the scan is recorded in Stats. Non-Kuiqr scanners see a simple page with the text instead of being redirected.
+- **Local backend bundling fixed** — The dynamic backend is now shipped as an app resource, so "Run local backend" works in packaged builds instead of returning "backend-not-found". The app also runs the server directly with Node instead of relying on npm.
+- **Backend data no longer lives inside the app bundle** — the trackable-QR database and API key are stored under the app's userData folder, so they survive read-only installs and don't break code signing. A fresh install no longer inherits a development database.
+- **Backend starts without a system Node** — if `node` isn't installed, Kuiqr falls back to the bundled Electron runtime in Node mode, so "Run local backend" works on machines that have never had Node.
+- **Much smaller installers** — unused GeoIP city databases (146 MB) are excluded from the bundle; country stats still work. macOS installers drop from ~151 MB to ~100 MB.
+
 ### v2.4.2.3.10
+- **Web QR Studio landing page** — New browser-based QR builder at [kuiqr.app](https://kuiqr.app) with 66 types, live preview, styling, PNG/SVG/PDF/JPG export, a real map location picker, and an in-page scanner that decodes the generated QR with contextual actions.
+- **Real map location picker** — The desktop app's Geo/Location template now uses a full Leaflet slippy map with place search, autocomplete, "use my location", and offline tile downloads. No more typing latitude/longitude.
+- **Cleaner Style → Dynamic → Export flow** — A dedicated separator now divides Style & Colors from Dynamic QR, the Dynamic panel only shows its border when expanded, and the Export panel uses a single format dropdown so only one download action is visible.
+- **Calendar-style event dates** — Event QR date fields now use a native calendar popup instead of five small dropdowns.
+- **Wi-Fi scan permissions** — When "Scan nearby" returns nothing on macOS, the app now clearly asks for Location Services access and provides a button to open the right System Settings pane.
 - **Full QR generator** — 8 templates (Text/URL, Wi-Fi, Contact, Event, Email, SMS, Phone, Location) that build phone-standard payloads, live preview, styling (dot style, colors, margin, logo embed with automatic self-check), and print-ready export (PNG presets, vector SVG, 300-DPI PDF).
-- **Trackable QR codes** — Make any URL QR count its scans. A small local tracking service starts automatically with the app; every scan is logged (device type, OS, country, per-day) and the code redirects to your destination. Stats view with auto-refresh lives in Settings → Dynamic QR. Works on your LAN; deployable to any host for worldwide reach.
+- **Trackable QR codes** — Make any URL or plain text QR count its scans. A small local tracking service starts automatically with the app; every scan is logged (device type, OS, country, per-day) and the code redirects to your destination (or shows the text). Stats view with auto-refresh lives in Settings → Dynamic QR. Works on your LAN; deployable to any host for worldwide reach.
 - **Region Watch** — Live-scan a rectangle of your screen. Kuiqr keeps decoding that region in the background (window can be hidden) and reacts the moment a new QR code appears — kiosks, payment screens, cycling displays. Pause/resume from the tray; auto-pauses while you're in Settings.
 - **Phone-like scan actions** — Scanned QR codes now *do* what they would on a phone: Wi-Fi codes offer to join the network, vCards open the Contacts app, events open Calendar ready to add, locations open Maps, email codes open a draft, tel/sms open the dialer/messages. Calendar payloads are now properly wrapped (VCALENDAR) so phone cameras recognize them; expired/dead trackable links show a friendly page instead of a raw 404.
 - **Batch QR generation** — Import a CSV, map columns to template fields, generate hundreds of codes at once, download as a zip. Perfect for inventory tags, badges, classroom sets.
@@ -491,12 +519,12 @@ No build step needed — pure static files. Load directly from the folder.
 
 ```bash
 # Chrome / Edge / Brave zip (straight from the source folder)
-cd extension && zip -r ../kuiqr-extension-2.4.2.3.10.zip . -x "*.DS_Store"
+cd extension && zip -r ../kuiqr-extension-2.4.2.5.1.zip . -x "*.DS_Store"
 
 # Firefox zip — copy source, inject a Gecko ID, then zip
 rm -rf /tmp/ff-build && cp -r extension /tmp/ff-build
 python3 -c "import json; p='/tmp/ff-build/manifest.json'; m=json.load(open(p)); m['browser_specific_settings']={'gecko':{'id':'kuiqr@local'}}; json.dump(m,open(p,'w'),indent=2)"
-cd /tmp/ff-build && zip -r /path/to/kuiqr-firefox-2.4.2.3.10.zip . -x "*.DS_Store"
+cd /tmp/ff-build && zip -r /path/to/kuiqr-firefox-2.4.2.5.1.zip . -x "*.DS_Store"
 ```
 
 ---

@@ -90,6 +90,7 @@ contextBridge.exposeInMainWorld("qrAPI", {
   // exposed to the renderer.
   createDynamicCode: (payload) => ipcRenderer.invoke("dynamic-create", payload),
   getDynamicStats: (payload) => ipcRenderer.invoke("dynamic-stats", payload),
+  lookupDynamicCode: (payload) => ipcRenderer.invoke("dynamic-lookup", payload),
 
   // ── QR export / file I/O (Steps 3 & 4) ──
   // Open the OS save dialog; resolves to the chosen path string or null.
@@ -121,6 +122,25 @@ contextBridge.exposeInMainWorld("qrAPI", {
 
   // ── Wi-Fi scan (nearby SSID picker in the WiFi QR template) ──
   scanWifi: () => ipcRenderer.invoke("scan-wifi"),
+  // macOS: open System Settings → Privacy & Security → Location Services.
+  // Nearby SSIDs stay redacted until Location Services is allowed for the app.
+  openLocationSettings: () => ipcRenderer.invoke("open-location-settings"),
+
+  // ── Map / geocoding (Geo QR template) ──
+  // Place search, proxied through the main process (proper User-Agent, no CORS
+  // surprises, provider fallback). Returns [{ primary, secondary, type, lat, lon }].
+  mapGeocode: (q, bias) => ipcRenderer.invoke("map-geocode", { q, ...(bias || {}) }),
+  // Coarse "where am I" (OS location, then IP fallback) used to rank local results.
+  mapLocate: () => ipcRenderer.invoke("map-locate"),
+  // Offline tile cache accounting: { tiles, bytes }.
+  mapCacheInfo: (force) => ipcRenderer.invoke("map-cache-info", !!force),
+  // Download the whole world at low zoom (z0–z4 by default) for offline use.
+  mapDownloadWorld: (opts) => ipcRenderer.invoke("map-download-world", opts || {}),
+  // Download the currently visible area up to a chosen zoom for offline use.
+  mapDownloadArea: (opts) => ipcRenderer.invoke("map-download-area", opts || {}),
+  mapDownloadCancel: () => ipcRenderer.invoke("map-download-cancel"),
+  mapCacheClear: () => ipcRenderer.invoke("map-cache-clear"),
+  onMapDownloadProgress: (callback) => ipcRenderer.on("map-download-progress", (e, info) => callback(info)),
 
   // ── Rich QR actions (scanned WIFI/vCard/event/geo payloads) ──
   // Join a Wi-Fi network from a WIFI: QR payload ({ ssid, password, security }).

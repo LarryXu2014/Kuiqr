@@ -18,6 +18,7 @@ function openDb() {
     CREATE TABLE IF NOT EXISTS codes (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       code       TEXT UNIQUE NOT NULL,
+      type       TEXT NOT NULL DEFAULT 'url',
       destination TEXT NOT NULL,
       note       TEXT,
       active     INTEGER NOT NULL DEFAULT 1,
@@ -45,6 +46,12 @@ function openDb() {
 }
 
 const database = openDb();
+// Migration: older databases were created without the `type` column.
+try {
+  database.exec(`ALTER TABLE codes ADD COLUMN type TEXT NOT NULL DEFAULT 'url'`);
+} catch (e) {
+  if (!/duplicate column/i.test(String(e.message || ""))) throw e;
+}
 
 const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -60,15 +67,16 @@ function getCodeByCode(code) {
   return database.prepare("SELECT * FROM codes WHERE code = ?").get(code) || null;
 }
 
-function createCode(destination, note, expiresAt) {
+function createCode(destination, type, note, expiresAt) {
+  const safeType = type === "text" ? "text" : "url";
   for (let attempt = 0; attempt < 12; attempt++) {
     const code = randomCode(config.CODE_LENGTH);
     try {
       database
         .prepare(
-          "INSERT INTO codes (code, destination, note, active, created_at, expires_at) VALUES (?, ?, ?, 1, ?, ?)"
+          "INSERT INTO codes (code, type, destination, note, active, created_at, expires_at) VALUES (?, ?, ?, ?, 1, ?, ?)"
         )
-        .run(code, destination, note || null, Date.now(), expiresAt || null);
+        .run(code, safeType, destination, note || null, Date.now(), expiresAt || null);
       return getCodeByCode(code);
     } catch (e) {
       if (String(e.message || "").includes("UNIQUE")) continue;
@@ -141,6 +149,7 @@ function getStats(code) {
     .map((d) => ({ device: formatDeviceLabel(d.device, d.os), total: d.total }));
   return {
     code,
+    type: row.type || "url",
     shortUrl: `${config.BASE_URL}/${code}`,
     destination: row.destination,
     createdAt: row.created_at,
@@ -154,7 +163,7 @@ function getStats(code) {
 
 function listCodes() {
   return database
-    .prepare("SELECT code, destination, note, active, created_at, expires_at FROM codes ORDER BY created_at DESC LIMIT 100")
+    .prepare("SELECT code, type, destination, note, active, created_at, expires_at FROM codes ORDER BY created_at DESC LIMIT 100")
     .all();
 }
 

@@ -375,15 +375,10 @@
         html += `<div class="tpl-field tpl-check"><label class="tpl-check-label">` +
           `<input type="checkbox" id="tpl-${tpl}-${f.id}" ${val ? "checked" : ""}/> ${escapeHtml(t(f.key))}</label></div>`;
       } else if (f.type === "datetime") {
-        // Event dates use a custom scrollable picker (year/month/day/hour/minute
-        // selects + Today/Tomorrow quick buttons) instead of the native spinner.
-        if (tpl === "event") {
-          html += `<div class="tpl-field"><div class="tpl-label">${escapeHtml(t(f.key))}</div>` +
-            `<div class="dt-placeholder" id="tpl-${tpl}-${f.id}" data-dtfield="${f.id}"></div></div>`;
-        } else {
-          html += `<div class="tpl-field"><div class="tpl-label">${escapeHtml(t(f.key))}</div>` +
-            `<input type="datetime-local" id="tpl-${tpl}-${f.id}" class="tpl-input" value="${escapeHtml(val)}" placeholder="${f.ph ? escapeHtml(t(f.ph)) : ""}"/></div>`;
-        }
+        // Event dates use the native calendar + time picker so the user gets a
+        // real date popup instead of a row of small dropdowns.
+        html += `<div class="tpl-field"><div class="tpl-label">${escapeHtml(t(f.key))}</div>` +
+          `<input type="datetime-local" id="tpl-${tpl}-${f.id}" class="tpl-input dt-native" value="${escapeHtml(val)}" placeholder="${f.ph ? escapeHtml(t(f.ph)) : ""}"/></div>`;
       } else {
         html += `<div class="tpl-field"><div class="tpl-label">${escapeHtml(t(f.key))}</div>` +
           `<input type="text" id="tpl-${tpl}-${f.id}" class="tpl-input" value="${escapeHtml(val)}" placeholder="${f.ph ? escapeHtml(t(f.ph)) : ""}"/></div>`;
@@ -401,15 +396,6 @@
         if (f.id === "encryption") renderTemplateForm();
         render();
       });
-    }
-    // Event: replace the datetime placeholders with the scrollable date/time picker.
-    if (tpl === "event") {
-      for (const f of def.fields) {
-        if (f.type !== "datetime") continue;
-        const ph = $("tpl-event-" + f.id);
-        if (!ph) continue;
-        ph.appendChild(buildDateTimePicker("event", f.id, vals[f.id] != null ? vals[f.id] : ""));
-      }
     }
     // Wi-Fi: nearby-network picker so users can pick the SSID instead of typing it.
     if (tpl === "wifi") wireWifiScan(host);
@@ -487,169 +473,540 @@
     return wrap;
   }
 
-  // ── Interactive world-map geolocation picker ─────────────────────────────────
-  // Equirectangular projection (1px = 1°): x = lon+180, y = 90−lat, in a 360×180
-  // viewBox. Clicking/dragging the map sets lat/lon; a search box (OpenStreetMap
-  // Nominatim, graceful fallback) and quick-pick city chips make exact placement
-  // easy. Replaces the raw latitude/longitude text fields.
-  const GEO_W = 360, GEO_H = 180;
-  const CONTINENTS = [
-    [[-168,65],[-160,70],[-140,70],[-120,73],[-95,72],[-80,68],[-60,60],[-55,52],[-65,45],[-70,42],[-75,35],[-80,30],[-82,25],[-90,30],[-97,26],[-105,22],[-110,30],[-120,35],[-125,42],[-130,55],[-140,60],[-168,65]],
-    [[-80,8],[-75,5],[-60,5],[-50,0],[-40,-5],[-35,-10],[-40,-22],[-50,-30],[-58,-38],[-65,-45],[-72,-52],[-75,-50],[-72,-40],[-70,-30],[-72,-20],[-78,-10],[-80,0],[-80,8]],
-    [[-10,36],[-10,44],[-5,48],[0,51],[2,58],[10,58],[20,55],[28,52],[30,45],[28,40],[20,38],[12,38],[0,36],[-10,36]],
-    [[-17,20],[-10,30],[0,36],[10,37],[20,33],[32,31],[35,24],[43,12],[51,12],[42,0],[40,-10],[35,-22],[25,-34],[18,-34],[12,-18],[8,4],[-5,5],[-15,12],[-17,20]],
-    [[30,45],[40,48],[50,55],[60,62],[80,72],[100,75],[140,72],[160,68],[180,65],[170,60],[150,52],[140,45],[130,35],[122,30],[120,22],[110,20],[105,10],[100,5],[95,15],[90,22],[80,8],[75,8],[70,20],[60,25],[55,38],[45,40],[35,42],[30,45]],
-    [[113,-22],[122,-18],[132,-12],[142,-12],[150,-20],[153,-28],[147,-38],[138,-35],[130,-32],[118,-35],[113,-28],[113,-22]],
-  ];
-  const GEO_CITIES = [
-    { n: "San Francisco", lat: 37.7749, lon: -122.4194 },
-    { n: "New York", lat: 40.7128, lon: -74.0060 },
-    { n: "London", lat: 51.5074, lon: -0.1278 },
-    { n: "Paris", lat: 48.8566, lon: 2.3522 },
-    { n: "Tokyo", lat: 35.6762, lon: 139.6503 },
-    { n: "Beijing", lat: 39.9042, lon: 116.4074 },
-    { n: "Sydney", lat: -33.8688, lon: 151.2093 },
-    { n: "São Paulo", lat: -23.5505, lon: -46.6333 },
-  ];
+  // ── Interactive map geolocation picker ─────────────────────────────────────
+  // A real slippy map (Leaflet, MIT) replaces the old static world SVG, so the
+  // location picker behaves like Google/Baidu Maps:
+  //   • zoom from whole continents down to a single landmark (z2 → z19)
+  //   • live autocomplete as you type, results ranked around where you are
+  //   • click or drag the pin to fine-tune, or paste raw "lat, lng"
+  //   • download tiles for offline use
+  //
+  // Tiles are loaded through the app's own `kuiqr-map://` scheme (see main.js),
+  // which caches every tile under userData/map-tiles and serves a transparent
+  // pixel when offline. Layered underneath is a bundled Natural Earth vector
+  // world (public domain), so the map is never blank — network or not.
+  const GEO_MIN_ZOOM = 2;
+  const GEO_MAX_ZOOM = 19;
+  const GEO_TILE_URL = "kuiqr-map://tile.openstreetmap.org/{z}/{x}/{y}.png";
+  const GEO_ATTRIBUTION =
+    '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+  const GEO_HOME = { lat: 30, lon: 10, zoom: 2 };   // whole-world view
+  const GEO_AREA_CAP = 4000;                        // max tiles for "download this area"
+  const GEO_COORD_RE = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*[,，]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
+
+  // One live Leaflet map at a time. Switching templates rebuilds the form, so
+  // the previous instance has to be torn down or its listeners leak.
+  let geoMapInstance = null;
+  let geoResizeObserver = null;
+  let geoDownloadSink = null;    // progress row of the currently mounted picker
+  let geoDownloadHooked = false; // the IPC progress listener is registered once
+
+  function geoLang() {
+    try { return (window.getLang && window.getLang()) || "en"; } catch { return "en"; }
+  }
+  function geoNum(n) {
+    try { return Number(n).toLocaleString(); } catch { return String(n); }
+  }
+  function geoBytes(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+    if (n < 1024 * 1024 * 1024) return `${(n / 1048576).toFixed(1)} MB`;
+    return `${(n / 1073741824).toFixed(2)} GB`;
+  }
+  function lonToTileX(lon, z) { return Math.floor(((lon + 180) / 360) * 2 ** z); }
+  function latToTileY(lat, z) {
+    const rad = (lat * Math.PI) / 180;
+    return Math.floor(((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * 2 ** z);
+  }
+  function geoCountTiles(bounds, minZ, maxZ) {
+    let total = 0;
+    for (let z = minZ; z <= maxZ; z++) {
+      let x0 = lonToTileX(bounds.west, z), x1 = lonToTileX(bounds.east, z);
+      let y0 = latToTileY(bounds.north, z), y1 = latToTileY(bounds.south, z);
+      if (x1 < x0) { const t = x0; x0 = x1; x1 = t; }
+      if (y1 < y0) { const t = y0; y0 = y1; y1 = t; }
+      const n = 2 ** z;
+      total += (Math.min(n - 1, x1) - Math.max(0, x0) + 1) * (Math.min(n - 1, y1) - Math.max(0, y0) + 1);
+    }
+    return total;
+  }
+  // Pick the deepest zoom that still fits the tile cap, so "download this area"
+  // can never accidentally queue a million tiles.
+  function geoPlanArea(bounds, minZ, maxZ) {
+    for (let z = maxZ; z >= minZ; z--) {
+      const total = geoCountTiles(bounds, minZ, z);
+      if (total <= GEO_AREA_CAP) return { minZ, maxZ: z, total };
+    }
+    return { minZ, maxZ: minZ, total: geoCountTiles(bounds, minZ, minZ) };
+  }
+
   function buildGeoPicker(tpl) {
     const vals = state.values[tpl] || (state.values[tpl] = {});
     const wrap = document.createElement("div");
     wrap.className = "geo-picker";
-    const toXY = (lat, lon) => ({ x: lon + 180, y: 90 - lat });
 
-    // Map container
-    const mapBox = document.createElement("div");
-    mapBox.className = "geo-map";
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    svg.setAttribute("viewBox", `0 0 ${GEO_W} ${GEO_H}`);
-    svg.setAttribute("class", "geo-svg");
-    svg.setAttribute("preserveAspectRatio", "none");
-    // ocean
-    const ocean = document.createElementNS(svgNS, "rect");
-    ocean.setAttribute("width", GEO_W); ocean.setAttribute("height", GEO_H);
-    ocean.setAttribute("fill", "#dbeafe");
-    svg.appendChild(ocean);
-    // graticule
-    for (let lon = -180; lon <= 180; lon += 30) {
-      const l = document.createElementNS(svgNS, "line");
-      l.setAttribute("x1", lon + 180); l.setAttribute("x2", lon + 180);
-      l.setAttribute("y1", 0); l.setAttribute("y2", GEO_H);
-      l.setAttribute("stroke", "#cdd9ec"); l.setAttribute("stroke-width", "0.4");
-      svg.appendChild(l);
-    }
-    for (let lat = -60; lat <= 60; lat += 30) {
-      const l = document.createElementNS(svgNS, "line");
-      l.setAttribute("x1", 0); l.setAttribute("x2", GEO_W);
-      l.setAttribute("y1", 90 - lat); l.setAttribute("y2", 90 - lat);
-      l.setAttribute("stroke", "#cdd9ec"); l.setAttribute("stroke-width", "0.4");
-      svg.appendChild(l);
-    }
-    // continents
-    for (const c of CONTINENTS) {
-      let d = "";
-      for (let i = 0; i < c.length; i++) {
-        const p = toXY(c[i][0], c[i][1]);
-        d += (i === 0 ? "M" : "L") + p.x.toFixed(1) + " " + p.y.toFixed(1) + " ";
-      }
-      d += "Z";
-      const path = document.createElementNS(svgNS, "path");
-      path.setAttribute("d", d);
-      path.setAttribute("fill", "#a7c4a0");
-      path.setAttribute("stroke", "#7fa874");
-      path.setAttribute("stroke-width", "0.5");
-      svg.appendChild(path);
-    }
-    // marker
-    const marker = document.createElementNS(svgNS, "g");
-    marker.setAttribute("class", "geo-marker");
-    const mdot = document.createElementNS(svgNS, "circle");
-    mdot.setAttribute("r", "3.2"); mdot.setAttribute("fill", "#e11d48"); mdot.setAttribute("stroke", "#fff"); mdot.setAttribute("stroke-width", "1");
-    marker.appendChild(mdot);
-    svg.appendChild(marker);
-    mapBox.appendChild(svg);
-    const hint = document.createElement("div");
-    hint.className = "geo-hint"; hint.textContent = t("tpl.geo.map");
-    mapBox.appendChild(hint);
-    wrap.appendChild(mapBox);
+    // ── Search row: autocomplete input + "use my location" ──
+    const searchWrap = document.createElement("div");
+    searchWrap.className = "geo-search";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "tpl-input geo-search-input";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.placeholder = t("tpl.geo.searchPh");
+    const locateBtn = document.createElement("button");
+    locateBtn.type = "button";
+    locateBtn.className = "geo-locate";
+    locateBtn.title = t("tpl.geo.myLocation");
+    locateBtn.setAttribute("aria-label", t("tpl.geo.myLocation"));
+    locateBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>' +
+      '<path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>';
+    const suggest = document.createElement("div");
+    suggest.className = "geo-suggest hidden";
+    searchWrap.appendChild(input);
+    searchWrap.appendChild(locateBtn);
+    searchWrap.appendChild(suggest);
+    wrap.appendChild(searchWrap);
 
-    // readout + manual
+    // ── Map ──
+    const mapEl = document.createElement("div");
+    mapEl.className = "geo-map";
+    wrap.appendChild(mapEl);
+
+    // ── Readout ──
     const readout = document.createElement("div");
     readout.className = "geo-readout";
-    readout.innerHTML = `<span class="geo-readout-lbl">${t("tpl.geo.current")}:</span> <span id="geo-coords">—</span>`;
+    const lbl = document.createElement("span");
+    lbl.className = "geo-readout-lbl";
+    lbl.textContent = `${t("tpl.geo.current")}:`;
+    const coordsEl = document.createElement("span");
+    coordsEl.className = "geo-coords";
+    coordsEl.textContent = "—";
+    const placeEl = document.createElement("span");
+    placeEl.className = "geo-place";
+    readout.appendChild(lbl);
+    readout.appendChild(coordsEl);
+    readout.appendChild(placeEl);
     wrap.appendChild(readout);
 
-    const setCoord = (lat, lon, fromMap) => {
+    // ── Offline / cache row ──
+    const offline = document.createElement("div");
+    offline.className = "geo-offline";
+    const cacheEl = document.createElement("span");
+    cacheEl.className = "geo-cache";
+    const dlWorld = document.createElement("button");
+    dlWorld.type = "button";
+    dlWorld.className = "btn-text geo-btn";
+    dlWorld.textContent = t("tpl.geo.downloadWorld");
+    const dlArea = document.createElement("button");
+    dlArea.type = "button";
+    dlArea.className = "btn-text geo-btn";
+    dlArea.textContent = t("tpl.geo.downloadArea");
+    const dlClear = document.createElement("button");
+    dlClear.type = "button";
+    dlClear.className = "btn-text geo-btn";
+    dlClear.textContent = t("tpl.geo.clearCache");
+    offline.appendChild(cacheEl);
+    offline.appendChild(dlWorld);
+    offline.appendChild(dlArea);
+    offline.appendChild(dlClear);
+    wrap.appendChild(offline);
+
+    // Progress row (hidden until a download runs)
+    const progress = document.createElement("div");
+    progress.className = "geo-progress hidden";
+    const bar = document.createElement("div");
+    bar.className = "geo-progress-bar";
+    const barFill = document.createElement("div");
+    barFill.className = "geo-progress-fill";
+    bar.appendChild(barFill);
+    const progressText = document.createElement("span");
+    progressText.className = "geo-progress-text";
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btn-text geo-btn";
+    cancelBtn.textContent = t("tpl.geo.cancel");
+    progress.appendChild(bar);
+    progress.appendChild(progressText);
+    progress.appendChild(cancelBtn);
+    wrap.appendChild(progress);
+
+    const status = document.createElement("div");
+    status.className = "geo-status hidden";
+    wrap.appendChild(status);
+
+    function setStatus(msg, isError) {
+      if (!msg) { status.classList.add("hidden"); status.textContent = ""; return; }
+      status.textContent = msg;
+      status.classList.remove("hidden");
+      status.classList.toggle("is-error", !!isError);
+    }
+
+    // ── Leaflet bootstrap ──
+    if (geoMapInstance) {
+      try { geoMapInstance.remove(); } catch { /* ignore */ }
+      geoMapInstance = null;
+    }
+    if (geoResizeObserver) {
+      try { geoResizeObserver.disconnect(); } catch { /* ignore */ }
+      geoResizeObserver = null;
+    }
+
+    let initLat = parseFloat(vals.lat), initLon = parseFloat(vals.lng);
+    const haveCoord = isFinite(initLat) && isFinite(initLon);
+    const map = L.map(mapEl, {
+      center: haveCoord ? [initLat, initLon] : [GEO_HOME.lat, GEO_HOME.lon],
+      zoom: haveCoord ? 12 : GEO_HOME.zoom,
+      minZoom: GEO_MIN_ZOOM,
+      maxZoom: GEO_MAX_ZOOM,
+      zoomControl: true,
+      attributionControl: true,
+      worldCopyJump: true,
+      zoomSnap: 0.5,
+      zoomDelta: 0.5,
+      wheelPxPerZoomLevel: 110,
+      preferCanvas: true,
+    });
+    geoMapInstance = map;
+
+    // The vector basemap sits *below* the tile pane so real map tiles cover it
+    // whenever they are available, and it shows through whenever they are not.
+    map.createPane("kuiqr-world");
+    const worldPane = map.getPane("kuiqr-world");
+    if (worldPane) {
+      worldPane.style.zIndex = "150";
+      worldPane.style.pointerEvents = "none";
+    }
+    // A dedicated canvas renderer forces all country paths onto the canvas in
+    // our custom pane. Without this Leaflet's default SVG renderer would attach
+    // to the overlay pane (above the tiles), and a canvas is much faster for the
+    // 110 m / 50 m world datasets.
+    const worldRenderer = L.canvas({ pane: "kuiqr-world", padding: 0.05 });
+    const WORLD_STYLE = {
+      color: "#5e7d9a", weight: 0.8, fillColor: "#f4efe6", fillOpacity: 1,
+      renderer: worldRenderer,
+    };
+    let vecCoarse = null, vecFine = null, vecFineLoading = false;
+
+    function ensureCoarse() {
+      if (vecCoarse || !window.KUIQR_WORLD_110m) return;
+      vecCoarse = L.geoJSON(window.KUIQR_WORLD_110m, {
+        pane: "kuiqr-world", style: WORLD_STYLE, interactive: false,
+      });
+    }
+    // The detailed 50m outlines are 1.6 MB, so they are only fetched and parsed
+    // the first time the user actually zooms past country level.
+    function ensureFine() {
+      if (vecFine || vecFineLoading || !window.L) return;
+      if (window.KUIQR_WORLD_50m) {
+        vecFine = L.geoJSON(window.KUIQR_WORLD_50m, { pane: "kuiqr-world", style: WORLD_STYLE, interactive: false });
+        syncVector();
+        return;
+      }
+      vecFineLoading = true;
+      const s = document.createElement("script");
+      s.src = "vendor/world-50m.js";
+      s.onload = () => {
+        vecFineLoading = false;
+        if (window.KUIQR_WORLD_50m && map && map._container) {
+          vecFine = L.geoJSON(window.KUIQR_WORLD_50m, { pane: "kuiqr-world", style: WORLD_STYLE, interactive: false });
+          syncVector();
+        }
+      };
+      s.onerror = () => { vecFineLoading = false; };
+      document.head.appendChild(s);
+    }
+    function syncVector() {
+      if (!map || !map._container) return;
+      const z = map.getZoom();
+      if (z >= 5) {
+        ensureFine();
+        if (vecFine && !map.hasLayer(vecFine)) map.addLayer(vecFine);
+        if (vecCoarse && map.hasLayer(vecCoarse)) map.removeLayer(vecCoarse);
+      } else {
+        ensureCoarse();
+        if (vecCoarse && !map.hasLayer(vecCoarse)) map.addLayer(vecCoarse);
+        if (vecFine && map.hasLayer(vecFine)) map.removeLayer(vecFine);
+      }
+    }
+    syncVector();
+    map.on("zoomend", syncVector);
+
+    L.tileLayer(GEO_TILE_URL, {
+      minZoom: GEO_MIN_ZOOM,
+      maxZoom: GEO_MAX_ZOOM,
+      maxNativeZoom: 19,
+      attribution: GEO_ATTRIBUTION,
+      keepBuffer: 4,
+      updateWhenZooming: false,
+    }).addTo(map);
+
+    const pinIcon = L.divIcon({
+      className: "geo-pin",
+      html: '<span class="geo-pin-dot"></span>',
+      iconSize: [22, 22],
+      iconAnchor: [11, 11],
+    });
+    const marker = L.marker(haveCoord ? [initLat, initLon] : [GEO_HOME.lat, GEO_HOME.lon], {
+      icon: pinIcon, draggable: true, keyboard: false, autoPan: true,
+    }).addTo(map);
+
+    function setCoord(lat, lon, opts) {
+      opts = opts || {};
       lat = Math.max(-85, Math.min(85, lat));
       lon = Math.max(-180, Math.min(180, lon));
-      vals.lat = String(lat); vals.lng = String(lon);
-      const p = toXY(lat, lon);
-      marker.setAttribute("transform", `translate(${p.x.toFixed(2)},${p.y.toFixed(2)})`);
-      const c = $("geo-coords");
-      if (c) c.textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-      if (!fromMap) render();
-    };
-    // initial marker
-    const initLat = parseFloat(vals.lat), initLon = parseFloat(vals.lng);
-    if (!isNaN(initLat) && !isNaN(initLon)) setCoord(initLat, initLon, true);
-
-    // click / drag
-    const pick = (e) => {
-      const r = svg.getBoundingClientRect();
-      const cx = (e.touches ? e.touches[0].clientX : e.clientX);
-      const cy = (e.touches ? e.touches[0].clientY : e.clientY);
-      const x = (cx - r.left) / r.width * GEO_W;
-      const y = (cy - r.top) / r.height * GEO_H;
-      setCoord(90 - y, x - 180, false);
-    };
-    let dragging = false;
-    svg.addEventListener("mousedown", (e) => { dragging = true; pick(e); });
-    window.addEventListener("mouseup", () => { dragging = false; });
-    window.addEventListener("mousemove", (e) => { if (dragging) pick(e); });
-    svg.addEventListener("touchstart", (e) => { pick(e); e.preventDefault(); }, { passive: false });
-    svg.addEventListener("touchmove", (e) => { pick(e); e.preventDefault(); }, { passive: false });
-
-    // search
-    const searchRow = document.createElement("div");
-    searchRow.className = "geo-search";
-    const searchInput = document.createElement("input");
-    searchInput.type = "text"; searchInput.className = "tpl-input";
-    searchInput.placeholder = t("tpl.geo.searchPh");
-    const searchBtn = document.createElement("button");
-    searchBtn.type = "button"; searchBtn.className = "btn-text"; searchBtn.textContent = t("tpl.geo.search");
-    const searchStatus = document.createElement("div");
-    searchStatus.className = "geo-search-status hidden";
-    searchRow.appendChild(searchInput); searchRow.appendChild(searchBtn);
-    wrap.appendChild(searchRow); wrap.appendChild(searchStatus);
-    searchBtn.addEventListener("click", async () => {
-      const q = searchInput.value.trim();
-      if (!q) return;
-      searchStatus.textContent = t("tpl.geo.searching");
-      searchStatus.className = "geo-search-status";
-      try {
-        const res = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(q), { headers: { "Accept": "application/json" } });
-        const j = await res.json();
-        if (j && j.length) { setCoord(parseFloat(j[0].lat), parseFloat(j[0].lon), false); searchStatus.className = "geo-search-status hidden"; }
-        else { searchStatus.textContent = t("tpl.geo.notFound"); }
-      } catch { searchStatus.textContent = t("tpl.geo.notFound"); }
-    });
-    searchInput.addEventListener("keydown", (e) => { if (e.key === "Enter") searchBtn.click(); });
-
-    // quick picks
-    const quickWrap = document.createElement("div");
-    quickWrap.className = "geo-quick";
-    const qlbl = document.createElement("span"); qlbl.className = "geo-quick-lbl"; qlbl.textContent = t("tpl.geo.quick") + ":";
-    quickWrap.appendChild(qlbl);
-    for (const c of GEO_CITIES) {
-      const b = document.createElement("button");
-      b.type = "button"; b.className = "geo-chip"; b.textContent = c.n;
-      b.addEventListener("click", () => setCoord(c.lat, c.lon, false));
-      quickWrap.appendChild(b);
+      vals.lat = String(Number(lat.toFixed(6)));
+      vals.lng = String(Number(lon.toFixed(6)));
+      coordsEl.textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+      if (!opts.fromMap) marker.setLatLng([lat, lon]);
+      if (!opts.silent) render();
     }
-    wrap.appendChild(quickWrap);
+    if (haveCoord) setCoord(initLat, initLon, { fromMap: true, silent: true });
+
+    map.on("click", (e) => { setCoord(e.latlng.lat, e.latlng.lng, { fromMap: true }); });
+    marker.on("dragend", () => { const p = marker.getLatLng(); setCoord(p.lat, p.lng, { fromMap: true }); });
+
+    // ── Location bias: "Shanghai High" should find the Shanghai school ──
+    let bias = null;
+    const haveCoordRef = { have: haveCoord };
+    function applyBiasLabel() {
+      input.placeholder = bias && bias.label
+        ? t("tpl.geo.searchPhNear", { place: bias.label })
+        : t("tpl.geo.searchPh");
+    }
+    async function detectLocation(center) {
+      if (!window.qrAPI || !window.qrAPI.mapLocate) return null;
+      locateBtn.classList.add("is-busy");
+      try {
+        const r = await window.qrAPI.mapLocate();
+        if (r && r.ok && isFinite(r.lat) && isFinite(r.lon)) {
+          bias = r;
+          applyBiasLabel();
+          if (center) {
+            map.setView([r.lat, r.lon], Math.max(map.getZoom(), 11));
+            haveCoordRef.have = true;
+            setCoord(r.lat, r.lon, {});
+          }
+          return r;
+        }
+        setStatus(t("tpl.geo.locateFail"), true);
+      } catch {
+        setStatus(t("tpl.geo.locateFail"), true);
+      } finally {
+        locateBtn.classList.remove("is-busy");
+      }
+      return null;
+    }
+    locateBtn.addEventListener("click", () => { detectLocation(true); });
+    // Kick off detection immediately so results are local from the first
+    // keystroke. Do not steal the view if the user already picked a spot.
+    setTimeout(() => { detectLocation(!haveCoordRef.have); }, 60);
+
+    // ── Autocomplete ──
+    let timer = null, token = 0, results = [], activeIdx = -1;
+
+    function hideSuggest() {
+      suggest.classList.add("hidden");
+      suggest.innerHTML = "";
+      results = [];
+      activeIdx = -1;
+    }
+    function renderSuggest() {
+      suggest.innerHTML = "";
+      if (!results.length) return;
+      results.forEach((r, i) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "geo-suggest-item" + (i === activeIdx ? " is-active" : "");
+        const p = document.createElement("span");
+        p.className = "geo-suggest-primary";
+        p.textContent = r.primary;
+        const s2 = document.createElement("span");
+        s2.className = "geo-suggest-secondary";
+        s2.textContent = r.secondary;
+        row.appendChild(p);
+        if (s2.textContent && s2.textContent !== r.primary) row.appendChild(s2);
+        row.addEventListener("mousedown", (e) => e.preventDefault()); // keep focus
+        row.addEventListener("click", () => choose(i));
+        suggest.appendChild(row);
+      });
+      suggest.classList.remove("hidden");
+    }
+    function choose(i) {
+      const r = results[i];
+      if (!r) return;
+      input.value = r.primary;
+      placeEl.textContent = r.secondary || r.primary;
+      marker.setLatLng([r.lat, r.lon]);
+      setCoord(r.lat, r.lon, { fromMap: true });
+      map.flyTo([r.lat, r.lon], Math.max(Math.round(map.getZoom()), r.type === "country" || r.type === "state" ? 8 : 16), { duration: 0.7 });
+      hideSuggest();
+      setStatus("");
+    }
+    function moveActive(delta) {
+      if (!results.length) return;
+      activeIdx = (activeIdx + delta + results.length) % results.length;
+      renderSuggest();
+      const el = suggest.children[activeIdx];
+      if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest" });
+    }
+
+    async function runSearch(q) {
+      if (!window.qrAPI || !window.qrAPI.mapGeocode) return;
+      const my = ++token;
+      setStatus(t("tpl.geo.searching"));
+      try {
+        const list = await window.qrAPI.mapGeocode(q, {
+          lat: bias ? bias.lat : null,
+          lon: bias ? bias.lon : null,
+          lang: geoLang(),
+        });
+        if (my !== token) return; // a newer keystroke already won
+        results = Array.isArray(list) ? list : [];
+        activeIdx = results.length ? 0 : -1;
+        if (!results.length) { hideSuggest(); setStatus(t("tpl.geo.notFound")); return; }
+        setStatus("");
+        renderSuggest();
+      } catch {
+        if (my === token) { hideSuggest(); setStatus(t("tpl.geo.notFound")); }
+      }
+    }
+
+    input.addEventListener("input", () => {
+      const q = input.value.trim();
+      clearTimeout(timer);
+      if (q.length < 2) { hideSuggest(); setStatus(""); return; }
+      timer = setTimeout(() => runSearch(q), 260);
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") { e.preventDefault(); moveActive(1); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); moveActive(-1); }
+      else if (e.key === "Enter") {
+        // Accept raw coordinates ("31.23, 121.47") as well as place names.
+        const m = input.value.match(GEO_COORD_RE);
+        if (m) {
+          e.preventDefault();
+          hideSuggest();
+          const la = parseFloat(m[1]), lo = parseFloat(m[2]);
+          if (isFinite(la) && isFinite(lo) && Math.abs(la) <= 85 && Math.abs(lo) <= 180) {
+            placeEl.textContent = "";
+            marker.setLatLng([la, lo]);
+            setCoord(la, lo, {});
+            map.flyTo([la, lo], Math.max(Math.round(map.getZoom()), 15), { duration: 0.7 });
+            setStatus("");
+          } else {
+            setStatus(t("tpl.geo.notFound"), true);
+          }
+          return;
+        }
+        if (results.length && activeIdx >= 0) { e.preventDefault(); choose(activeIdx); }
+        else if (input.value.trim().length >= 2) { e.preventDefault(); runSearch(input.value.trim()); }
+      } else if (e.key === "Escape") {
+        hideSuggest();
+        setStatus("");
+      }
+    });
+    input.addEventListener("blur", () => { setTimeout(hideSuggest, 120); });
+
+    // ── Offline maps ──
+    function refreshCache() {
+      if (!window.qrAPI || !window.qrAPI.mapCacheInfo) return;
+      window.qrAPI.mapCacheInfo(true).then((info) => {
+        const tiles = (info && info.tiles) || 0;
+        cacheEl.textContent = tiles
+          ? t("tpl.geo.cacheSize", { tiles: geoNum(tiles), size: geoBytes(info.bytes) })
+          : t("tpl.geo.cacheEmpty");
+        dlClear.disabled = !tiles;
+      }).catch(() => {});
+    }
+
+    function renderProgress(info) {
+      const total = Math.max(1, info.total || 1);
+      const pct = Math.min(100, Math.round(((info.done || 0) / total) * 100));
+      barFill.style.width = `${pct}%`;
+      if (info.finished) {
+        progress.classList.add("hidden");
+        dlWorld.disabled = false;
+        dlArea.disabled = false;
+        setStatus(
+          info.cancelled ? t("tpl.geo.downloadCancelled") : t("tpl.geo.downloadDone", { n: geoNum(info.done || 0) }),
+          !!info.failed && !info.cancelled
+        );
+        refreshCache();
+        return;
+      }
+      progress.classList.remove("hidden");
+      progressText.textContent = t("tpl.geo.downloading", { done: geoNum(info.done || 0), total: geoNum(total) });
+    }
+
+    if (!geoDownloadHooked && window.qrAPI && window.qrAPI.onMapDownloadProgress) {
+      geoDownloadHooked = true;
+      window.qrAPI.onMapDownloadProgress((info) => { renderProgress(info); });
+    }
+    geoDownloadSink = progress;
+
+    function startDownload(promise) {
+      clearTimeout(timer);
+      hideSuggest();
+      setStatus("");
+      dlWorld.disabled = true;
+      dlArea.disabled = true;
+      progress.classList.remove("hidden");
+      barFill.style.width = "0%";
+      progressText.textContent = t("tpl.geo.downloading", { done: "0", total: "…" });
+      Promise.resolve(promise).catch(() => {
+        progress.classList.add("hidden");
+        dlWorld.disabled = false;
+        dlArea.disabled = false;
+        setStatus(t("tpl.geo.locateFail"), true);
+      });
+    }
+
+    dlWorld.addEventListener("click", () => {
+      // z0–z4 is the whole planet at country/region detail: ~1,365 tiles.
+      startDownload(window.qrAPI.mapDownloadWorld({ minZ: 0, maxZ: 4 }));
+    });
+    dlArea.addEventListener("click", () => {
+      const b = map.getBounds();
+      const bounds = { north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() };
+      const z = Math.max(GEO_MIN_ZOOM, Math.round(map.getZoom()));
+      const plan = geoPlanArea(bounds, z, Math.min(GEO_MAX_ZOOM, z + 5));
+      if (plan.total > GEO_AREA_CAP) {
+        setStatus(t("tpl.geo.areaTooBig", { n: geoNum(plan.total) }), true);
+        return;
+      }
+      startDownload(window.qrAPI.mapDownloadArea({ bounds, minZ: plan.minZ, maxZ: plan.maxZ }));
+    });
+    cancelBtn.addEventListener("click", () => {
+      if (window.qrAPI && window.qrAPI.mapDownloadCancel) window.qrAPI.mapDownloadCancel();
+    });
+    dlClear.addEventListener("click", () => {
+      if (!window.qrAPI || !window.qrAPI.mapCacheClear) return;
+      window.qrAPI.mapCacheClear().then(() => {
+        refreshCache();
+        setStatus(t("tpl.geo.cacheCleared"));
+      }).catch(() => {});
+    });
+
+    refreshCache();
+    applyBiasLabel();
+
+    // The picker is built before it is attached, so Leaflet measures a 0×0 box.
+    // Re-measure on the next frame, once more after layout settles, and on every
+    // container resize (the generator panel can be collapsed/expanded).
+    requestAnimationFrame(() => { try { map.invalidateSize(); } catch { /* ignore */ } });
+    setTimeout(() => { try { map.invalidateSize(); } catch { /* ignore */ } }, 150);
+    if (window.ResizeObserver) {
+      geoResizeObserver = new ResizeObserver(() => {
+        try { map.invalidateSize(); } catch { /* ignore */ }
+      });
+      geoResizeObserver.observe(mapEl);
+    }
     return wrap;
   }
-
   // ── Wi-Fi nearby SSID picker ─────────────────────────────────────────────
   function wireWifiScan(host) {
     const input = $("tpl-wifi-ssid");
@@ -692,6 +1049,31 @@
       list.appendChild(row);
     };
 
+    // macOS redacts every nearby SSID until the app is allowed under
+    // Privacy & Security → Location Services. That is a permission problem, not a
+    // failed scan, so explain it and offer a button straight to that pane.
+    const appendLocationRow = (msgKey) => {
+      const box = document.createElement("div");
+      box.className = "wifi-scan-perm";
+      const msg = document.createElement("p");
+      msg.className = "wifi-scan-empty";
+      msg.textContent = t(msgKey);
+      box.appendChild(msg);
+      if (window.qrAPI && window.qrAPI.openLocationSettings) {
+        const openBtn = document.createElement("button");
+        openBtn.type = "button";
+        openBtn.className = "btn-save wifi-scan-perm-btn";
+        openBtn.textContent = t("tpl.wifi.openLocation");
+        openBtn.addEventListener("click", async () => {
+          openBtn.disabled = true;
+          try { await window.qrAPI.openLocationSettings(); } catch { /* ignore */ }
+          openBtn.disabled = false;
+        });
+        box.appendChild(openBtn);
+      }
+      list.appendChild(box);
+    };
+
     btn.addEventListener("click", async () => {
       if (btn.disabled) return;
       btn.disabled = true;
@@ -702,26 +1084,67 @@
       catch (e) { res = { ok: false, reason: String((e && e.message) || e) }; }
       btn.disabled = false;
       if (!res || !res.ok || !res.networks || !res.networks.length) {
-        const why = res && res.reason === "no-networks" ? t("tpl.wifi.none") : t("tpl.wifi.fail");
-        list.innerHTML = `<div class="wifi-scan-empty">${why}</div>`;
+        list.innerHTML = "";
+        // On macOS a failed/empty scan is almost always because Location Services
+        // is withholding nearby SSIDs. Point the user to the right settings pane.
+        const isMac = /mac|darwin/i.test(navigator.platform);
+        if (res && res.locationRestricted) {
+          appendLocationRow("tpl.wifi.needLocation");
+        } else if (isMac) {
+          appendLocationRow("tpl.wifi.needLocation");
+        } else {
+          const empty = document.createElement("div");
+          empty.className = "wifi-scan-empty";
+          empty.textContent = res && res.reason === "no-networks" ? t("tpl.wifi.none") : t("tpl.wifi.fail");
+          list.appendChild(empty);
+        }
         appendManualRow();
         return;
       }
       list.innerHTML = "";
-      for (const n of res.networks.slice(0, 12)) {
-        const item = document.createElement("button");
-        item.type = "button";
-        item.className = "wifi-scan-item";
-        const sig = (n.signal != null && n.signal >= 0) ? `<span class="wifi-scan-sig">${n.signal}%</span>` : "";
-        item.innerHTML = `<span class="wifi-scan-ssid"></span>${sig}`;
-        item.querySelector(".wifi-scan-ssid").textContent = n.ssid;
-        item.addEventListener("click", () => {
-          input.value = n.ssid;
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-          list.classList.add("hidden");
-        });
-        list.appendChild(item);
+      // Results arrive in three groups because macOS gates them differently:
+      // the current network and the saved list need no permission, while
+      // everything actually in range stays hidden without Location Services.
+      const groups = [
+        { key: "current", label: "tpl.wifi.groupCurrent", items: [] },
+        { key: "nearby", label: "tpl.wifi.groupNearby", items: [] },
+        { key: "saved", label: "tpl.wifi.groupSaved", items: [] },
+      ];
+      for (const n of res.networks) {
+        const g = groups.find((x) => x.key === (n.group || "nearby"));
+        if (g) g.items.push(n);
       }
+      for (const g of groups) {
+        if (!g.items.length) continue;
+        const head = document.createElement("div");
+        head.className = "wifi-scan-group";
+        head.textContent = t(g.label);
+        list.appendChild(head);
+        for (const n of g.items.slice(0, g.key === "saved" ? 40 : 12)) {
+          const item = document.createElement("button");
+          item.type = "button";
+          item.className = "wifi-scan-item";
+          const ssid = document.createElement("span");
+          ssid.className = "wifi-scan-ssid";
+          ssid.textContent = n.ssid;
+          item.appendChild(ssid);
+          if (n.signal != null && n.signal >= 0) {
+            const sig = document.createElement("span");
+            sig.className = "wifi-scan-sig";
+            sig.textContent = `${n.signal}%`;
+            item.appendChild(sig);
+          }
+          item.addEventListener("click", () => {
+            input.value = n.ssid;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            list.classList.add("hidden");
+          });
+          list.appendChild(item);
+        }
+      }
+      // Partial success: saved networks are readable, but macOS hid the ones
+      // actually in range — point at the pane that unblocks them.
+      if (res.locationRestricted) appendLocationRow("tpl.wifi.locationHint");
       appendManualRow();
     });
     // Hide the list when clicking outside (one live document listener at a time).
@@ -908,18 +1331,14 @@
       dynCreateBtn.addEventListener("click", async () => {
         const destination = (content() || "").trim();
         if (!destination) { setStatus(t("gen.needDestination"), true); return; }
-        // A trackable QR must encode a redirect URL. Non-URL payloads (WiFi,
-        // vCard, etc.) cannot be handled by an HTTP redirect.
-        if (!/^https?:\/\//i.test(destination)) {
-          setStatus(t("gen.dynamicNeedsUrl"), true);
-          return;
-        }
+        const isUrl = /^https?:\/\//i.test(destination);
+        const type = isUrl ? "url" : "text";
         dynCreateBtn.disabled = true;
         dynCreateBtn.textContent = t("gen.creating");
         try {
-          const res = await window.qrAPI.createDynamicCode({ destination });
+          const res = await window.qrAPI.createDynamicCode({ destination, type });
           if (!res || !res.ok) { setStatus(t("gen.dynamicError", { reason: (res && res.reason) || "unknown" }), true); return; }
-          const cur = { code: res.data.code, shortUrl: res.data.shortUrl, destination, createdAt: res.data.createdAt };
+          const cur = { code: res.data.code, type: res.data.type || type, shortUrl: res.data.shortUrl, destination, createdAt: res.data.createdAt };
           const list = loadDynamicCodes().filter((c) => c.code !== cur.code);
           list.unshift(cur); saveDynamicCodes(list);
           if (window.__kuiqrRefreshStatsList) window.__kuiqrRefreshStatsList();
@@ -934,7 +1353,7 @@
                 `<code class="dyn-link-code">${escapeHtml(cur.shortUrl)}</code>` +
                 `<button class="btn-text dyn-copy-link" id="dyn-copy-link">${t("gen.copyShortLink")}</button>` +
               `</div>` +
-              `<p class="dyn-card-dest">${t("gen.trackableDestination", { url: escapeHtml(destination) })}</p>` +
+              `<p class="dyn-card-dest">${cur.type === "text" ? t("gen.trackableText", { url: escapeHtml(destination) }) : t("gen.trackableDestination", { url: escapeHtml(destination) })}</p>` +
               networkNote +
               `<div class="dyn-card-actions">` +
                 `<button class="btn-text dyn-view-stats" id="dyn-view-stats">${t("gen.viewStats")}</button>` +
@@ -1382,22 +1801,31 @@
     return o;
   }
 
-  // ── Export format segmented control (PNG / SVG / PDF) ──────────────────────
-  // Show only the options for the selected format. PNG/SVG/PDF each reveal their
-  // own settings; the PDF caption lives only inside the PDF block so it can never
-  // be confused with a global caption.
+  // ── Export format selector (PNG / SVG / PDF) ───────────────────────────────
+  // A single dropdown picks the format; only the matching options and the one
+  // primary action button are visible. This avoids a row of format buttons that
+  // look like competing download actions.
+  const EXPORT_LABEL_KEYS = { png: "gen.download", svg: "gen.exportSVG", pdf: "gen.exportPDF" };
+  let exportFormat = "png";
+
   function setupExportFormat() {
-    const seg = $("export-format");
-    if (!seg) return;
+    const sel = $("export-format");
+    if (!sel) return;
     const opts = { png: $("png-options"), svg: $("svg-options"), pdf: $("pdf-options") };
-    const btns = Array.from(seg.querySelectorAll(".seg-btn"));
     function setFmt(fmt) {
-      btns.forEach((b) => b.classList.toggle("active", b.dataset.format === fmt));
+      exportFormat = fmt;
+      sel.value = fmt;
       Object.keys(opts).forEach((k) => { if (opts[k]) opts[k].classList.toggle("hidden", k !== fmt); });
       updateExportMeta();
     }
-    btns.forEach((b) => b.addEventListener("click", () => setFmt(b.dataset.format)));
+    sel.addEventListener("change", () => setFmt(sel.value));
     setFmt("png");
+  }
+
+  function runExport() {
+    if (exportFormat === "svg") exportSVG();
+    else if (exportFormat === "pdf") exportPDF();
+    else exportPNG();
   }
 
   // ── Collapsible panels (Style / Export) ────────────────────────────────────
@@ -1469,9 +1897,15 @@
     // maximum so the chosen size reads as the reasonable, modest option (after
     // seeing 2048, 1024 feels like "less than half", not "small").
     const PNG_MAX = 2048, SVG_MAX = 2048, PDF_MAX = "90×50mm";
-    setBtnMeta("gen-download-meta", png + "×" + png + " · max " + PNG_MAX);
-    setBtnMeta("gen-export-svg-meta", svg + "px · max " + SVG_MAX);
-    setBtnMeta("gen-export-pdf-meta", (pdfLabels[pdf] || pdf) + " · max " + PDF_MAX);
+    // Only the ACTIVE format's size is worth showing — the other presets live
+    // behind the segmented control and would just be noise next to the button.
+    const meta =
+      exportFormat === "svg" ? svg + "px · max " + SVG_MAX
+        : exportFormat === "pdf" ? (pdfLabels[pdf] || pdf) + " · max " + PDF_MAX
+          : png + "×" + png + " · max " + PNG_MAX;
+    const label = $("gen-export-label");
+    if (label) label.textContent = t(EXPORT_LABEL_KEYS[exportFormat] || "gen.download");
+    setBtnMeta("gen-export-meta", meta);
   }
 
   // ── Public init ────────────────────────────────────────────────────────────
@@ -1533,10 +1967,8 @@
     // Reset style button
     if ($("style-reset")) $("style-reset").addEventListener("click", resetStyle);
 
-    // Export buttons
-    if ($("gen-download")) $("gen-download").addEventListener("click", exportPNG);
-    if ($("gen-export-svg")) $("gen-export-svg").addEventListener("click", exportSVG);
-    if ($("gen-export-pdf")) $("gen-export-pdf").addEventListener("click", exportPDF);
+    // Single primary export button — runs whichever format is selected above.
+    if ($("gen-export")) $("gen-export").addEventListener("click", runExport);
     if ($("gen-copy-qr")) $("gen-copy-qr").addEventListener("click", async () => {
       if (!lastDataUrl) return;
       try { const res = await window.qrAPI.copyQrImage(lastDataUrl); if (res && res.ok === false) throw new Error(res.reason || "Copy failed"); flashBtn($("gen-copy-qr"), t("result.copied")); }

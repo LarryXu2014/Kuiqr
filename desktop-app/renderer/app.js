@@ -1034,10 +1034,10 @@ async function handleDecodedResult(qrResult) {
   const isUrl = payload.type === "url";
 
   // A trackable short link created by THIS app: never auto-open it — show the
-  // destination + stats actions instead, so the owner understands what happened.
-  const trackable = isUrl ? findTrackableCode(text) : null;
+  // destination / text + stats actions instead, so the owner understands what happened.
+  const trackable = findTrackableCode(text);
   if (trackable) {
-    showTrackableResult(trackable, text);
+    await showTrackableResult(trackable, text);
     // Reciprocity: celebrate the first successful scan here too (trackable link).
     const scanResultEl = document.getElementById("scan-result");
     if (scanResultEl) window.kuiqrGiftHint(scanResultEl, "gift.scan", "kuiqr.giftScanSeen");
@@ -1145,8 +1145,8 @@ window.kuiqrGiftHint = function (parentEl, i18nKey, storageKey) {
 };
 
 // Dedicated result UI for a scanned trackable short link (owner preview):
-// shows where it redirects and offers Open destination / Copy link / stats.
-function showTrackableResult(rec, shortUrl) {
+// shows where it redirects / the stored text and offers Open destination / Copy / stats.
+async function showTrackableResult(rec, shortUrl) {
   const el = document.getElementById("scan-result");
   const badge = document.getElementById("result-badge");
   const dataEl = document.getElementById("result-data");
@@ -1160,35 +1160,67 @@ function showTrackableResult(rec, shortUrl) {
 
   actionsEl.innerHTML = "";
 
-  const sub = document.createElement("p");
-  sub.className = "result-sub";
-  sub.textContent = t("result.trackableSub", { url: rec.destination || "?" });
-  actionsEl.appendChild(sub);
-
   const btns = document.createElement("div");
   btns.className = "result-actions";
   btns.style.marginTop = "6px";
 
-  const openBtn = document.createElement("button");
-  openBtn.className = "btn-result";
-  openBtn.textContent = t("result.openDest");
-  openBtn.addEventListener("click", () => {
-    const dest = rec.destination || "";
-    if (dest) window.qrAPI.openUrl(dest.startsWith("http") ? dest : `https://${dest}`);
-  });
-  btns.appendChild(openBtn);
+  // Text trackable: fetch the stored text from the backend, copy it to the
+  // clipboard, and show it so the owner sees exactly what scanners will get.
+  if (rec.type === "text") {
+    let resolvedText = rec.destination || "";
+    try {
+      const lookup = await window.qrAPI.lookupDynamicCode({ code: rec.code });
+      if (lookup && lookup.ok && typeof lookup.data.destination === "string") {
+        resolvedText = lookup.data.destination;
+      }
+    } catch { /* fall back to stored destination */ }
 
-  const copyBtn = document.createElement("button");
-  copyBtn.className = "btn-result btn-result-secondary";
-  copyBtn.textContent = t("result.copyShortLink");
-  copyBtn.addEventListener("click", async () => {
+    const sub = document.createElement("p");
+    sub.className = "result-sub";
+    sub.textContent = resolvedText;
+    actionsEl.appendChild(sub);
+
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "btn-result";
+    copyBtn.textContent = t("result.copy");
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(resolvedText);
+        copyBtn.textContent = t("result.copied");
+        setTimeout(() => { copyBtn.textContent = t("result.copy"); }, 1500);
+      } catch { /* clipboard unavailable */ }
+    });
+    btns.appendChild(copyBtn);
+
+    // Auto-copy on scan so the owner's own test scan behaves like a real one.
+    try { await navigator.clipboard.writeText(resolvedText); } catch { /* ignore */ }
+  } else {
+    const sub = document.createElement("p");
+    sub.className = "result-sub";
+    sub.textContent = t("result.trackableSub", { url: rec.destination || "?" });
+    actionsEl.appendChild(sub);
+
+    const openBtn = document.createElement("button");
+    openBtn.className = "btn-result";
+    openBtn.textContent = t("result.openDest");
+    openBtn.addEventListener("click", () => {
+      const dest = rec.destination || "";
+      if (dest) window.qrAPI.openUrl(dest.startsWith("http") ? dest : `https://${dest}`);
+    });
+    btns.appendChild(openBtn);
+  }
+
+  const copyLinkBtn = document.createElement("button");
+  copyLinkBtn.className = "btn-result btn-result-secondary";
+  copyLinkBtn.textContent = t("result.copyShortLink");
+  copyLinkBtn.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(shortUrl);
-      copyBtn.textContent = t("result.copied");
-      setTimeout(() => { copyBtn.textContent = t("result.copyShortLink"); }, 1500);
+      copyLinkBtn.textContent = t("result.copied");
+      setTimeout(() => { copyLinkBtn.textContent = t("result.copyShortLink"); }, 1500);
     } catch { /* clipboard unavailable */ }
   });
-  btns.appendChild(copyBtn);
+  btns.appendChild(copyLinkBtn);
 
   const statsBtn = document.createElement("button");
   statsBtn.className = "btn-result btn-result-secondary";

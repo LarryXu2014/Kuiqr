@@ -43,6 +43,9 @@ window.qrAPI = new Proxy({
   copyQrImage: async () => ({ ok: true }),
   copyClipboard: () => {},
   openUrl: async (url) => { window.__openUrlArgs = url; return { ok: true }; },
+  createDynamicCode: async (p) => ({ ok: true, data: { code: "testcode", type: p.type || "url", shortUrl: "http://localhost:3000/testcode", destination: p.destination, createdAt: Date.now() } }),
+  getDynamicStats: async () => ({ ok: true, data: { total: 0, unique: 0, byDay: [], byCountry: [], byDevice: [] } }),
+  lookupDynamicCode: async (p) => ({ ok: true, data: { code: p.code, type: "url", destination: "https://example.com/landing", createdAt: 0 } }),
 }, {
   get(t, k) { return t[k] !== undefined ? t[k] : async () => ({}); }
 });
@@ -64,13 +67,14 @@ await page.waitForTimeout(700); // let app.js + qrgen.js init
 await page.evaluate(() => { if (window.requestSwitchTab) window.requestSwitchTab("generate"); });
 await page.waitForTimeout(250);
 
-// 1. Generate tab present; style/export panels collapsed by default.
+// 1. Generate tab present; style step collapsible, export step always visible (v2.4.2.5 step UI).
 check("style panel exists", await page.locator("#style-panel").count() === 1);
 check("export panel exists", await page.locator("#export-panel").count() === 1);
 const styleBodyHidden = !(await page.locator("#style-body").evaluate((el) => getComputedStyle(el).display !== "none" && el.getClientRects().length > 0));
-const exportBodyHidden = !(await page.locator("#export-body").evaluate((el) => getComputedStyle(el).display !== "none" && el.getClientRects().length > 0));
 check("style panel collapsed by default", styleBodyHidden);
-check("export panel collapsed by default", exportBodyHidden);
+const exportVisible = await page.locator("#export-format").evaluate((el) => el.getClientRects().length > 0 && getComputedStyle(el).display !== "none");
+check("export step visible by default", exportVisible);
+check("export offers png/svg/pdf formats", await page.locator("#export-format option").count() === 3);
 
 // 2. Preview visible WITHOUT expanding panels (the core UX ask).
 const previewVisible = await page.locator("#gen-preview").evaluate((el) => el.getClientRects().length > 0 && getComputedStyle(el).display !== "none");
@@ -88,7 +92,8 @@ await page.waitForTimeout(250);
 check("wifi scan button rendered", await page.locator(".wifi-scan-btn").count() === 1);
 await page.click(".wifi-scan-btn");
 await page.waitForSelector(".wifi-scan-item", { timeout: 5000 });
-check("wifi list shows networks", await page.locator(".wifi-scan-item").count() === 2);
+check("wifi list shows networks", await page.locator(".wifi-scan-item:not(.wifi-scan-item-manual)").count() === 2);
+check("wifi list offers manual entry row", await page.locator(".wifi-scan-item-manual").count() === 1);
 await page.locator(".wifi-scan-item").first().click();
 const ssidVal = await page.inputValue("#tpl-wifi-ssid");
 check("clicking network fills SSID", ssidVal === "HomeNet-5G", 'got "' + ssidVal + '"');
@@ -131,13 +136,25 @@ check("reset persisted", lsReset && lsReset.fg === "#000000");
 const openState = await page.evaluate(() => localStorage.getItem("kuiqr.genpanel.style"));
 check("panel state persisted", openState !== null, 'state=' + openState);
 
-// 9. Dynamic (trackable) QR row sits directly under the action buttons, above the style panel.
-const dynPos = await page.evaluate(() => {
+// 9. Step order: template → content → preview → style → dynamic → export → buttons.
+const stepOrder = await page.evaluate(() => {
+  const tab = document.getElementById("tab-generate");
   const g = document.getElementById("dynamic-group");
-  return { prev: g && g.previousElementSibling ? g.previousElementSibling.className : "", beforeStyle: !!g && !!document.getElementById("style-panel") && g.compareDocumentPosition(document.getElementById("style-panel")) & Node.DOCUMENT_POSITION_FOLLOWING };
+  // Walk past the visual step-separator (no id) to the real previous step.
+  function prevId(el) {
+    let p = el && el.previousElementSibling;
+    while (p && !p.id) p = p.previousElementSibling;
+    return p ? p.id : "";
+  }
+  return {
+    order: Array.from(tab.children).map((el) => el.id || el.className),
+    prev: prevId(g),
+    next: g && g.nextElementSibling ? g.nextElementSibling.id : "",
+    buttonsLast: !!tab.lastElementChild && tab.lastElementChild.className.includes("generate-buttons"),
+  };
 });
-check("dynamic group sits under action buttons", dynPos.prev.includes("generate-buttons"), 'prev="' + dynPos.prev + '"');
-check("dynamic group above style panel", !!dynPos.beforeStyle);
+check("dynamic step sits between style and export", stepOrder.prev === "style-panel" && stepOrder.next === "export-panel", JSON.stringify({ prev: stepOrder.prev, next: stepOrder.next }));
+check("action buttons row is last", stepOrder.buttonsLast, JSON.stringify(stepOrder.order));
 
 // 10. Toggling it on reveals the panel and rotates the chevron (expanded class).
 // (The checkbox is visually hidden behind the toggle slider — flip it via JS.)
@@ -150,7 +167,7 @@ check("dynamic chevron rotates (expanded)", await page.locator("#dynamic-group")
 //     (Trackable QR badge + "redirects to" + no auto-open), not a blind URL open.
 await page.evaluate(() => {
   localStorage.setItem("kuiqr.dynamicCodes", JSON.stringify([
-    { code: "abc1234", shortUrl: "http://localhost:3000/abc1234", destination: "https://example.com/landing", createdAt: 0 },
+    { code: "abc1234", type: "url", shortUrl: "http://localhost:3000/abc1234", destination: "https://example.com/landing", createdAt: 0 },
   ]));
 });
 const scanRes = await page.evaluate(async () => {
