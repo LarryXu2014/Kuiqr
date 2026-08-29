@@ -137,12 +137,12 @@ If `ghproxy.com` is down, try `https://mirror.ghproxy.com/`.
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ |
 | Chrome / Edge / Brave      | [kuiqr-extension-2.4.2.5.1.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-extension-2.4.2.5.1.zip)                           | 84 KB | Verified |
 | Firefox (109+)             | [kuiqr-firefox-2.4.2.5.1.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/kuiqr-firefox-2.4.2.5.1.zip)                               | 84 KB | Verified |
-| macOS (Apple Silicon)      | [Kuiqr-2.4.2.5.1-mac-arm64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-arm64.zip)     | ~92 MB | Verified |
-| macOS (Apple Silicon, .dmg)| [Kuiqr-2.4.2.5.1-mac-arm64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-arm64.dmg)     | ~95 MB | Verified |
-| macOS (Intel)              | [Kuiqr-2.4.2.5.1-mac-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-x64.zip)         | ~97 MB | Verified |
-| macOS (Intel, .dmg)        | [Kuiqr-2.4.2.5.1-mac-x64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-x64.dmg)         | ~100 MB | Verified |
-| macOS (Apple Silicon, .pkg)| [Kuiqr-2.4.2.5.1-mac-arm64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-arm64.pkg)     | ~95 MB | ⚠ Unsigned — needs bypass |
-| macOS (Intel, .pkg)        | [Kuiqr-2.4.2.5.1-mac-x64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-x64.pkg)         | ~95 MB | ⚠ Unsigned — needs bypass |
+| macOS (Apple Silicon)      | [Kuiqr-2.4.2.5.1-mac-arm64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-arm64.zip)     | ~107 MB | Verified |
+| macOS (Apple Silicon, .dmg)| [Kuiqr-2.4.2.5.1-mac-arm64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-arm64.dmg)     | ~112 MB | Verified |
+| macOS (Intel)              | [Kuiqr-2.4.2.5.1-mac-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-x64.zip)         | ~113 MB | Verified |
+| macOS (Intel, .dmg)        | [Kuiqr-2.4.2.5.1-mac-x64.dmg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-x64.dmg)         | ~117 MB | Verified |
+| macOS (Apple Silicon, .pkg)| [Kuiqr-2.4.2.5.1-mac-arm64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-arm64.pkg)     | ~111 MB | ⚠ Unsigned — needs bypass |
+| macOS (Intel, .pkg)        | [Kuiqr-2.4.2.5.1-mac-x64.pkg](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-mac-x64.pkg)         | ~116 MB | ⚠ Unsigned — needs bypass |
 | Windows (x64) — Setup      | [Kuiqr-2.4.2.5.1-windows-x64-setup.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-windows-x64-setup.exe) | ~70 MB | Verified |
 | Windows (x64) — Portable   | [Kuiqr-2.4.2.5.1-windows-x64-portable.exe](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-windows-x64-portable.exe) | ~70 MB | Verified |
 | Windows (x64) — Zip       | [Kuiqr-2.4.2.5.1-windows-x64.zip](https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.1-windows-x64.zip) | ~70 MB | Verified |
@@ -276,7 +276,7 @@ Full walkthrough of every feature: **[USER_GUIDE.md](./USER_GUIDE.md)**
 - **Local backend bundling fixed** — The dynamic backend is now shipped as an app resource, so "Run local backend" works in packaged builds instead of returning "backend-not-found". The app also runs the server directly with Node instead of relying on npm.
 - **Backend data no longer lives inside the app bundle** — the trackable-QR database and API key are stored under the app's userData folder, so they survive read-only installs and don't break code signing. A fresh install no longer inherits a development database.
 - **Backend starts without a system Node** — if `node` isn't installed, Kuiqr falls back to the bundled Electron runtime in Node mode, so "Run local backend" works on machines that have never had Node.
-- **Much smaller installers** — unused GeoIP city databases (146 MB) are excluded from the bundle; country stats still work. macOS installers drop from ~151 MB to ~100 MB.
+- **Much smaller installers** — unused GeoIP city databases (146 MB) are excluded from the bundle; country stats still work. macOS installers drop from ~151 MB to ~107 MB.
 
 ### v2.4.2.3.10
 - **Web QR Studio landing page** — New browser-based QR builder at [kuiqr.app](https://kuiqr.app) with 66 types, live preview, styling, PNG/SVG/PDF/JPG export, a real map location picker, and an in-page scanner that decodes the generated QR with contextual actions.
