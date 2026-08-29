@@ -22,7 +22,8 @@ API = "https://api.github.com"
 UPLOAD = "https://uploads.github.com"
 PROXY = "127.0.0.1:10808"
 
-# The six macOS artifacts. Filenames must match the download links in README.md.
+# The eight artifacts this script uploads directly (6 macOS + 2 extension).
+# Windows and Linux artifacts are produced by GitHub Actions.
 ASSETS = [
     (f"Kuiqr-{VERSION}-mac-arm64.dmg", "application/x-apple-diskimage"),
     (f"Kuiqr-{VERSION}-mac-arm64.zip", "application/zip"),
@@ -30,6 +31,8 @@ ASSETS = [
     (f"Kuiqr-{VERSION}-mac-x64.dmg", "application/x-apple-diskimage"),
     (f"Kuiqr-{VERSION}-mac-x64.zip", "application/zip"),
     (f"Kuiqr-{VERSION}-mac-x64.pkg", "application/x-newton-compatible-pkg"),
+    (f"kuiqr-extension-{VERSION}.zip", "application/zip"),
+    (f"kuiqr-firefox-{VERSION}.zip", "application/zip"),
 ]
 
 BODY = f"""## Kuiqr {VERSION}
@@ -39,7 +42,9 @@ BODY = f"""## Kuiqr {VERSION}
 - **"Run local backend" now works in packaged builds** — the dynamic backend ships as an app resource, so it no longer fails with "backend-not-found", and it is started directly with Node instead of relying on npm.
 - **Backend data moved out of the app bundle** — the trackable-QR database and API key are stored in the app's userData folder, so they survive read-only installs and don't break code signing. Fresh installs no longer inherit a development database.
 - **Backend starts without a system Node** — if `node` isn't installed, Kuiqr falls back to the bundled Electron runtime in Node mode.
-- **Much smaller macOS installers** — unused GeoIP city databases (146 MB) are excluded; country stats still work. Installers drop from ~151 MB to ~100 MB.
+- **Create Trackable QR auto-starts the backend** — if you click "Create trackable QR" before a backend is configured, the app starts the local backend automatically and creates the code. No need to open Settings first.
+- **No more "first QR" celebration banners** — removed the one-time "you successfully generated/scanned your first QR code" hints.
+- **Much smaller macOS installers** — unused GeoIP city databases (146 MB) are excluded; country stats still work. Installers drop from ~151 MB to ~107 MB.
 
 ### Assets
 | File | For |
@@ -50,6 +55,8 @@ BODY = f"""## Kuiqr {VERSION}
 | `Kuiqr-{VERSION}-mac-x64.dmg` | macOS, Intel — disk image |
 | `Kuiqr-{VERSION}-mac-x64.zip` | macOS, Intel — portable app |
 | `Kuiqr-{VERSION}-mac-x64.pkg` | macOS, Intel — installer (unsigned) |
+| `kuiqr-extension-{VERSION}.zip` | Chrome / Edge / Brave extension |
+| `kuiqr-firefox-{VERSION}.zip` | Firefox extension (109+) |
 
 Windows and Linux builds are produced by GitHub Actions and appear on this same release.
 

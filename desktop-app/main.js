@@ -3054,10 +3054,25 @@ ipcMain.handle("restart-app", () => {
 // (it is stored in settings and never handed to the renderer). Config lives in
 // Settings: dynamicBackendUrl + dynamicApiKey.
 async function callDynamicApi(apiPath, { method = "GET", body } = {}) {
-  const settings = loadSettings();
-  const base = (settings.dynamicBackendUrl || "").replace(/\/+$/, "");
+  let settings = loadSettings();
+  let base = (settings.dynamicBackendUrl || "").replace(/\/+$/, "");
   let key = settings.dynamicApiKey || "";
-  if (!base) return { ok: false, reason: "backend-not-configured" };
+
+  // If no backend is configured yet, automatically start the local one and
+  // persist its URL + key. This lets "Create trackable QR" work on first use
+  // without forcing the user to open Settings → Dynamic QR first.
+  if (!base) {
+    const start = await startLocalBackend();
+    if (!start || !start.ok) {
+      return { ok: false, reason: (start && start.reason) || "backend-start-failed" };
+    }
+    settings.dynamicBackendUrl = start.url;
+    settings.dynamicApiKey = start.apiKey;
+    saveSettings(settings);
+    base = (start.url || "").replace(/\/+$/, "");
+    key = start.apiKey || "";
+    if (!base) return { ok: false, reason: "backend-start-failed" };
+  }
 
   const tryOnce = async () => {
     const headers = { "Content-Type": "application/json" };

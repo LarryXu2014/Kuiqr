@@ -1332,24 +1332,9 @@
         dynCreateBtn.disabled = true;
         dynCreateBtn.textContent = t("gen.creating");
         try {
-          let res = await window.qrAPI.createDynamicCode({ destination, type });
-          // If the backend isn't configured, automatically start the local one and
-          // persist its URL + key, then retry once. This matches what the Settings
-          // "Run local backend" button does, so Create Trackable QR works on first
-          // use without making the user hunt through tabs.
-          if (res && !res.ok && res.reason === "backend-not-configured") {
-            dynCreateBtn.textContent = t("gen.startingBackend");
-            const start = await window.qrAPI.startLocalBackend();
-            if (!start || !start.ok) {
-              setStatus(t("gen.dynamicError", { reason: (start && start.reason) || "backend-start-failed" }), true);
-              return;
-            }
-            const s = await window.qrAPI.getSettings();
-            s.dynamicBackendUrl = start.url;
-            s.dynamicApiKey = start.apiKey;
-            await window.qrAPI.saveSettings(s);
-            res = await window.qrAPI.createDynamicCode({ destination, type });
-          }
+          // The main process auto-starts the local backend if none is configured,
+          // so this call works on first use without opening Settings first.
+          const res = await window.qrAPI.createDynamicCode({ destination, type });
           if (!res || !res.ok) { setStatus(t("gen.dynamicError", { reason: (res && res.reason) || "unknown" }), true); return; }
           const cur = { code: res.data.code, type: res.data.type || type, shortUrl: res.data.shortUrl, destination, createdAt: res.data.createdAt };
           const list = loadDynamicCodes().filter((c) => c.code !== cur.code);
