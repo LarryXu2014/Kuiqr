@@ -356,27 +356,6 @@ body {
   margin-top: 4px;
 }
 
-/* Reciprocity "gift" acknowledgement — a subtle, one-time value signal that
-   appears after the user receives something for free/instant/offline. */
-.gift-hint {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
-  line-height: 1.4;
-  color: var(--primary-dark, #4338ca);
-  background: color-mix(in srgb, var(--primary, #4f46e5) 10%, white);
-  border: 1px solid color-mix(in srgb, var(--primary, #4f46e5) 22%, white);
-  border-radius: 8px;
-  padding: 8px 10px;
-  margin-bottom: 10px;
-}
-.gift-hint::before {
-  content: "✓";
-  font-weight: 700;
-  color: var(--primary, #4f46e5);
-}
-
 /* ---- Image Preview ---- */
 .image-preview-container {
   background: var(--card);

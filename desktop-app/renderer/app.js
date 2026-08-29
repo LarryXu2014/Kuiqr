@@ -1038,9 +1038,6 @@ async function handleDecodedResult(qrResult) {
   const trackable = findTrackableCode(text);
   if (trackable) {
     await showTrackableResult(trackable, text);
-    // Reciprocity: celebrate the first successful scan here too (trackable link).
-    const scanResultEl = document.getElementById("scan-result");
-    if (scanResultEl) window.kuiqrGiftHint(scanResultEl, "gift.scan", "kuiqr.giftScanSeen");
     // Record history + show the toast, but skip the blind auto-open.
     const response = await window.qrAPI.onDecoded(text, { noAutoOpen: true });
     await loadHistory();
@@ -1055,11 +1052,6 @@ async function handleDecodedResult(qrResult) {
   } else {
     showResult("text", text, null, false);
   }
-
-  // Reciprocity: after the user's first real successful scan, celebrate the win
-  // so they feel the value (free / instant / offline) before any ask.
-  const scanResultEl = document.getElementById("scan-result");
-  if (scanResultEl) window.kuiqrGiftHint(scanResultEl, "gift.scan", "kuiqr.giftScanSeen");
 
   // Scan success feedback is delivered as an IN-APP overlay by the main process
   // (applyDecodedResult), controlled by the "Show scan notifications" setting.
@@ -1126,23 +1118,6 @@ function showResult(type, data, sub, isUrl) {
 function hideResult() {
   document.getElementById("scan-result").classList.add("hidden");
 }
-
-// Reciprocity (UX Peak): surface a one-time "gift" acknowledgement after the user
-// receives real value for free/instant/offline, so the value is FELT before any
-// ask. Shown once per surface, then remembered in localStorage. Re-localizable:
-// the <span> carries data-i18n so a later language switch re-translates it.
-window.kuiqrGiftHint = function (parentEl, i18nKey, storageKey) {
-  try { if (localStorage.getItem(storageKey) === "1") return; localStorage.setItem(storageKey, "1"); } catch {}
-  if (!parentEl) return;
-  parentEl.querySelectorAll(".gift-hint").forEach((n) => n.remove());
-  const banner = document.createElement("div");
-  banner.className = "gift-hint";
-  const span = document.createElement("span");
-  span.dataset.i18n = i18nKey;
-  span.textContent = t(i18nKey);
-  banner.appendChild(span);
-  parentEl.insertBefore(banner, parentEl.firstChild);
-};
 
 // Dedicated result UI for a scanned trackable short link (owner preview):
 // shows where it redirects / the stored text and offers Open destination / Copy / stats.

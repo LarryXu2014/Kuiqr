@@ -48,14 +48,14 @@ let trayUpdateState = false;    // false = normal (white), true = update availab
 const isMac = process.platform === "darwin";
 const isWin = process.platform === "win32";
 
-// Release version — the 4-part build version (e.g. "2.4.2.5.1") that matches the
+// Release version — the 4-part build version (e.g. "2.4.2.5.2") that matches the
 // GitHub release tag and the extension zip filenames. In the PACKAGED app,
 // electron-builder strips `build.buildVersion` out of package.json, so we must fall
 // back to the hard-coded FALLBACK_RELEASE_VERSION (kept in sync with package.json
 // build.buildVersion and the GitHub tag each release) BEFORE the npm `version` field.
 // The npm `version` is only the 3-part semver ("2.4.1") and would otherwise make every
 // built app report as 2.4.1 and always think it is outdated.
-const FALLBACK_RELEASE_VERSION = "2.4.2.5.1";
+const FALLBACK_RELEASE_VERSION = "2.4.2.5.2";
 const RELEASE_VERSION = (() => {
   try {
     const pkg = require("./package.json");
@@ -66,7 +66,7 @@ const RELEASE_VERSION = (() => {
 })();
 
 // App version for display — use the REAL 4-part release version so the UI shows the
-// exact build the user is running (e.g. "2.4.2.5.1"), not the npm 3-part semver.
+// exact build the user is running (e.g. "2.4.2.5.2"), not the npm 3-part semver.
 const APP_VERSION = RELEASE_VERSION;
 
 // ── macOS native Vision QR helper path ──
