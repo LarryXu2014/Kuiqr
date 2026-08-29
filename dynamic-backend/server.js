@@ -16,6 +16,26 @@ const analytics = require("./src/analytics");
 
 const app = Fastify({ logger: true });
 
+// Basic in-memory rate limiter to protect all endpoints from high-volume abuse.
+// Keyed per client IP with a fixed window; keeps the fix dependency-free.
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 100;
+const rateLimitBuckets = new Map();
+
+app.addHook("onRequest", async (req, reply) => {
+  const key = req.ip || "unknown";
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(key);
+  if (!bucket || now - bucket.start > RATE_LIMIT_WINDOW_MS) {
+    rateLimitBuckets.set(key, { start: now, count: 1 });
+    return;
+  }
+  bucket.count += 1;
+  if (bucket.count > RATE_LIMIT_MAX) {
+    reply.code(429).send({ error: "too many requests" });
+  }
+});
+
 // Shared API-key guard. Returns false (and sends 401) when the request is denied.
 function checkKey(req, reply) {
   if (!config.API_KEY) {
