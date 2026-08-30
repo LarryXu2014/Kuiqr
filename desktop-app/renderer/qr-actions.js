@@ -67,9 +67,9 @@
     };
     let name = get("FN");
     if (!name) {
-      // Fallback: assemble from N:Last;First;Middle;Prefix;Suffix
+      // Fallback: assemble from N:Family;Given;Middle;Prefix;Suffix
       const n = get("N").split(";").map((s) => s.trim());
-      name = [n[3], n[1], n[2]].filter(Boolean).join(" ") || n[0] || "";
+      name = [n[3], n[1], n[2], n[0]].filter(Boolean).join(" ") || n[0] || "";
     }
     return {
       type: "vcard",

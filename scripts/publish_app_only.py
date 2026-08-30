@@ -38,13 +38,9 @@ ASSETS = [
 BODY = f"""## Kuiqr {VERSION}
 
 ### Highlights
-- **Trackable QR for text** — trackable QR codes are no longer limited to URLs. Create a trackable code for any text (e.g. "I am Larry"); when someone scans it with Kuiqr the text is copied to their clipboard and the scan is recorded in Stats. Scanners that aren't Kuiqr see a simple page showing the text instead of being redirected.
-- **"Run local backend" now works in packaged builds** — the dynamic backend ships as an app resource, so it no longer fails with "backend-not-found", and it is started directly with Node instead of relying on npm.
-- **Backend data moved out of the app bundle** — the trackable-QR database and API key are stored in the app's userData folder, so they survive read-only installs and don't break code signing. Fresh installs no longer inherit a development database.
-- **Backend starts without a system Node** — if `node` isn't installed, Kuiqr falls back to the bundled Electron runtime in Node mode.
-- **Create Trackable QR auto-starts the backend** — if you click "Create trackable QR" before a backend is configured, the app starts the local backend automatically and creates the code. No need to open Settings first.
-- **No more "first QR" celebration banners** — removed the one-time "you successfully generated/scanned your first QR code" hints.
-- **Much smaller macOS installers** — unused GeoIP city databases (146 MB) are excluded; country stats still work. Installers drop from ~151 MB to ~107 MB.
+- **Contact QR codes now show the person's name** — generated vCards now include the required `N:` (structured name) field. Before, a contact with an organization (e.g. name "Larry Xu", org "Home") was imported by Apple Contacts as a *company* card — the organization appeared where the person's name should be. Now it imports correctly as "Larry Xu" with "Home" as his organization.
+- **Re-saving a scanned contact no longer corrupts it** — the app scanner and the kuiqr.app web studio now keep the original vCard payload (including `N:`, `TITLE:`, addresses) when re-saving a scanned contact instead of rebuilding it with only a few fields.
+- **Scanner name fallback fixed** — when a vCard lacks `FN:`, the scanner's fallback name assembly from `N:` no longer drops the family name.
 
 ### Assets
 | File | For |

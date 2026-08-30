@@ -100,6 +100,18 @@
 
   // ── Escaping helpers ────────────────────────────────────────────────────
   function escWifi(s) { return String(s == null ? "" : s).replace(/([\\;,":])/g, "\\$1"); }
+  // N: is REQUIRED by RFC 2426 (vCard 3.0) and Apple Contacts keys the contact's
+  // display name off it. Without N:, a card that carries an ORG: is imported by
+  // iOS/macOS Contacts as a *company* card — the organization ends up shown as
+  // the contact's name. Split "First … Last" heuristically: the final token
+  // becomes the family name, the rest the given name(s).
+  function vcardNLine(name) {
+    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return null;
+    const family = parts.length > 1 ? parts.pop() : "";
+    const given = parts.join(" ");
+    return "N:" + [family, given, "", "", ""].map(escV).join(";");
+  }
   function escV(v) {
     return String(v == null ? "" : v)
       .replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
@@ -132,7 +144,11 @@
       case "vcard": {
         const lines = ["BEGIN:VCARD", "VERSION:3.0"];
         const name = (v.name || "").trim();
-        if (name) lines.push("FN:" + escV(name));
+        if (name) {
+          const nLine = vcardNLine(name);
+          if (nLine) lines.push(nLine);
+          lines.push("FN:" + escV(name));
+        }
         const org = (v.org || "").trim();  if (org) lines.push("ORG:" + escV(org));
         const title = (v.title || "").trim(); if (title) lines.push("TITLE:" + escV(title));
         const phone = (v.phone || "").trim(); if (phone) lines.push("TEL;TYPE=CELL:" + escV(phone));
@@ -1593,7 +1609,12 @@
       }
       case "vcard": {
         const lines = ["BEGIN:VCARD", "VERSION:3.0"];
-        const name = col("name").trim(); if (name) lines.push("FN:" + escV(name));
+        const name = col("name").trim();
+        if (name) {
+          const nLine = vcardNLine(name);
+          if (nLine) lines.push(nLine);
+          lines.push("FN:" + escV(name));
+        }
         const org = col("org").trim(); if (org) lines.push("ORG:" + escV(org));
         const title = col("title").trim(); if (title) lines.push("TITLE:" + escV(title));
         const phone = col("phone").trim(); if (phone) lines.push("TEL;TYPE=CELL:" + escV(phone));
@@ -1761,7 +1782,13 @@
       { name: "wifi-nopass", tpl: "wifi", v: { ssid: "Open", encryption: "nopass", hidden: true },
         expected: "WIFI:T:nopass;S:Open;H:true;;" },
       { name: "vcard", tpl: "vcard", v: { name: "Jane Doe", org: "Acme", phone: "+1 555 0100", email: "jane@acme.com" },
-        expected: "BEGIN:VCARD\nVERSION:3.0\nFN:Jane Doe\nORG:Acme\nTEL;TYPE=CELL:+1 555 0100\nEMAIL:jane@acme.com\nEND:VCARD" },
+        expected: "BEGIN:VCARD\nVERSION:3.0\nN:Doe;Jane;;;\nFN:Jane Doe\nORG:Acme\nTEL;TYPE=CELL:+1 555 0100\nEMAIL:jane@acme.com\nEND:VCARD" },
+      // N: MUST be present — without it Apple Contacts imports the card as a
+      // company contact and shows ORG: where the person's name should be.
+      { name: "vcard-org", tpl: "vcard", v: { name: "Larry Xu", org: "Home", title: "Student" },
+        expected: "BEGIN:VCARD\nVERSION:3.0\nN:Xu;Larry;;;\nFN:Larry Xu\nORG:Home\nTITLE:Student\nEND:VCARD" },
+      { name: "vcard-single", tpl: "vcard", v: { name: "Prince" },
+        expected: "BEGIN:VCARD\nVERSION:3.0\nN:;Prince;;;\nFN:Prince\nEND:VCARD" },
       { name: "email", tpl: "email", v: { email: "jane@acme.com", subject: "Hi", body: "Hello world" },
         expected: "mailto:jane@acme.com?subject=Hi&body=Hello%20world" },
       { name: "sms", tpl: "sms", v: { number: "+1 555 0100", message: "Hello there" },

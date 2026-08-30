@@ -50,10 +50,10 @@ xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
 
 ```bash
 # Apple Silicon (M1/M2/M3/M4)
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.2-mac-arm64.zip -o ~/Downloads/Kuiqr.zip && unzip -o ~/Downloads/Kuiqr.zip -d /Applications && xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.3-mac-arm64.zip -o ~/Downloads/Kuiqr.zip && unzip -o ~/Downloads/Kuiqr.zip -d /Applications && xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
 
 # Intel
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.2-mac-x64.zip -o ~/Downloads/Kuiqr.zip && unzip -o ~/Downloads/Kuiqr.zip -d /Applications && xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.3-mac-x64.zip -o ~/Downloads/Kuiqr.zip && unzip -o ~/Downloads/Kuiqr.zip -d /Applications && xattr -cr /Applications/Kuiqr.app && open /Applications/Kuiqr.app
 ```
 
 Not sure which Mac you have?  → About This Mac — "Apple M-series" = Apple Silicon, "Intel" = Intel.
@@ -64,7 +64,7 @@ Not sure which Mac you have?  → About This Mac — "Apple M-series" = Apple Si
 
 ```powershell
 # Setup installer (recommended)
-Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.2-windows-x64-setup.exe" -OutFile "$env:USERPROFILE\Downloads\Kuiqr-setup.exe"; Start-Process "$env:USERPROFILE\Downloads\Kuiqr-setup.exe"
+Invoke-WebRequest -Uri "https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.3-windows-x64-setup.exe" -OutFile "$env:USERPROFILE\Downloads\Kuiqr-setup.exe"; Start-Process "$env:USERPROFILE\Downloads\Kuiqr-setup.exe"
 ```
 
 A **portable** `.exe` and a `.zip` are also on the release page if you'd rather not run an installer. Windows SmartScreen may warn on first launch (the app is unsigned) — click **More info → Run anyway**. You only see this once.
@@ -75,15 +75,15 @@ A **portable** `.exe` and a `.zip` are also on the release page if you'd rather 
 
 ```bash
 # x64 AppImage
-curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.2-linux-x86_64.AppImage -o ~/Downloads/Kuiqr.AppImage && chmod +x ~/Downloads/Kuiqr.AppImage && ~/Downloads/Kuiqr.AppImage
+curl -L https://github.com/LarryXu2014/Kuiqr/releases/latest/download/Kuiqr-2.4.2.5.3-linux-x86_64.AppImage -o ~/Downloads/Kuiqr.AppImage && chmod +x ~/Downloads/Kuiqr.AppImage && ~/Downloads/Kuiqr.AppImage
 ```
 
-`.deb` packages (`Kuiqr-2.4.2.5.2-linux-{amd64,arm64}.deb`) are on the release page for Debian/Ubuntu. On GNOME, install the [AppIndicator](https://extensions.gnome.org/extension/615/appindicator-support/) extension if the tray icon doesn't appear.
+`.deb` packages (`Kuiqr-2.4.2.5.3-linux-{amd64,arm64}.deb`) are on the release page for Debian/Ubuntu. On GNOME, install the [AppIndicator](https://extensions.gnome.org/extension/615/appindicator-support/) extension if the tray icon doesn't appear.
 </details>
 
 ### Browser Extension (Chrome / Edge / Brave / Firefox)
 
-1. Download `kuiqr-extension-2.4.2.5.2.zip` (or `kuiqr-firefox-2.4.2.5.2.zip`) from the [latest release](https://github.com/LarryXu2014/Kuiqr/releases/latest) and unzip it
+1. Download `kuiqr-extension-2.4.2.5.3.zip` (or `kuiqr-firefox-2.4.2.5.3.zip`) from the [latest release](https://github.com/LarryXu2014/Kuiqr/releases/latest) and unzip it
 2. **Chrome / Edge / Brave:** open `chrome://extensions` → enable **Developer mode** (top-right) → **Load unpacked** → select the unzipped folder
 3. **Firefox:** open `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → pick `manifest.json` inside the unzipped folder
 4. Open the extension popup, click **Record**, and press your shortcut (default **Cmd+Shift+Y** / **Ctrl+Shift+Y**)

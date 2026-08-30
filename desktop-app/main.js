@@ -55,7 +55,7 @@ const isWin = process.platform === "win32";
 // build.buildVersion and the GitHub tag each release) BEFORE the npm `version` field.
 // The npm `version` is only the 3-part semver ("2.4.1") and would otherwise make every
 // built app report as 2.4.1 and always think it is outdated.
-const FALLBACK_RELEASE_VERSION = "2.4.2.5.2";
+const FALLBACK_RELEASE_VERSION = "2.4.2.5.3";
 const RELEASE_VERSION = (() => {
   try {
     const pkg = require("./package.json");
